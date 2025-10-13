@@ -41,6 +41,8 @@ tags
 .history
 .ionide
 
+*.pdf
+
 cgi_tester
 tester
 ubuntu_cgi_tester
