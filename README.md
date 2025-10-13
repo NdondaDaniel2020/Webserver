@@ -36,7 +36,8 @@ Este projeto faz parte de um exercício de aprofundamento em **programação de 
 ```bash
 webserver/
 ├── src/              # Código-fonte principal (classes e lógica do servidor)
-├── includes/         # Arquivos de cabeçalho (.hpp)
+├── docs/             # Arquivos de Documentação do projeto
+├── include/          # Arquivos de cabeçalho (.hpp)
 ├── config/           # Arquivo(s) de configuração do servidor
 ├── www/              # Diretório raiz dos arquivos servidos
 ├── tests/            # Casos de teste e scripts de validação
