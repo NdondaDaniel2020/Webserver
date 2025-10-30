@@ -34,15 +34,71 @@ Este projeto faz parte de um exercício de aprofundamento em **programação de 
 ## 📁 Estrutura do Projeto
 
 ```bash
-webserver/
-├── src/              # Código-fonte principal (classes e lógica do servidor)
-├── docs/             # Arquivos de Documentação do projeto
-├── include/          # Arquivos de cabeçalho (.hpp)
-├── config/           # Arquivo(s) de configuração do servidor
-├── www/              # Diretório raiz dos arquivos servidos
-├── tests/            # Casos de teste e scripts de validação
-├── Makefile          # Automação de compilação
-└── README.md         # Documentação do projeto
+webserv/
+│── Makefile                # Automação de compilação
+│── README.md               # Documentação do projeto
+│── config/                 # Arquivo(s) de configuração do servidor
+│   ├── default.conf        # Arquivo de configuração padrão
+│   └── examples/           # Exemplos de configs adicionais
+│
+│── src/                    # Código fonte (C++)
+│   ├── main.cpp            # Ponto de entrada
+│   ├── server/             # Lógica do servidor
+│   │   ├── Server.cpp
+│   │   ├── Client.cpp
+│   │   └── PollManager.cpp
+│   │
+│   ├── http/               # Camada HTTP (parser e respostas)
+│   │   ├── Request.cpp
+│   │   ├── Response.cpp
+│   │   ├── StatusCodes.cpp
+│   │   └── Headers.cpp
+│   │
+│   ├── config/             # Parser do arquivo de configuração
+│   │   ├── ConfigParser.cpp
+│   │   └── ConfigData.cpp
+│   │
+│   ├── cgi/                # Módulo CGI
+│   │   ├── CGIHandler.cpp
+│   │   └── EnvBuilder.cpp
+│   │
+│   └── utils/              # Funções auxiliares
+│       ├── Logger.cpp
+│       └── FileUtils.cpp
+│
+│── include/                # Headers (.hpp ou .h)
+│   ├── Server.hpp
+│   ├── Client.hpp
+│   ├── PollManager.hpp
+│   ├── Request.hpp
+│   ├── Response.hpp
+│   ├── StatusCodes.hpp
+│   ├── Headers.hpp
+│   ├── ConfigParser.hpp
+│   ├── ConfigData.hpp
+│   ├── CGIHandler.hpp
+│   ├── EnvBuilder.hpp
+│   ├── Logger.hpp
+│   └── FileUtils.hpp
+│
+│── www/                    # Conteúdo servido pelo servidor
+│   ├── index.html
+│   ├── errors/
+│   │   ├── 404.html
+│   │   └── 500.html
+│   ├── uploads/            # Pasta de uploads
+│   └── cgi-bin/            # Scripts CGI (ex.: .php, .py)
+│
+│── tests/                  # Testes manuais e automáticos
+│   ├── test_requests.http  # Arquivo com requests para curl/httpie
+│   ├── test_upload.py      # Script para testar upload
+│   ├── stress_test.py      # Stress test (múltiplas conexões)
+│   └── unit/               # Se quiser unit tests em C++
+│
+└── docs/                   # Documentação
+    ├── RFC_notes.md        # Notas de estudo HTTP
+    └── design.md           # Arquitetura e decisões do projeto
+
 ```
 
 ---
