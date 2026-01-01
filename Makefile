@@ -25,7 +25,8 @@ SRCDIR		= src
 # Arquivos existentes atualmente
 SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/server/Server.cpp \
-			  $(SRCDIR)/utils/FileUtils.cpp
+			  $(SRCDIR)/utils/FileUtils.cpp \
+			  $(SRCDIR)/config/ConfigParser.cpp
 # Arquivos futuros (descomente conforme forem sendo criados)
 # SOURCES	+= $(SRCDIR)/server/Client.cpp \
 #			  $(SRCDIR)/server/PollManager.cpp \
@@ -46,7 +47,8 @@ OBJECTS		= $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 
 # Headers existentes atualmente
 HEADERS		= include/Server.hpp \
-			  include/FileUtils.hpp
+			  include/FileUtils.hpp \
+			  include/ConfigParser.hpp \
 # Headers futuros (descomente conforme forem sendo criados)
 # HEADERS	+= include/Client.hpp \
 #			  include/PollManager.hpp \

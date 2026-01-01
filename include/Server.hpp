@@ -23,20 +23,27 @@
 # include <sys/epoll.h>
 # include <arpa/inet.h>
 # include "FileUtils.hpp"
+# include "ConfigParser.hpp"
 
-
+struct HttpRequest
+{
+    std::string method;
+    std::string path;
+    std::string version;
+};
 
 class Server
 {
     private:
         int         server_fd;
-        int         port;
         sockaddr_in addr;
         int         epoll_fd;
         epoll_event list_events[64];
+        HttpRequest req;
+        ServerConfig config;
 
     public:
-        Server(int port);
+        Server(const ServerConfig& config);
         ~Server();
 
         void start();
@@ -48,6 +55,8 @@ class Server
         void handleEvents(); // Lidar com Eventos
         int  handleNewConnection(); // Lidar com Nova Conexão
         void handleClientData(int client_fd); // Lidar com Dados do Cliente
+        HttpRequest parseHttpRequest(const std::string& raw_request);
+        std::string buildHttpResponse(const HttpRequest& req); 
 };
 
 #endif

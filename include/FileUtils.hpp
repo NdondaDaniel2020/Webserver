@@ -15,10 +15,12 @@
 # define FILEUTILS_HPP
 # include <iostream>
 # include <sstream>
+# include <fstream>
 # include <cstring>
 # include <errno.h>
 # include <string>
 
 std::string create_error_message(const std::string& error);
+std::string readFile(const std::string& filepath);
 
 #endif

@@ -18,3 +18,16 @@ std::string create_error_message(const std::string& error)
     oss << error << " - " << strerror(errno);
     return oss.str();
 }
+
+std::string readFile(const std::string& filepath)
+{
+    std::ifstream file(filepath.c_str());
+    if (!file.is_open())
+        return "";
+    
+    std::ostringstream buffer;
+    buffer << file.rdbuf();
+    file.close();
+    
+    return buffer.str();
+}
