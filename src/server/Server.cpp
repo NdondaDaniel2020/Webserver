@@ -136,6 +136,15 @@ void Server::handleClientData(int client_fd) // Lidar com Dados do Cliente
     buf[r] = '\0';
     std::cout << "[fd " << client_fd << "] disse: " << buf;
 
+    // ---------- Enviar Resposta HTTP Válida ----------
+    std::string response = "HTTP/1.1 200 OK\r\n";
+    response += "Content-Type: text/html; charset=UTF-8\r\n";
+    response += "Content-Length: 34\r\n";
+    response += "Connection: close\r\n";
+    response += "\r\n";
+    response += "<html><body>Hello World!</body></html>";
+    write(client_fd, response.c_str(), response.size());
+
     // ---------- 7. Ecoar de volta ----------
     write(client_fd, buf, r);
     // close(client_fd);
