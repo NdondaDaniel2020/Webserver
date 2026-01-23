@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2025/11/04 12:58:34 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/01/23 11:25:27 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -135,6 +135,7 @@ void Server::handleClientData(int client_fd) // Lidar com Dados do Cliente
     close(client_fd);
     epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, client_fd, NULL);
 }
+
 
 HttpRequest Server::parseHttpRequest(const std::string& raw_request)
 {

@@ -80,8 +80,8 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         std::string key, value;
         iss >> key;
         std::getline(iss, value);
-        
-        if (key == "port")
+
+        if (key == "listen")
         {
             server.port = atoi(trim(value).c_str());
         }
