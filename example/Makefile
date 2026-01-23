@@ -28,9 +28,11 @@ TEST15 = rede_sockets_avanCado_3.cpp
 TEST16 = rede_sockets_avanCado_4.cpp
 TEST17 = sinais_e_processos.cpp
 TEST18 = sistema_de_arquivos_e_acesso.cpp
+TEST19 = zbase_do_servidor_1.cpp
+TEST20 = zbase_do_servidor_2.cpp
 
 # Targets para cada teste
-.PHONY: all clean help 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18
+.PHONY: all clean help 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20
 
 # Target padrão
 all: help
@@ -58,7 +60,8 @@ help:
 	@echo "  16 - rede_sockets_avanCado_4"
 	@echo "  17 - sinais_e_processos"
 	@echo "  18 - sistema_de_arquivos_e_acesso"
-	@echo ""
+	@echo "  19 - zbase_do_servidor_1"
+	@echo "  20 - zbase_do_servidor_2"
 	@echo "Exemplo: make 1"
 	@echo "         make clean"
 
@@ -202,6 +205,14 @@ $(BINDIR)/test17: $(SRCDIR)/$(TEST17)
 18: $(BINDIR)/test18
 	@echo "=== Executando Teste 18: sistema_de_arquivos_e_acesso ==="
 	./$(BINDIR)/test18
+
+19: $(BINDIR)/test19
+	@echo "=== Executando Teste 19: zbase_do_servidor_1 ==="
+	./$(BINDIR)/test19
+
+20: $(BINDIR)/test20
+	@echo "=== Executando Teste 20: zbase_do_servidor_2 ==="
+	./$(BINDIR)/test20
 
 $(BINDIR)/test18: $(SRCDIR)/$(TEST18)
 	$(CXX) $(CXXFLAGS) -o $@ $<
