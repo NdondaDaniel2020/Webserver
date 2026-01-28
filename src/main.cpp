@@ -32,7 +32,6 @@ int main(int argc, char **argv)
 
         int list_server = parser.getServerCount();
         ServerConfig list_server_config[list_server];
-
         std::cout << std::endl << "Number of servers configured: " << list_server << std::endl;
         for (int i = 0; i < list_server; i++)
         {

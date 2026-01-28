@@ -1,4 +1,3 @@
-
 #ifndef CONFIG_PARSER_HPP
 # define CONFIG_PARSER_HPP
 
@@ -10,6 +9,7 @@
 # include <stdexcept>
 # include <algorithm>
 # include <iostream>
+# include "StringUtils.hpp"
 
 struct LocationConfig {
     std::string path;
@@ -48,8 +48,17 @@ class ConfigParser {
 
     private:
         std::vector<ServerConfig> servers;
-        std::string trim(const std::string& str);
         void parseServerBlock(std::ifstream& file, ServerConfig& server);
+        void parseLocationBlock(std::ifstream& file, LocationConfig& location);
+
+        // Generic parsing helpers
+        void parseRoot(const std::string& value, std::string& root);
+        void parseIndex(const std::string& value, std::vector<std::string>& index_files);
+        void parseClientMaxBodySize(const std::string& value, size_t& max_body_size);
+        void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages);
+        void parseAutoIndex(const std::string& value, bool& autoindex);
+        void parseRedirect(const std::string& value, int& code, std::string& url); // Example for location return
+
 
     public:
         ConfigParser();
