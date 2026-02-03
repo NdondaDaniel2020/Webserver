@@ -6,7 +6,7 @@
 #    By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 10:11:23 by nmatondo          #+#    #+#              #
-#    Updated: 2025/11/04 12:46:58 by nmatondo         ###   ########.fr        #
+#    Updated: 2026/02/03 07:51:33 by nmatondo         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -39,6 +39,8 @@ SOURCES		= $(SRCDIR)/main.cpp \
 #			  $(SRCDIR)/config/ConfigParser.cpp \
 #			  $(SRCDIR)/config/ConfigData.cpp \
 #			  $(SRCDIR)/cgi/CGIHandler.cpp \
+
+OBJECTS		= $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 
 # ================================= HEADERS ================================== #
 
