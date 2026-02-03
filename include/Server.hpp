@@ -6,13 +6,12 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2025/11/04 12:57:16 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/03 12:06:48 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #ifndef SERVER_HPP
 # define SERVER_HPP
-
 # include <cerrno>
 # include <cstdio>
 # include <unistd.h>
@@ -24,39 +23,29 @@
 # include <arpa/inet.h>
 # include "FileUtils.hpp"
 # include "ConfigParser.hpp"
-
-struct HttpRequest
-{
-    std::string method;
-    std::string path;
-    std::string version;
-};
+# include "Response.hpp"
 
 class Server
 {
     private:
-        int         server_fd;
-        sockaddr_in addr;
-        int         epoll_fd;
-        epoll_event list_events[64];
-        HttpRequest req;
-        ServerConfig config;
+        int* ports;
+        int epoll_fd;
+        int* servers;
+        int port_count;
+        epoll_event events[64];
 
     public:
-        Server(const ServerConfig& config);
+        Server(const ConfigParser& config);
         ~Server();
-
+        Server(const Server& other);
+        Server& operator=(const Server& other);
         void start();
         void stop();
 
     private:
-        void setupSocket(); // Configurar Socket
-        void setupEpoll(); // Configurar Epoll
-        void handleEvents(); // Lidar com Eventos
-        int  handleNewConnection(); // Lidar com Nova Conexão
-        void handleClientData(int client_fd); // Lidar com Dados do Cliente
-        HttpRequest parseHttpRequest(const std::string& raw_request);
-        std::string buildHttpResponse(const HttpRequest& req); 
+        int createServerSocket(int port);
+        void newConnection(int fd);
+        void handleClientData(int fd);
 };
 
 #endif
