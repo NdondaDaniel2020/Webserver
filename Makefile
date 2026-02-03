@@ -6,7 +6,7 @@
 #    By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 10:11:23 by nmatondo          #+#    #+#              #
-#    Updated: 2026/02/03 07:51:33 by nmatondo         ###   ########.fr        #
+#    Updated: 2026/02/03 12:08:54 by nmatondo         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -27,7 +27,8 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/server/Server.cpp \
 			  $(SRCDIR)/utils/FileUtils.cpp \
 			  $(SRCDIR)/config/ConfigParser.cpp \
-			  $(SRCDIR)/utils/StringUtils.cpp
+			  $(SRCDIR)/utils/StringUtils.cpp \
+			  $(SRCDIR)/http/Response.cpp
 
 # Arquivos futuros (descomente conforme forem sendo criados)
 # SOURCES	+= $(SRCDIR)/server/Client.cpp \
@@ -48,7 +49,8 @@ OBJECTS		= $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 HEADERS		= include/Server.hpp \
 			  include/FileUtils.hpp \
 			  include/ConfigParser.hpp \
-			  include/StringUtils.hpp
+			  include/StringUtils.hpp \
+			  include/Response.hpp
 # Headers futuros (descomente conforme forem sendo criados)
 # HEADERS	+= include/Client.hpp \
 #			  include/PollManager.hpp \
