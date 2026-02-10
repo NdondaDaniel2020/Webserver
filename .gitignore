@@ -43,6 +43,7 @@ tags
 .ionide
 
 *.pdf
+*.o
 
 cgi_tester
 tester

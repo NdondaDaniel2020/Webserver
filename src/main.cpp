@@ -10,12 +10,6 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <fcntl.h>
-#include <cstring>
-#include <iostream>
-#include <unistd.h>
-#include <sys/epoll.h>
-#include <netinet/in.h>
 #include "Server.hpp"
 
 int main(int argc, char **argv)
