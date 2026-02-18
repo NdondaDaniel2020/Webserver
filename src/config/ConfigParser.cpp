@@ -1,5 +1,6 @@
 
 # include "../../include/ConfigParser.hpp"
+# include "../../include/ConfigHelper.hpp"
 
 ConfigParser::ConfigParser() 
 {
@@ -68,14 +69,14 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
             line.erase(line.size() - 1);
         
         std::string key, value;
-        extractKeyValue(line, key, value);
+        ConfigHelper::extractKeyValue(line, key, value);
 
         if (key == "listen")
             server.port = atoi(StringUtils::trim(value).c_str());
         else if (key == "server_name")
             server.server_name = StringUtils::trim(value);
         else if (key == "error_page")
-            parseErrorPage(value, server.error_pages);
+            ConfigHelper::parseErrorPage(value, server.error_pages);
         else if (key == "location")
         {
             LocationConfig location;
@@ -92,7 +93,7 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
             server.locations.push_back(location);
         }
         else
-            parseCommonConfig(key, value, server);
+            ConfigHelper::parseCommonConfig(key, value, server);
     }
 }
 
@@ -114,14 +115,14 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
             line.erase(line.size() - 1);
         
         std::string key, value;
-        extractKeyValue(line, key, value);
+        ConfigHelper::extractKeyValue(line, key, value);
 
         if (key == "autoindex")
-            parseAutoIndex(value, location.autoindex);
+            ConfigHelper::parseAutoIndex(value, location.autoindex);
         else if (key == "return")
-            parseRedirect(value, location.redirect_code, location.redirect_url);
+            ConfigHelper::parseRedirect(value, location.redirect_code, location.redirect_url);
         else
-            parseCommonConfig(key, value, location);
+            ConfigHelper::parseCommonConfig(key, value, location);
     }
 }
 

@@ -52,22 +52,6 @@ class ConfigParser
         void parseServerBlock(std::ifstream& file, ServerConfig& server);
         void parseLocationBlock(std::ifstream& file, LocationConfig& location);
         
-        // Generic parsing for shared config between server and location (overloaded)
-        void parseCommonConfig(const std::string& key, const std::string& value, ServerConfig& server);
-        void parseCommonConfig(const std::string& key, const std::string& value, LocationConfig& location);
-
-        // Generic parsing helpers
-        void parseRoot(const std::string& value, std::string& root);
-        void parseAutoIndex(const std::string& value, bool& autoindex);
-        void parseRedirect(const std::string& value, int& code, std::string& url);
-        void parseClientMaxBodySize(const std::string& value, size_t& max_body_size);
-        void parseIndex(const std::string& value, std::vector<std::string>& index_files);
-        void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages);
-        
-        // Generic extractors
-        void extractKeyValue(const std::string& line, std::string& key, std::string& value);
-        void extractTwoValues(const std::string& input, std::string& first, std::string& second);
-        
     public:
         ConfigParser();
         ~ConfigParser();
