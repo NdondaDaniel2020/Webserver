@@ -12,10 +12,8 @@
 
 #include "Response.hpp"
 
-Response::Response(const std::string &request)
+Response::Response(const std::string &request, const ServerConfig& config) : config(config)
 {
-    this->root = "www";
-    this->error_pages["404"] = "/errors/404.html";
     buildHttpResponse(parseHttpRequest(request));
 }
 
@@ -33,6 +31,7 @@ Response &Response::operator=(const Response &other)
     if (this != &other)
     {
         this->response_str = other.response_str;
+        this->config = other.config;
     }
     return *this;
 }
@@ -48,6 +47,7 @@ HttpRequest Response::parseHttpRequest(const std::string &raw_request)
     std::istringstream stream(raw_request);
     std::string line;
     
+    std::cout << "[RAW REQUEST]\n" << raw_request << std::endl;
     // Parsear primeira linha: GET /index.html HTTP/1.1
     if (std::getline(stream, line))
     {
@@ -73,7 +73,7 @@ HttpRequest Response::parseHttpRequest(const std::string &raw_request)
 void Response::buildHttpResponse(const HttpRequest& request)
 {
     // Construir caminho completo: root + req.path
-    std::string file_path = this->root + request.path;
+    std::string file_path = this->config.root + request.path;
     
     std::cout << "[FILE] Tentando ler: " << file_path << std::endl;
     
@@ -95,9 +95,9 @@ void Response::httpFileNotFound(const std::string& content, const std::string& f
     
     // Buscar página de erro 404 personalizada
     std::string error_page_404;
-    std::map<std::string, std::string>::const_iterator it = this->error_pages.find("404");
-    if (it != this->error_pages.end())
-        error_page_404 = this->root + it->second;
+    std::map<std::string, std::string>::const_iterator it = this->config.error_pages.find("404");
+    if (it != this->config.error_pages.end())
+        error_page_404 = this->config.root + it->second;
     
     std::string final_content = content;
     if (!error_page_404.empty())

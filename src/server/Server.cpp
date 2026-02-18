@@ -12,7 +12,7 @@
 
 #include "Server.hpp"
 
-Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
+Server::Server(const ConfigParser& config) : port_count(config.getServerCount()), config(config)
 {
     // ---------- Portas ----------
     this->ports = new int[this->port_count];
@@ -22,7 +22,8 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
 
     // ---------- Criar epoll ----------
     this->epoll_fd = epoll_create(1);
-    if (this->epoll_fd < 0) { perror("epoll_create");}
+    if (this->epoll_fd < 0) 
+        perror("epoll_create");
 
     // ---------- Criar sockets servidores ----------
     this->servers = new int[this->port_count];
@@ -77,7 +78,8 @@ void Server::start()
         int n = epoll_wait(this->epoll_fd, this->events, 64, -1);
         if (n < 0) { perror("epoll_wait"); break; }
 
-        for (int i = 0; i < n; i++) {
+        for (int i = 0; i < n; i++)
+        {
             int fd = this->events[i].data.fd;
 
             bool is_server = false;
@@ -159,11 +161,11 @@ void Server::handleClientData(int fd)
         std::cout << "[-] Cliente desconectado fd=" << fd << std::endl;
         close(fd);
         epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-        return;
+        return ;
     }
 
     buf[r] = '\0';
-    std::string response = Response(buf).getResponseHttp();
+    std::string response = Response(buf, this->config.getServerConfig(0)).getResponseHttp();
     write(fd, response.c_str(), response.size());
     close(fd);
     epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);

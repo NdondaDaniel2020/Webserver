@@ -28,20 +28,20 @@ struct HttpRequest
 class Response
 {
     private:
-        std::string root;
         std::string response_str;
-        std::map<std::string, std::string> error_pages;
+        ServerConfig config;
 
     public:
+        Response(const std::string& request, const ServerConfig& config);
         ~Response();
-        std::string getResponseHttp();
         Response(const Response& other);
-        Response(const std::string& request);
         Response& operator=(const Response& other);
+        
+        std::string getResponseHttp();
 
     private:
-        void buildHttpResponse(const HttpRequest& request);
         HttpRequest parseHttpRequest(const std::string& raw_request);
+        void buildHttpResponse(const HttpRequest& request);
         void httpFileFound(const std::string& content, const std::string& file_path);
         void httpFileNotFound(const std::string& content, const std::string& file_path);
 };

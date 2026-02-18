@@ -34,20 +34,21 @@ class Server
         int* servers;
         int port_count;
         epoll_event events[64];
+        ConfigParser config;
 
     public:
+        Server(const ConfigParser& config);
         ~Server();
         Server(const Server& other);
-        Server(const ConfigParser& config);
         Server& operator=(const Server& other);
-
-        void stop();
+        
         void start();
+        void stop();
 
     private:
+        int createServerSocket(int port);
         void newConnection(int fd);
         void handleClientData(int fd);
-        int createServerSocket(int port);
 };
 
 #endif
