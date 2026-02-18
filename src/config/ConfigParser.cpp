@@ -14,17 +14,14 @@ size_t ConfigParser::getServerCount() const
     return servers.size();
 }
 
+
+
 bool ConfigParser::loadFromFile(const std::string& filename) 
 {
-    std::ifstream file(filename.c_str());
-
-    if (!file.is_open())
-    {
-        throw std::runtime_error("Error: Could not open config file: " + filename);
-        return (false);
-    }
-    
     std::string line;
+    std::ifstream file;
+
+    openFile(file, filename, ERROR_OPENING_FILE);
     while (std::getline(file, line))
     {
         line = StringUtils::trim(line);

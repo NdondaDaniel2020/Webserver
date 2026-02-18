@@ -10,6 +10,7 @@
 # include <algorithm>
 # include <iostream>
 # include "StringUtils.hpp"
+# include "FileUtils.hpp"
 
 struct LocationConfig {
     std::string path;

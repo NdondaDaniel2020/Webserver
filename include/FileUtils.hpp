@@ -20,7 +20,10 @@
 # include <errno.h>
 # include <string>
 
-std::string create_error_message(const std::string& error);
+# define ERROR_OPENING_FILE "Error: Could not open file"
+
 std::string readFile(const std::string& filepath);
+std::string create_error_message(const std::string& error);
+void openFile(std::ifstream& file, const std::string& filename, std::string sms);
 
 #endif

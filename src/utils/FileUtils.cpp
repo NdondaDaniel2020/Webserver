@@ -31,3 +31,12 @@ std::string readFile(const std::string& filepath)
     
     return buffer.str();
 }
+
+void openFile(std::ifstream& file, const std::string& filename, std::string sms)
+{
+    file.open(filename.c_str());
+
+    if (!file.is_open()) {
+        throw std::runtime_error(sms + filename);
+    }
+}
