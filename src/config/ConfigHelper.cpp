@@ -1,12 +1,5 @@
 # include "../../include/ConfigParser.hpp"
 
-ServerConfig ConfigParser::getServerConfig(size_t index) const
-{
-    if (index < servers.size())
-        return servers[index];
-    return ServerConfig();
-}
-
 void ConfigParser::parseRoot(const std::string& value, std::string& root)
 {
     root = StringUtils::trim(value);
@@ -50,4 +43,24 @@ void ConfigParser::parseRedirect(const std::string& value, int& code, std::strin
 {
     std::istringstream iss(StringUtils::trim(value));
     iss >> code >> url;
+}
+
+void ConfigParser::parseCommonConfig(const std::string& key, const std::string& value, ServerConfig& server)
+{
+    if (key == "root")
+        parseRoot(value, server.root);
+    else if (key == "index")
+        parseIndex(value, server.index_files);
+    else if (key == "client_max_body_size")
+        parseClientMaxBodySize(value, server.client_max_body_size);
+}
+
+void ConfigParser::parseCommonConfig(const std::string& key, const std::string& value, LocationConfig& location)
+{
+    if (key == "root")
+        parseRoot(value, location.root);
+    else if (key == "index")
+        parseIndex(value, location.index_files);
+    else if (key == "client_max_body_size")
+        parseClientMaxBodySize(value, location.client_max_body_size);
 }

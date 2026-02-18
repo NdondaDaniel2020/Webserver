@@ -51,6 +51,10 @@ class ConfigParser {
         std::vector<ServerConfig> servers;
         void parseServerBlock(std::ifstream& file, ServerConfig& server);
         void parseLocationBlock(std::ifstream& file, LocationConfig& location);
+        
+        // Generic parsing for shared config between server and location (overloaded)
+        void parseCommonConfig(const std::string& key, const std::string& value, ServerConfig& server);
+        void parseCommonConfig(const std::string& key, const std::string& value, LocationConfig& location);
 
         // Generic parsing helpers
         void parseRoot(const std::string& value, std::string& root);
