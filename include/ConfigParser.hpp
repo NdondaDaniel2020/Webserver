@@ -45,8 +45,8 @@ struct ServerConfig {
                      client_max_body_size(0) {}
 };
 
-class ConfigParser {
-
+class ConfigParser
+{
     private:
         std::vector<ServerConfig> servers;
         void parseServerBlock(std::ifstream& file, ServerConfig& server);
@@ -64,13 +64,17 @@ class ConfigParser {
         void parseIndex(const std::string& value, std::vector<std::string>& index_files);
         void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages);
         
+        // Generic extractors
+        void extractKeyValue(const std::string& line, std::string& key, std::string& value);
+        void extractTwoValues(const std::string& input, std::string& first, std::string& second);
+        
     public:
         ConfigParser();
         ~ConfigParser();
 
+        size_t getServerCount() const;
         bool loadFromFile(const std::string& filename);
         ServerConfig getServerConfig(size_t index) const;
-        size_t getServerCount() const;
 };
 
 

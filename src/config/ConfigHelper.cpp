@@ -23,9 +23,7 @@ void ConfigParser::parseErrorPage(const std::string& value, std::map<std::string
 {
     std::string code;
     std::string path;
-    std::istringstream evs(StringUtils::trim(value));
-
-    evs >> code >> path;
+    extractTwoValues(value, code, path);
     error_pages[code] = path;
 }
 
@@ -41,8 +39,9 @@ void ConfigParser::parseAutoIndex(const std::string& value, bool& autoindex)
 
 void ConfigParser::parseRedirect(const std::string& value, int& code, std::string& url)
 {
-    std::istringstream iss(StringUtils::trim(value));
-    iss >> code >> url;
+    std::string code_str;
+    extractTwoValues(value, code_str, url);
+    code = atoi(code_str.c_str());
 }
 
 void ConfigParser::parseCommonConfig(const std::string& key, const std::string& value, ServerConfig& server)
@@ -63,4 +62,17 @@ void ConfigParser::parseCommonConfig(const std::string& key, const std::string& 
         parseIndex(value, location.index_files);
     else if (key == "client_max_body_size")
         parseClientMaxBodySize(value, location.client_max_body_size);
+}
+
+void ConfigParser::extractKeyValue(const std::string& line, std::string& key, std::string& value)
+{
+    std::istringstream iss(line);
+    iss >> key;
+    std::getline(iss, value);
+}
+
+void ConfigParser::extractTwoValues(const std::string& input, std::string& first, std::string& second)
+{
+    std::istringstream iss(StringUtils::trim(input));
+    iss >> first >> second;
 }

@@ -62,15 +62,13 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
             continue;
         
         if (line == "}")
-            break;
+            break ;
 
         if (!line.empty() && line[line.size() - 1] == ';')
             line.erase(line.size() - 1);
         
-        std::istringstream iss(line);
         std::string key, value;
-        iss >> key;
-        std::getline(iss, value);
+        extractKeyValue(line, key, value);
 
         if (key == "listen")
             server.port = atoi(StringUtils::trim(value).c_str());
@@ -115,10 +113,8 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
         if (!line.empty() && line[line.size() - 1] == ';')
             line.erase(line.size() - 1);
         
-        std::istringstream iss(line);
         std::string key, value;
-        iss >> key;
-        std::getline(iss, value);
+        extractKeyValue(line, key, value);
 
         if (key == "autoindex")
             parseAutoIndex(value, location.autoindex);
