@@ -20,6 +20,7 @@ bool ConfigParser::loadFromFile(const std::string& filename)
 {
     std::string line;
     std::ifstream file;
+    ServerConfig config;
 
     openFile(file, filename, ERROR_OPENING_FILE);
     while (std::getline(file, line))
@@ -31,14 +32,11 @@ bool ConfigParser::loadFromFile(const std::string& filename)
         
         if (line.find("server") != std::string::npos && line.find("{") != std::string::npos)
         {
-            ServerConfig config;
             parseServerBlock(file, config);
             servers.push_back(config);
         }
     }
-
     file.close();
-
     if (servers.empty())
     {
         throw std::runtime_error("Error: No server configurations found in file: " + filename);
@@ -70,29 +68,17 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         std::getline(iss, value);
 
         if (key == "listen")
-        {
             server.port = atoi(StringUtils::trim(value).c_str());
-        }
         else if (key == "server_name")
-        {
             server.server_name = StringUtils::trim(value);
-        }
         else if (key == "root")
-        {
             parseRoot(value, server.root);
-        }
         else if (key == "error_page")
-        {
             parseErrorPage(value, server.error_pages);
-        }
         else if (key == "index")
-        {
             parseIndex(value, server.index_files);
-        }
         else if (key == "client_max_body_size")
-        {
             parseClientMaxBodySize(value, server.client_max_body_size);
-        }
         else if (key == "location")
         {
             LocationConfig location;
@@ -148,54 +134,3 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
     }
 }
 
-// Generic Helpers
-
-void ConfigParser::parseRoot(const std::string& value, std::string& root)
-{
-    root = StringUtils::trim(value);
-}
-
-void ConfigParser::parseIndex(const std::string& value, std::vector<std::string>& index_files)
-{
-    std::istringstream ivs(StringUtils::trim(value));
-    std::string index_file;
-    while (ivs >> index_file)
-    {
-        index_files.push_back(index_file);
-    }
-}
-
-void ConfigParser::parseClientMaxBodySize(const std::string& value, size_t& max_body_size)
-{
-    max_body_size = StringUtils::parseSize(value);
-}
-
-void ConfigParser::parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages)
-{
-    std::istringstream evs(StringUtils::trim(value));
-    std::string code, path;
-    evs >> code >> path;
-    error_pages[code] = path;
-}
-
-void ConfigParser::parseAutoIndex(const std::string& value, bool& autoindex)
-{
-    std::string val = StringUtils::trim(value);
-    if (val == "on")
-        autoindex = true;
-    else
-        autoindex = false;
-}
-
-void ConfigParser::parseRedirect(const std::string& value, int& code, std::string& url)
-{
-    std::istringstream iss(StringUtils::trim(value));
-    iss >> code >> url;
-}
-
-ServerConfig ConfigParser::getServerConfig(size_t index) const
-{
-    if (index < servers.size())
-        return servers[index];
-    return ServerConfig();
-}
