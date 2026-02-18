@@ -12,6 +12,7 @@
 
 #ifndef SERVER_HPP
 # define SERVER_HPP
+
 # include <cerrno>
 # include <cstdio>
 # include <unistd.h>
@@ -35,17 +36,18 @@ class Server
         epoll_event events[64];
 
     public:
-        Server(const ConfigParser& config);
         ~Server();
         Server(const Server& other);
+        Server(const ConfigParser& config);
         Server& operator=(const Server& other);
-        void start();
+
         void stop();
+        void start();
 
     private:
-        int createServerSocket(int port);
         void newConnection(int fd);
         void handleClientData(int fd);
+        int createServerSocket(int port);
 };
 
 #endif

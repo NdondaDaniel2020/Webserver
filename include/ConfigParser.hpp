@@ -58,13 +58,12 @@ class ConfigParser {
 
         // Generic parsing helpers
         void parseRoot(const std::string& value, std::string& root);
-        void parseIndex(const std::string& value, std::vector<std::string>& index_files);
-        void parseClientMaxBodySize(const std::string& value, size_t& max_body_size);
-        void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages);
         void parseAutoIndex(const std::string& value, bool& autoindex);
-        void parseRedirect(const std::string& value, int& code, std::string& url); // Example for location return
-
-
+        void parseRedirect(const std::string& value, int& code, std::string& url);
+        void parseClientMaxBodySize(const std::string& value, size_t& max_body_size);
+        void parseIndex(const std::string& value, std::vector<std::string>& index_files);
+        void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages);
+        
     public:
         ConfigParser();
         ~ConfigParser();
