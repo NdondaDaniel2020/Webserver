@@ -12,9 +12,9 @@
 
 #include "Response.hpp"
 
-Response::Response(const std::string &request, const ServerConfig& config) : config(config)
+Response::Response(const HttpRequest& request, const ServerConfig& config) : config(config)
 {
-    buildHttpResponse(parseHttpRequest(request));
+    buildHttpResponse(request);
 }
 
 Response::~Response()
@@ -41,39 +41,10 @@ std::string Response::getResponseHttp()
     return this->response_str;
 }
 
-HttpRequest Response::parseHttpRequest(const std::string &raw_request)
-{
-    HttpRequest req;
-    std::istringstream stream(raw_request);
-    std::string line;
-    
-    std::cout << "[RAW REQUEST]\n" << raw_request << std::endl;
-    // Parsear primeira linha: GET /index.html HTTP/1.1
-    if (std::getline(stream, line))
-    {
-        // Remover \r no final
-        if (!line.empty() && line[line.size() - 1] == '\r')
-            line.erase(line.size() - 1);
-        
-        std::istringstream line_stream(line);
-        line_stream >> req.method >> req.path >> req.version;
-        
-        // Se path é "/", usar o index file
-        if (req.path == "/")
-        {
-            req.path = "/index.html";
-        }
-        
-        std::cout << "[REQUEST] " << req.method << " " << req.path << " " << req.version << std::endl;
-    }
-    
-    return req;
-}
-
 void Response::buildHttpResponse(const HttpRequest& request)
 {
-    // Construir caminho completo: root + req.path
-    std::string file_path = this->config.root + request.path;
+    // Construir caminho completo: root + uri
+    std::string file_path = this->config.root + request.getUri();
     
     std::cout << "[FILE] Tentando ler: " << file_path << std::endl;
     

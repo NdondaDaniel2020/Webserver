@@ -17,13 +17,7 @@
 # include <sstream>
 # include "FileUtils.hpp"
 # include "ConfigParser.hpp"
-
-struct HttpRequest
-{
-    std::string path;
-    std::string method;
-    std::string version;
-};
+# include "HttpRequest.hpp"
 
 class Response
 {
@@ -32,7 +26,7 @@ class Response
         ServerConfig config;
 
     public:
-        Response(const std::string& request, const ServerConfig& config);
+        Response(const HttpRequest& request, const ServerConfig& config);
         ~Response();
         Response(const Response& other);
         Response& operator=(const Response& other);
@@ -40,7 +34,6 @@ class Response
         std::string getResponseHttp();
 
     private:
-        HttpRequest parseHttpRequest(const std::string& raw_request);
         void buildHttpResponse(const HttpRequest& request);
         void httpFileFound(const std::string& content, const std::string& file_path);
         void httpFileNotFound(const std::string& content, const std::string& file_path);

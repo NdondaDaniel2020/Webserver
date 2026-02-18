@@ -29,7 +29,8 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/config/ConfigParser.cpp \
 			  $(SRCDIR)/config/ConfigHelper.cpp \
 			  $(SRCDIR)/utils/StringUtils.cpp \
-			  $(SRCDIR)/http/Response.cpp
+			  $(SRCDIR)/http/Response.cpp \
+			  $(SRCDIR)/http/HttpRequest.cpp
 
 # Arquivos futuros (descomente conforme forem sendo criados)
 # SOURCES	+= $(SRCDIR)/server/Client.cpp \

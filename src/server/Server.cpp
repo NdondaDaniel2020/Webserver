@@ -165,7 +165,8 @@ void Server::handleClientData(int fd)
     }
 
     buf[r] = '\0';
-    std::string response = Response(buf, this->config.getServerConfig(0)).getResponseHttp();
+    HttpRequest request = HttpRequest::parse(buf);
+    std::string response = Response(request, this->config.getServerConfig(0)).getResponseHttp();
     write(fd, response.c_str(), response.size());
     close(fd);
     epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
