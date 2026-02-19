@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/03 12:06:48 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/19 12:33:15 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 # include <unistd.h>
 # include <stdexcept>
 # include <exception>
+# include <map>
 # include <sys/socket.h>
 # include <netinet/in.h>
 # include <sys/epoll.h>
@@ -25,6 +26,7 @@
 # include "FileUtils.hpp"
 # include "ConfigParser.hpp"
 # include "Response.hpp"
+# include "Client.hpp"
 
 class Server
 {
@@ -35,6 +37,7 @@ class Server
         int port_count;
         epoll_event events[64];
         ConfigParser config;
+        std::map<int, Client*> clients;  // fd -> Client*
 
     public:
         Server(const ConfigParser& config);
@@ -49,6 +52,8 @@ class Server
         int createServerSocket(int port);
         void newConnection(int fd);
         void handleClientData(int fd);
+        void closeClient(int fd);
+        bool isServerSocket(int fd) const;
 };
 
 #endif

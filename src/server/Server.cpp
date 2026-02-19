@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/03 12:04:41 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/19 13:03:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -40,6 +40,13 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
 
 Server::~Server()
 {
+    // Limpar todos os clientes
+    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); ++it)
+    {
+        delete it->second;
+    }
+    clients.clear();
+    
     delete[] this->ports;
     delete[] this->servers;
 }
@@ -73,6 +80,8 @@ Server& Server::operator=(const Server& other)
 
 void Server::start()
 {
+    std::cout << "Servidor iniciado. Aguardando conexões..." << std::endl;
+    
     while (true)
     {
         int n = epoll_wait(this->epoll_fd, this->events, 64, -1);
@@ -82,17 +91,7 @@ void Server::start()
         {
             int fd = this->events[i].data.fd;
 
-            bool is_server = false;
-            // Verificar se é socket servidor
-            for (int j = 0; j < this->port_count; j++)
-            {
-                if (fd == this->servers[j]) {
-                    is_server = true;
-                    break;
-                }
-            }
-
-            if (is_server)
+            if (isServerSocket(fd))
                 newConnection(fd);  // ---------- Nova conexão ----------
             else
                 handleClientData(fd);  // ---------- Dados de cliente ----------
@@ -145,8 +144,13 @@ void Server::newConnection(int fd)
 
     std::cout << "[+] Cliente conectado fd=" << client_fd << std::endl;
 
+    // Criar objeto Client
+    Client* client = new Client(client_fd, &this->config);
+    this->clients[client_fd] = client;
+
+    // Adicionar ao epoll
     epoll_event cev;
-    cev.events = EPOLLIN;
+    cev.events = EPOLLIN | EPOLLOUT;  // Monitora leitura e escrita
     cev.data.fd = client_fd;
 
     epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, client_fd, &cev);
@@ -154,20 +158,88 @@ void Server::newConnection(int fd)
 
 void Server::handleClientData(int fd)
 {
-    char buf[1024];
-    int r = read(fd, buf, sizeof(buf)-1);
-
-    if (r <= 0) {
-        std::cout << "[-] Cliente desconectado fd=" << fd << std::endl;
-        close(fd);
-        epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
-        return ;
+    // Buscar cliente
+    std::map<int, Client*>::iterator it = this->clients.find(fd);
+    if (it == this->clients.end())
+    {
+        std::cerr << "[ERRO] Cliente fd=" << fd << " não encontrado" << std::endl;
+        closeClient(fd);
+        return;
     }
 
-    buf[r] = '\0';
-    HttpRequest request = HttpRequest::parse(buf);
-    std::string response = Response(request, this->config.getServerConfig(0)).getResponseHttp();
-    write(fd, response.c_str(), response.size());
-    close(fd);
+    Client* client = it->second;
+    
+    // ========== LEITURA ==========
+    if (client->getState() == Client::READING_HEADERS || 
+        client->getState() == Client::READING_BODY)
+    {
+        char buf[4096];
+        int r = read(fd, buf, sizeof(buf));
+        
+        if (r <= 0)
+        {
+            // Cliente desconectou ou erro
+            std::cout << "[-] Cliente desconectado fd=" << fd << std::endl;
+            closeClient(fd);
+            return;
+        }
+        
+        // Adicionar dados ao buffer do cliente
+        client->appendRecvData(buf, r);
+        
+        // Verificar se requisição está completa
+        if (client->isRequestComplete())
+        {
+            // Processar requisição
+            client->processRequest(this->config.getServerConfig(0));
+        }
+    }
+    
+    // ========== ESCRITA ==========
+    if (client->getState() == Client::SENDING_RESPONSE)
+    {
+        if (client->hasDataToSend())
+        {
+            bool finished = client->sendData();
+            
+            if (finished)
+            {
+                // Resposta enviada completamente
+                if (client->isKeepAlive())
+                {
+                    // Reset para próxima requisição
+                    client->reset();
+                }
+                else
+                {
+                    // Fechar conexão
+                    closeClient(fd);
+                }
+            }
+        }
+    }
+}
+
+void Server::closeClient(int fd)
+{
+    std::map<int, Client*>::iterator it = this->clients.find(fd);
+    if (it != this->clients.end())
+    {
+        delete it->second;
+        this->clients.erase(it);
+    }
+    
     epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    close(fd);
+    std::cout << "[-] Cliente fd=" << fd << " fechado" << std::endl;
+}
+
+bool Server::isServerSocket(int fd) const
+{
+    for (int i = 0; i < this->port_count; i++)
+    {
+        if (fd == this->servers[i])
+            return true;
+    }
+    return false;
 }
