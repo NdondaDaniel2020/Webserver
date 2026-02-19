@@ -45,6 +45,8 @@ tags
 *.pdf
 *.o
 
+obj
+obj/*
 cgi_tester
 tester
 ubuntu_cgi_tester
