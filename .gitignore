@@ -52,5 +52,8 @@ tester
 ubuntu_cgi_tester
 ubuntu_tester
 
+# Webserver executable
+webserv
+
 # End of https://www.toptal.com/developers/gitignore/api/vim,visualstudiocode
 
