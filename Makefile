@@ -6,7 +6,7 @@
 #    By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 10:11:23 by nmatondo          #+#    #+#              #
-#    Updated: 2026/02/03 12:08:54 by nmatondo         ###   ########.fr        #
+#    Updated: 2026/02/19 11:55:40 by nmatondo         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -30,11 +30,11 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/config/ConfigHelper.cpp \
 			  $(SRCDIR)/utils/StringUtils.cpp \
 			  $(SRCDIR)/http/Response.cpp \
-			  $(SRCDIR)/http/HttpRequest.cpp
+			  $(SRCDIR)/http/HttpRequest.cpp \
+			  $(SRCDIR)/server/Client.cpp \
 
 # Arquivos futuros (descomente conforme forem sendo criados)
-# SOURCES	+= $(SRCDIR)/server/Client.cpp \
-#			  $(SRCDIR)/server/PollManager.cpp \
+# SOURCES  += $(SRCDIR)/server/PollManager.cpp \
 #			  $(SRCDIR)/http/Request.cpp \
 #			  $(SRCDIR)/http/Response.cpp \
 #			  $(SRCDIR)/http/StatusCodes.cpp \
@@ -52,10 +52,12 @@ HEADERS		= include/Server.hpp \
 			  include/FileUtils.hpp \
 			  include/ConfigParser.hpp \
 			  include/StringUtils.hpp \
-			  include/Response.hpp
+			  include/Response.hpp \
+			  include/HttpRequest.hpp \
+			  include/Client.hpp \
 # Headers futuros (descomente conforme forem sendo criados)
-# HEADERS	+= include/Client.hpp \
-#			  include/PollManager.hpp \
+
+# HEADERS  += include/PollManager.hpp \
 #			  include/Request.hpp \
 #			  include/Response.hpp \
 #			  include/StatusCodes.hpp \
