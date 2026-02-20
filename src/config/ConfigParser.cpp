@@ -38,14 +38,20 @@ bool ConfigParser::loadFromFile(const std::string& filename)
         
         if (line.find("server") != std::string::npos && line.find("{") != std::string::npos)
         {
-            parseServerBlock(file, config);
-            servers.push_back(config);
+            size_t serverPos = line.find("server");
+            size_t bracePos = line.find("{", serverPos);
+            if (bracePos != std::string::npos && serverPos < bracePos)
+            {
+                parseServerBlock(file, config);
+                servers.push_back(config);
+                config = ServerConfig();
+            }
         }
     }
     file.close();
     if (servers.empty())
     {
-        throw std::runtime_error("Error: No server configurations found in file: " + filename);
+        throw std::runtime_error("No server configurations found in file: " + filename);
         return (false);
     }
     return (true);
