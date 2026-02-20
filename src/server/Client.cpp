@@ -112,9 +112,9 @@ bool Client::isRequestComplete()
         {
             parseHeaders();
             
-            // Se não tem body (GET, HEAD, DELETE) ou Content-Length: 0
+            // Se não tem body (GET, POST, DELETE) ou Content-Length: 0
             if (request.getMethod() == "GET" || 
-                request.getMethod() == "HEAD" ||
+                request.getMethod() == "POST" ||
                 request.getMethod() == "DELETE" ||
                 content_length == 0)
             {
