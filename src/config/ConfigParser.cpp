@@ -1,6 +1,7 @@
 
 # include "../../include/ConfigParser.hpp"
 # include "../../include/ConfigHelper.hpp"
+# include    "../../include/ConfigValidator.hpp"
 
 ConfigParser::ConfigParser() 
 {
@@ -70,17 +71,21 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
 
         if (line == "}")
             break ;
+        
+        if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
+            throw std::runtime_error("Missing semicolon: " + line);
 
         if (!line.empty() && line[line.size() - 1] == ';')
             line.erase(line.size() - 1);
-        if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
-            throw std::runtime_error("Missing semicolon: " + line);
         
         std::string key, value;
         ConfigHelper::extractKeyValue(line, key, value);
 
         if (key == "listen")
+        {
+            
             server.port = atoi(StringUtils::trim(value).c_str());
+        }
         else if (key == "server_name")
             server.server_name = StringUtils::trim(value);
         else if (key == "error_page")
@@ -91,13 +96,14 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
             std::string path;
             std::istringstream lss(StringUtils::trim(value));
             lss >> path;
-            
             size_t bracePos = path.find('{');
             if (bracePos != std::string::npos)
-                path = path.substr(0, bracePos);
+            path = path.substr(0, bracePos);
             
             location.path = path;
             parseLocationBlock(file, location);
+            if (!ConfigValidator::validateAllowedMethods(location))
+                std::runtime_error("invalid method");
             server.locations.push_back(location);
         }
         else
@@ -118,7 +124,9 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
         
         if (line == "}")
             break;
-
+        if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
+            throw std::runtime_error("Missing semicolon: " + line);
+        
         if (!line.empty() && line[line.size() - 1] == ';')
             line.erase(line.size() - 1);
         

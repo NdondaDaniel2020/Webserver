@@ -28,6 +28,7 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/utils/FileUtils.cpp \
 			  $(SRCDIR)/config/ConfigParser.cpp \
 			  $(SRCDIR)/config/ConfigHelper.cpp \
+			  $(SRCDIR)/config/ConfigValidator.cpp \
 			  $(SRCDIR)/utils/StringUtils.cpp \
 			  $(SRCDIR)/http/Response.cpp \
 			  $(SRCDIR)/http/HttpRequest.cpp \
@@ -55,7 +56,7 @@ HEADERS		= include/Server.hpp \
 			  include/Response.hpp \
 			  include/HttpRequest.hpp \
 			  include/Client.hpp \
-			  include/configValidator.hpp \
+			  include/ConfigValidator.hpp \
 # Headers futuros (descomente conforme forem sendo criados)
 
 # HEADERS  += include/PollManager.hpp \

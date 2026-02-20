@@ -1,14 +1,14 @@
-# include "../../include/ConfigHelper.hpp"
+#include "../../include/ConfigHelper.hpp"
 
-namespace ConfigHelper 
+namespace ConfigHelper
 {
 
-    void parseRoot(const std::string& value, std::string& root)
+    void parseRoot(const std::string &value, std::string &root)
     {
         root = StringUtils::trim(value);
     }
 
-    void parseIndex(const std::string& value, std::vector<std::string>& index_files)
+    void parseIndex(const std::string &value, std::vector<std::string> &index_files)
     {
         std::string index_file;
         std::istringstream ivs(StringUtils::trim(value));
@@ -17,12 +17,12 @@ namespace ConfigHelper
             index_files.push_back(index_file);
     }
 
-    void parseClientMaxBodySize(const std::string& value, size_t& max_body_size)
+    void parseClientMaxBodySize(const std::string &value, size_t &max_body_size)
     {
         max_body_size = StringUtils::parseSize(value);
     }
 
-    void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages)
+    void parseErrorPage(const std::string &value, std::map<std::string, std::string> &error_pages)
     {
         std::string code;
         std::string path;
@@ -30,7 +30,7 @@ namespace ConfigHelper
         error_pages[code] = path;
     }
 
-    void parseAutoIndex(const std::string& value, bool& autoindex)
+    void parseAutoIndex(const std::string &value, bool &autoindex)
     {
         std::string val = StringUtils::trim(value);
 
@@ -40,7 +40,7 @@ namespace ConfigHelper
             autoindex = false;
     }
 
-    void parseRedirect(const std::string& value, int& code, std::string& url)
+    void parseRedirect(const std::string &value, int &code, std::string &url)
     {
         std::string code_str;
         Detail::extractTwoValues(value, code_str, url);
@@ -55,9 +55,11 @@ namespace ConfigHelper
             parseIndex(value, server.index_files);
         else if (key == "client_max_body_size")
             parseClientMaxBodySize(value, server.client_max_body_size);
+        else
+            std::runtime_error("invalid directive " + key);
     }
 
-    void parseCommonConfig(const std::string& key, const std::string& value, LocationConfig& location)
+    void parseCommonConfig(const std::string &key, const std::string &value, LocationConfig &location)
     {
         if (key == "root")
             parseRoot(value, location.root);
@@ -65,9 +67,17 @@ namespace ConfigHelper
             parseIndex(value, location.index_files);
         else if (key == "client_max_body_size")
             parseClientMaxBodySize(value, location.client_max_body_size);
+        else if (key == "allowed_methods")
+        {
+            std::istringstream iss(StringUtils::trim(value));
+            std::string method;
+            while (iss >> method)
+                location.allowed_methods.push_back(method);
+            
+        }
     }
 
-    void extractKeyValue(const std::string& line, std::string& key, std::string& value)
+    void extractKeyValue(const std::string &line, std::string &key, std::string &value)
     {
         std::istringstream iss(line);
         iss >> key;
@@ -76,7 +86,7 @@ namespace ConfigHelper
 
     namespace Detail
     {
-        void extractTwoValues(const std::string& input, std::string& first, std::string& second)
+        void extractTwoValues(const std::string &input, std::string &first, std::string &second)
         {
             std::istringstream iss(StringUtils::trim(input));
             iss >> first >> second;

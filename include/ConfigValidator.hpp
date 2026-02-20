@@ -2,6 +2,7 @@
 #ifndef CONFIG_VALIDATOR_HPP
 # define CONFIG_VALIDATOR_HPP
 
+# include <sys/stat.h>
 # include "ConfigParser.hpp"
 
 namespace ConfigValidator
