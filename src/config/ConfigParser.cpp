@@ -61,12 +61,14 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
 
         if (line.empty() || line[0] == '#')
             continue;
-        
+
         if (line == "}")
             break ;
 
         if (!line.empty() && line[line.size() - 1] == ';')
             line.erase(line.size() - 1);
+        if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
+            throw std::runtime_error("Missing semicolon: " + line);
         
         std::string key, value;
         ConfigHelper::extractKeyValue(line, key, value);

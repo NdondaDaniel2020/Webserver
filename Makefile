@@ -55,6 +55,7 @@ HEADERS		= include/Server.hpp \
 			  include/Response.hpp \
 			  include/HttpRequest.hpp \
 			  include/Client.hpp \
+			  include/configValidator.hpp \
 # Headers futuros (descomente conforme forem sendo criados)
 
 # HEADERS  += include/PollManager.hpp \
