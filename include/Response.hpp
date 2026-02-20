@@ -22,14 +22,14 @@
 class Response
 {
     private:
-        std::string response_str;
         ServerConfig config;
+        std::string response_str;
 
     public:
-        Response(const HttpRequest& request, const ServerConfig& config);
         ~Response();
         Response(const Response& other);
         Response& operator=(const Response& other);
+        Response(const HttpRequest& request, const ServerConfig& config);
         
         std::string getResponseHttp();
 
