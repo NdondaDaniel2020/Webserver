@@ -27,9 +27,11 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
 
     // ---------- Criar sockets servidores ----------
     this->servers = new int[this->port_count];
-    for (int i = 0; i < this->port_count; i++) {
+    for (int i = 0; i < this->port_count; i++) 
+    {
         this->servers[i] = createServerSocket(this->ports[i]);
-        if (this->servers[i] < 0) return;
+        if (this->servers[i] < 0) 
+            return ;
         epoll_event ev;
         ev.events = EPOLLIN;
         ev.data.fd = this->servers[i];

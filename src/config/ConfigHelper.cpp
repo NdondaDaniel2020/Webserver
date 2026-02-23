@@ -73,7 +73,6 @@ namespace ConfigHelper
             std::string method;
             while (iss >> method)
                 location.allowed_methods.push_back(method);
-            
         }
     }
 
