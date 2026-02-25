@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/03 11:55:43 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/25 15:28:04 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,11 +32,17 @@ class Response
         Response(const HttpRequest& request, const ServerConfig& config);
         
         std::string getResponseHttp();
-
+        
     private:
         void buildHttpResponse(const HttpRequest& request);
-        void httpFileFound(const std::string& content, const std::string& file_path);
-        void httpFileNotFound(const std::string& content, const std::string& file_path);
+        void httpFileFound200(const HttpRequest& request, const std::string& content, const std::string& file_path);
+        void httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path);
+        void methodNotAllowed405(const std::string& file_path);
+        void httpForbidden403(const std::string& file_path);
+
+        void methodGet(const HttpRequest& request, const std::string& file_path);
+        void methodPost(const HttpRequest& request, const std::string& file_path);
+        void methodDelete(const HttpRequest& request, const std::string& file_path);
 };
 
 #endif

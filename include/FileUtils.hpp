@@ -22,6 +22,11 @@
 # include <cstring>
 # include <errno.h>
 # include <string>
+# include <vector>
+# include <sys/stat.h>
+# include <unistd.h>
+# include <limits.h>
+# include <ctime>
 
 # define ERROR_OPENING_FILE "Error: Could not open file"
 
@@ -30,5 +35,24 @@ std::string create_error_message(const std::string& error);
 void openFile(std::ifstream& file, const std::string& filename, std::string sms);
 
 uint32_t ipToHex(const std::string& ip);
+
+// Path manipulation and security
+std::string sanitizePath(const std::string& path);
+std::string normalizePath(const std::string& path);
+bool isPathSafe(const std::string& path, const std::string& root);
+std::string getRealPath(const std::string& path);
+
+// File system checks
+bool fileExists(const std::string& path);
+bool isDirectory(const std::string& path);
+bool isReadable(const std::string& path);
+std::string findIndexFile(const std::string& dir_path, const std::vector<std::string>& index_files);
+
+// MIME types
+std::string getMimeType(const std::string& path);
+
+// HTTP date
+std::string getCurrentHttpDate();
+std::string getFileModifiedDate(const std::string& path);
 
 #endif
