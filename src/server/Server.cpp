@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/19 13:03:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/25 09:40:56 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -119,7 +119,7 @@ int Server::createServerSocket(int port)
     sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_addr.s_addr = INADDR_ANY; // htonl(ipToHex(interface))
     addr.sin_port = htons(port);
 
     if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -134,6 +134,8 @@ int Server::createServerSocket(int port)
         return -1;
     }
 
+    // std::cout << "Servidor ouvindo na porta " << port 
+    //           << " http://"<< interface << ":" << port << std::endl;
     std::cout << "Servidor ouvindo na porta " << port 
               << " http://localhost:" << port << std::endl;
     return server_fd;
