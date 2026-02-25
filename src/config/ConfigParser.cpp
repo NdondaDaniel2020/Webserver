@@ -85,6 +85,8 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
             if (ConfigValidator::validatePort(value))
             {
                 size_t pos = value.find(":");
+                if (value.substr(0, pos).size() == 1)
+                    server.interface = "0.0.0.0";
                 server.interface = value.substr(0, pos);
                 server.port = atoi(StringUtils::trim(value.substr(pos +1)).c_str());
             }
@@ -92,9 +94,19 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
                 throw std::runtime_error("invalid interface:port " + line);
         }
         else if (key == "server_name")
-            server.server_name = StringUtils::trim(value);
+        {
+            if (ConfigValidator::validateServerName(value))
+                server.server_name = StringUtils::trim(value);
+            else 
+                throw std::runtime_error("invalid server name " + line);
+        }
         else if (key == "error_page")
-            ConfigHelper::parseErrorPage(value, server.error_pages);
+        {
+            if (ConfigValidator::validateErrorPages(server.error_pages))
+                ConfigHelper::parseErrorPage(value, server.error_pages);
+            else
+                throw std::runtime_error("invalid error page arguments "+ line );
+        }
         else if (key == "location")
         {
             LocationConfig location;
@@ -123,7 +135,6 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
     while (std::getline(file, line))
     {
         line = StringUtils::trim(line);
-
         if (line.empty() || line[0] == '#')
             continue;
         
@@ -137,11 +148,20 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
         
         std::string key, value;
         ConfigHelper::extractKeyValue(line, key, value);
-
         if (key == "autoindex")
-            ConfigHelper::parseAutoIndex(value, location.autoindex);
+        {
+           if (ConfigValidator::validateAutoIndex(value))
+                ConfigHelper::parseAutoIndex(value, location.autoindex);
+            else
+                throw std::runtime_error("invalid arguments " + line);
+        }
         else if (key == "return")
-            ConfigHelper::parseRedirect(value, location.redirect_code, location.redirect_url);
+        {
+            if (ConfigValidator::validateReturn(value))
+                ConfigHelper::parseRedirect(value, location.redirect_code, location.redirect_url);
+            else
+                throw std::runtime_error("invalid return " + line);
+        }
         else
             ConfigHelper::parseCommonConfig(key, value, location);
     }
