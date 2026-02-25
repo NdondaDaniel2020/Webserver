@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2025/11/03 15:46:01 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/25 09:32:44 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,4 +39,24 @@ void openFile(std::ifstream& file, const std::string& filename, std::string sms)
     if (!file.is_open()) {
         throw std::runtime_error(sms + filename);
     }
+}
+
+uint32_t ipToHex(const std::string& ip)
+{
+    std::stringstream ss(ip);
+    std::string part;
+
+    std::getline(ss, part, '.');
+    uint32_t a = static_cast<uint32_t>(std::stoi(part));
+
+    std::getline(ss, part, '.');
+    uint32_t b = static_cast<uint32_t>(std::stoi(part));
+
+    std::getline(ss, part, '.');
+    uint32_t c = static_cast<uint32_t>(std::stoi(part));
+
+    std::getline(ss, part, '.');
+    uint32_t d = static_cast<uint32_t>(std::stoi(part));
+
+    return (a << 24) | (b << 16) | (c << 8) | d;
 }
