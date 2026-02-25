@@ -31,6 +31,7 @@ struct LocationConfig {
 };
 
 struct ServerConfig {
+    std::string interface;
     int port;
     std::string server_name;
     std::string root;

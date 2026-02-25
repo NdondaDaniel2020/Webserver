@@ -71,9 +71,6 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
 
         if (line == "}")
             break ;
-        
-        if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
-            throw std::runtime_error("Missing semicolon: " + line);
 
         if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
             throw std::runtime_error("Missing semicolon: " + line);
@@ -85,8 +82,14 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
 
         if (key == "listen")
         {
-            
-            server.port = atoi(StringUtils::trim(value).c_str());
+            if (ConfigValidator::validatePort(value))
+            {
+                size_t pos = value.find(":");
+                server.interface = value.substr(0, pos);
+                server.port = atoi(StringUtils::trim(value.substr(pos +1)).c_str());
+            }
+            else
+                throw std::runtime_error("invalid interface:port " + line);
         }
         else if (key == "server_name")
             server.server_name = StringUtils::trim(value);

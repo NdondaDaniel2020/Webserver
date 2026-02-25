@@ -5,17 +5,38 @@ namespace ConfigValidator
 
     bool validatePort(std::string port)
     {
-        int port_num;
-
-        if (port.empty())
+        port = StringUtils::trim(port);
+        size_t pos = port.find(":");
+        if (pos == std::string::npos)
             return false;
-        for (size_t i = 0; i < port.size(); ++i)
+        std::string ip = port.substr(0, pos);
+        if (ip.empty())
+            return false;
+        std::string number_port = port.substr(pos + 1);
+        std::stringstream octs(ip);
+        std::string oct;
+        while (std::getline(octs, oct,'.'))
         {
-            if (!isdigit(port[i]))
+            if (oct.size() > 3)
+                return false;
+            for (size_t i = 0; i < oct.size(); i++)
+            {
+                if (oct[i] != '*' && !isdigit(oct[i]))
+                    return false;
+            }
+            int oct_int = atoi(oct.c_str());
+            if (oct_int < 0 || oct_int > 254)
                 return false;
         }
-        port_num = atoi(port.c_str());
-        return (port_num > 0 && port_num <= 65535);
+        if (port.empty())
+            return false;
+        for (size_t i = 0; i < number_port.size(); ++i)
+        {
+            if (!isdigit(number_port[i]))
+                return false;
+        }
+        int port_num = atoi(number_port.c_str());
+        return (port_num > 1023 && port_num <= 65535);
     }
 
     bool validatePath(const std::string &path)
