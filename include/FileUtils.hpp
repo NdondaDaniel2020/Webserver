@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 09:35:35 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/25 11:25:41 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@
 # include <iostream>
 # include <sstream>
 # include <fstream>
+# include <cstdlib>
 # include <cstring>
 # include <errno.h>
 # include <string>

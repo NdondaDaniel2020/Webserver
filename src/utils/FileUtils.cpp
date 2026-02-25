@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 09:32:44 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/25 11:24:27 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,16 +47,16 @@ uint32_t ipToHex(const std::string& ip)
     std::string part;
 
     std::getline(ss, part, '.');
-    uint32_t a = static_cast<uint32_t>(std::stoi(part));
+    uint32_t a = static_cast<uint32_t>(std::atoi(part.c_str()));
 
     std::getline(ss, part, '.');
-    uint32_t b = static_cast<uint32_t>(std::stoi(part));
+    uint32_t b = static_cast<uint32_t>(std::atoi(part.c_str()));
 
     std::getline(ss, part, '.');
-    uint32_t c = static_cast<uint32_t>(std::stoi(part));
+    uint32_t c = static_cast<uint32_t>(std::atoi(part.c_str()));
 
     std::getline(ss, part, '.');
-    uint32_t d = static_cast<uint32_t>(std::stoi(part));
+    uint32_t d = static_cast<uint32_t>(std::atoi(part.c_str()));
 
     return (a << 24) | (b << 16) | (c << 8) | d;
 }
