@@ -1,4 +1,4 @@
-# 📤 ENVIAR ARQUIVO VIA CURL
+# 📤 ENVIAR ARQUIVO VIA CURL POST
 
 ## 1. Upload com POST (multipart/form-data)
 
@@ -58,6 +58,7 @@ curl -X POST \
   -F "file=@/caminho/local/arquivo.txt;filename=novo_nome.txt" \
   http://localhost:8080/upload
 ```
+
 
 ## 2. Upload com PUT (Binary)
 
@@ -251,4 +252,132 @@ for file in *.txt; do
     RESPONSE=$(curl -s -X POST -F "file=@$file" $URL)
     echo "Resposta: $RESPONSE"
 done
+```
+
+# Exemplos com GET
+
+## Download de Arquivo
+```bash
+# Baixar arquivo e salvar com mesmo nome do servidor
+curl -X GET -O http://localhost:8080/uploads/documento.pdf
+
+# Baixar e salvar com nome customizado
+curl -X GET http://localhost:8080/uploads/documento.pdf -o meu_doc.pdf
+```
+
+## Listar Recursos
+```bash
+# Listar uploads (se endpoint retornar JSON/HTML)
+curl -X GET http://localhost:8080/uploads
+
+# Com query params
+curl -X GET "http://localhost:8080/uploads?pagina=1&limite=20"
+```
+
+## GET com Headers
+```bash
+# Enviar header Authorization
+curl -X GET \
+  -H "Authorization: Bearer seu_token_aqui" \
+  http://localhost:8080/uploads
+```
+
+# Exemplos com DELETE
+
+## Deletar Arquivo Específico
+```bash
+# Remove um arquivo pelo caminho
+curl -X DELETE http://localhost:8080/uploads/documento.pdf
+```
+
+## DELETE com Autenticação
+```bash
+# Basic Auth
+curl -X DELETE \
+  -u "usuario:senha" \
+  http://localhost:8080/uploads/documento.pdf
+
+# Bearer Token
+curl -X DELETE \
+  -H "Authorization: Bearer seu_token_aqui" \
+  http://localhost:8080/uploads/documento.pdf
+```
+
+## DELETE com Query String
+```bash
+# Exemplo: endpoint que apaga por parâmetro
+curl -X DELETE "http://localhost:8080/uploads?file=documento.pdf"
+```
+
+# Exemplos com CGI (GET, POST, DELETE)
+
+> Exemplos assumindo scripts em `/cgi-bin/` (ajuste conforme sua rota).
+
+## GET em CGI
+
+```bash
+# GET simples
+curl -X GET "http://localhost:8080/cgi-bin/echo.py"
+
+# GET com query string
+curl -X GET "http://localhost:8080/cgi-bin/echo.py?nome=natanael&lang=pt"
+
+# GET com header customizado
+curl -X GET \
+  -H "X-Request-Id: 12345" \
+  "http://localhost:8080/cgi-bin/echo.py?debug=1"
+```
+
+## POST em CGI
+
+```bash
+# POST form-urlencoded
+curl -X POST \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "nome=natanael&email=n@example.com" \
+  http://localhost:8080/cgi-bin/form.py
+
+# POST JSON
+curl -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"acao":"criar","arquivo":"teste.txt"}' \
+  http://localhost:8080/cgi-bin/api.py
+
+# POST multipart (arquivo + campo)
+curl -X POST \
+  -F "file=@teste.txt" \
+  -F "descricao=arquivo de teste" \
+  http://localhost:8080/cgi-bin/upload.py
+```
+
+## DELETE em CGI
+
+```bash
+# DELETE com query param
+curl -X DELETE \
+  "http://localhost:8080/cgi-bin/delete.py?file=teste.txt"
+
+# DELETE com JSON no body
+curl -X DELETE \
+  -H "Content-Type: application/json" \
+  -d '{"file":"teste.txt"}' \
+  http://localhost:8080/cgi-bin/delete.py
+
+# DELETE com autenticação Bearer
+curl -X DELETE \
+  -H "Authorization: Bearer seu_token_aqui" \
+  "http://localhost:8080/cgi-bin/delete.py?file=documento.pdf"
+```
+
+## Debug de CGI
+
+```bash
+# Ver request/response completos
+curl -v -X GET "http://localhost:8080/cgi-bin/echo.py?teste=1"
+
+# Ver headers da resposta CGI
+curl -i -X POST \
+  -H "Content-Type: application/json" \
+  -d '{"ping":"pong"}' \
+  http://localhost:8080/cgi-bin/api.py
 ```
