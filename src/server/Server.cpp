@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 09:40:56 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 09:51:35 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,9 +16,12 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
 {
     // ---------- Portas ----------
     this->ports = new int[this->port_count];
-    
+    this->interface = new std::string[this->port_count];
     for (int i = 0; i < this->port_count; i++)
+    {
         this->ports[i] = config.getServerConfig(i).port;
+        this->interface[i] = config.getServerConfig(i).interface;
+    }
 
     // ---------- Criar epoll ----------
     this->epoll_fd = epoll_create(1);
@@ -29,7 +32,7 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
     this->servers = new int[this->port_count];
     for (int i = 0; i < this->port_count; i++) 
     {
-        this->servers[i] = createServerSocket(this->ports[i]);
+        this->servers[i] = createServerSocket(this->interface[i], this->ports[i]);
         if (this->servers[i] < 0) 
             return ;
         epoll_event ev;
@@ -48,9 +51,9 @@ Server::~Server()
         delete it->second;
     }
     clients.clear();
-    
     delete[] this->ports;
     delete[] this->servers;
+    delete[] this->interface;
 }
 
 Server::Server(const Server& other) : port_count(other.port_count)
@@ -60,6 +63,9 @@ Server::Server(const Server& other) : port_count(other.port_count)
     this->epoll_fd = other.epoll_fd;
     this->servers = new int[this->port_count];
     std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
+    this->interface = new std::string[this->port_count];
+    for (int i = 0; i < this->port_count; i++)
+        this->interface[i] = other.interface[i];
     std::memcpy(this->events, other.events, sizeof(other.events));
 }
 
@@ -74,7 +80,11 @@ Server& Server::operator=(const Server& other)
         std::memcpy(this->ports, other.ports, sizeof(int) * this->port_count);
         this->epoll_fd = other.epoll_fd;
         this->servers = new int[this->port_count];
+        
         std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
+        this->interface = new std::string[this->port_count];
+        for (int i = 0; i < this->port_count; i++)
+            this->interface[i] = other.interface[i];
         std::memcpy(this->events, other.events, sizeof(other.events));
     }
     return *this;
@@ -92,7 +102,6 @@ void Server::start()
         for (int i = 0; i < n; i++)
         {
             int fd = this->events[i].data.fd;
-
             if (isServerSocket(fd))
                 newConnection(fd);  // ---------- Nova conexão ----------
             else
@@ -108,7 +117,7 @@ void Server::stop()
     close(this->epoll_fd);
 }
 
-int Server::createServerSocket(int port)
+int Server::createServerSocket(const std::string& interface, int port)
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) { perror("socket"); return -1; }
@@ -119,7 +128,7 @@ int Server::createServerSocket(int port)
     sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY; // htonl(ipToHex(interface))
+    addr.sin_addr.s_addr = htonl(ipToHex(interface));
     addr.sin_port = htons(port);
 
     if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -134,10 +143,8 @@ int Server::createServerSocket(int port)
         return -1;
     }
 
-    // std::cout << "Servidor ouvindo na porta " << port 
-    //           << " http://"<< interface << ":" << port << std::endl;
     std::cout << "Servidor ouvindo na porta " << port 
-              << " http://localhost:" << port << std::endl;
+              << " http://"<< interface << ":" << port << std::endl;
     return server_fd;
 }
 

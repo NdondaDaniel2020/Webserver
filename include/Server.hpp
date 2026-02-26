@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/19 12:33:15 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 09:21:14 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,6 +35,7 @@ class Server
         int epoll_fd;
         int* servers;
         int port_count;
+        std::string* interface;
         epoll_event events[64];
         ConfigParser config;
         std::map<int, Client*> clients;  // fd -> Client*
@@ -49,7 +50,7 @@ class Server
         void stop();
 
     private:
-        int createServerSocket(int port);
+        int createServerSocket(const std::string& interface, int port);
         void newConnection(int fd);
         void handleClientData(int fd);
         void closeClient(int fd);
