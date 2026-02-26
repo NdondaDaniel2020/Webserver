@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 15:32:35 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 14:16:11 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -105,9 +105,75 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
 }
 
 void Response::methodPost(const HttpRequest& request, const std::string& file_path)
-{
-    (void)request;
-    (void)file_path;
+{   
+    // 1. Validar client_max_body_size
+    size_t body_size = request.getBody().size();
+    if (this->config.client_max_body_size > 0 && body_size > this->config.client_max_body_size)
+    {
+        std::cout << "[413] Body size (" << body_size << ") excede limite (" 
+                  << this->config.client_max_body_size << ")" << std::endl;
+        return httpPayloadTooLarge413();
+    }
+    
+    // 2. Obter Content-Type
+    std::string content_type = request.getHeader("Content-Type");
+    if (content_type.empty())
+    {
+        std::cout << "[415] Content-Type não especificado" << std::endl;
+        return httpUnsupportedMediaType415();
+    }
+    
+    // 3. Processar conforme Content-Type
+
+    // 3.1 multipart/form-data - Upload de arquivos
+    if (content_type.find("multipart/form-data") != std::string::npos)
+        return multipartFormData(request, file_path, content_type);
+
+    // 3.2 application/x-www-form-urlencoded - Dados de formulário
+    else if (content_type.find("application/x-www-form-urlencoded") != std::string::npos)
+    {
+        // Decodificar form data
+        std::string decoded_body = urlDecode(request.getBody());
+        
+        // Aqui você pode processar os dados do formulário
+        // Por exemplo, salvar em um arquivo ou processar conforme necessário
+        
+        std::ostringstream json_response;
+        json_response << "{\"message\":\"Form data recebido\",";
+        json_response << "\"size\":" << decoded_body.size() << "}";
+        
+        return httpCreated201("/form", json_response.str());
+    }
+    
+    // 3.3 application/json - Dados JSON
+    else if (content_type.find("application/json") != std::string::npos)
+    {
+        // Processar JSON (validação básica)
+        std::string json_body = request.getBody();
+        
+        std::ostringstream json_response;
+        json_response << "{\"message\":\"JSON recebido\",";
+        json_response << "\"size\":" << json_body.size() << "}";
+        
+        return httpCreated201("/api", json_response.str());
+    }
+    
+    // 3.4 text/plain - Texto simples
+    else if (content_type.find("text/plain") != std::string::npos)
+    {
+        std::ostringstream json_response;
+        json_response << "{\"message\":\"Text data recebido\",";
+        json_response << "\"size\":" << request.getBody().size() << "}";
+        
+        return httpCreated201("/text", json_response.str());
+    }
+    
+    // Content-Type não suportado
+    else
+    {
+        std::cout << "[415] Content-Type não suportado: " << content_type << std::endl;
+        return httpUnsupportedMediaType415();
+    }
 }
 
 void Response::methodDelete(const HttpRequest& request, const std::string& file_path)
@@ -115,6 +181,115 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     (void)request;
     (void)file_path;
 }
+
+
+
+
+ 
+void Response::multipartFormData(const HttpRequest& request, const std::string& file_path, const std::string& content_type)
+{
+    std::string boundary = extractBoundary(content_type);
+    if (boundary.empty())
+    {
+        std::cout << "[400] Boundary não encontrado no Content-Type" << std::endl;
+        return httpUnsupportedMediaType415();
+    }
+    
+    std::vector<MultipartFile> files;
+    if (!parseMultipartData(request.getBody(), boundary, files))
+    {
+        std::cout << "[400] Erro ao parsear multipart data" << std::endl;
+        return httpUnsupportedMediaType415();
+    }
+    
+    // Determinar diretório de upload (usar root se não houver upload_dir configurado)
+    std::string upload_dir = this->config.root;
+    this->config.locations.size();
+    for (size_t i = 0; i < this->config.locations.size(); i++)
+    {
+        if (file_path.find(this->config.locations[i].path) != std::string::npos)
+        {
+            // Verificar se método POST é permitido para essa location
+            if (this->config.locations[i].allowed_methods.size() > 0 && 
+                std::find(this->config.locations[i].allowed_methods.begin(), 
+                            this->config.locations[i].allowed_methods.end(), "POST") == this->config.locations[i].allowed_methods.end())
+            {
+                std::cout << "[405] Método POST não permitido para: " << file_path << std::endl;
+                return methodNotAllowed405(file_path);
+            }
+            // Verificar client_max_body_size específico da location
+            if (this->config.locations[i].client_max_body_size > 0 && request.getBody().size() > this->config.locations[i].client_max_body_size)
+            {
+                std::cout << "[413] Body size (" << request.getBody().size() << ") excede limite da location (" 
+                            << this->config.locations[i].client_max_body_size << ")" << std::endl;
+                return httpPayloadTooLarge413();
+            }
+            // Determinar upload_dir específico da location
+            if (!this->config.locations[i].upload_dir.empty())
+            {
+                if (this->config.locations[i].upload_dir[0] != '/')
+                    upload_dir = this->config.root + "/" + this->config.locations[i].upload_dir;
+                else
+                    upload_dir = this->config.locations[i].upload_dir;
+            }
+            break;
+        }
+    }
+    
+    // Criar diretório se não existir
+    if (!createDirectory(upload_dir))
+    {
+        std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
+        return httpForbidden403(upload_dir);
+    }
+    
+    // Verificar permissões de escrita
+    if (!hasWritePermission(upload_dir))
+    {
+        std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
+        return httpForbidden403(upload_dir);
+    }
+    
+    // Salvar cada arquivo
+    std::ostringstream json_response;
+    json_response << "{\"files\":[";
+    
+    for (size_t i = 0; i < files.size(); ++i)
+    {
+        std::string unique_filename = generateUniqueFilename(files[i].filename);
+        std::string full_path = upload_dir + "/" + unique_filename;
+        
+        if (writeFileToDisk(full_path, files[i].content))
+        {
+            std::cout << "[201] Arquivo salvo: " << full_path 
+                        << " (" << files[i].content.size() << " bytes)" << std::endl;
+            
+            if (i > 0)
+                json_response << ",";
+            
+            json_response << "{";
+            json_response << "\"filename\":\"" << unique_filename << "\",";
+            json_response << "\"original_name\":\"" << files[i].filename << "\",";
+            json_response << "\"size\":" << files[i].content.size() << ",";
+            json_response << "\"content_type\":\"" << files[i].content_type << "\"";
+            json_response << "}";
+        }
+        else
+        {
+            std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
+        }
+    }
+    
+    json_response << "]}";
+    
+    // Retornar 201 Created com Location do primeiro arquivo
+    std::string location = "";
+    if (!files.empty())
+        location = upload_dir + "/" + generateUniqueFilename(files[0].filename);
+    
+    httpCreated201(location, json_response.str());
+}
+
 
 
 
@@ -214,5 +389,58 @@ void Response::httpForbidden403(const std::string& file_path)
     this->response_str = oss.str();
 }
 
+void Response::httpCreated201(const std::string& location, const std::string& message)
+{
+    // Recurso criado - retornar 201 Created
+    std::cout << "[201] Recurso criado: " << location << std::endl;
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 201 Created\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Location: " << location << "\r\n";
+    oss << "Content-Type: application/json; charset=UTF-8\r\n";
+    oss << "Content-Length: " << message.size() << "\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    oss << message;
+    this->response_str = oss.str();
+}
 
+void Response::httpPayloadTooLarge413()
+{
+    // Body muito grande - retornar 413 Payload Too Large
+    std::cout << "[413] Payload Too Large" << std::endl;
+    
+    std::string content = "<html><body><h1>413 Payload Too Large</h1></body></html>";
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 413 Payload Too Large\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Content-Type: text/html; charset=UTF-8\r\n";
+    oss << "Content-Length: " << content.size() << "\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    oss << content;
+    this->response_str = oss.str();
+}
 
+void Response::httpUnsupportedMediaType415()
+{
+    // Content-Type não suportado - retornar 415 Unsupported Media Type
+    std::cout << "[415] Unsupported Media Type" << std::endl;
+    
+    std::string content = "<html><body><h1>415 Unsupported Media Type</h1></body></html>";
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 415 Unsupported Media Type\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Content-Type: text/html; charset=UTF-8\r\n";
+    oss << "Content-Length: " << content.size() << "\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    oss << content;
+    this->response_str = oss.str();
+}

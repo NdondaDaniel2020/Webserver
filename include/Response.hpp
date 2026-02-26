@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 15:28:04 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 14:02:24 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,9 +39,15 @@ class Response
         void httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path);
         void methodNotAllowed405(const std::string& file_path);
         void httpForbidden403(const std::string& file_path);
+        void httpCreated201(const std::string& location, const std::string& message);
+        void httpPayloadTooLarge413();
+        void httpUnsupportedMediaType415();
 
         void methodGet(const HttpRequest& request, const std::string& file_path);
+        
         void methodPost(const HttpRequest& request, const std::string& file_path);
+        void multipartFormData(const HttpRequest& request, const std::string& file_path, const std::string& content_type);
+        
         void methodDelete(const HttpRequest& request, const std::string& file_path);
 };
 
