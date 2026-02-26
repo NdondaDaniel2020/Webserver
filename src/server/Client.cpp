@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/19 12:33:15 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 12:49:45 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -112,10 +112,10 @@ bool Client::isRequestComplete()
         {
             parseHeaders();
             
-            // Se não tem body (GET, POST, DELETE) ou Content-Length: 0
-            if (request.getMethod() == "GET" || 
+            // Se não tem body (GET, POST, DELETE) e Content-Length: 0
+            if ((request.getMethod() == "GET" || 
                 request.getMethod() == "POST" ||
-                request.getMethod() == "DELETE" ||
+                request.getMethod() == "DELETE") &&
                 content_length == 0)
             {
                 state = PROCESSING;
@@ -190,11 +190,16 @@ void Client::processRequest(const ServerConfig& server_config)
     if (state != PROCESSING)
         return;
     
-    // Se tem body, adicionar ao request
+    // Se tem body, extrair do recv_buffer e adicionar ao request
     if (content_length > 0 && headers_end_pos > 0)
     {
-        // TODO: Adicionar método setBody no HttpRequest
-        // Por enquanto, o body já foi parseado
+        size_t body_size = recv_buffer.size() - headers_end_pos;
+        if (body_size >= content_length)
+        {
+            std::string body = recv_buffer.substr(headers_end_pos, content_length);
+            request.setBody(body);
+            std::cout << "[CLIENT " << fd << "] Body extraído: " << body.size() << " bytes" << std::endl;
+        }
     }
     
     // Criar resposta
