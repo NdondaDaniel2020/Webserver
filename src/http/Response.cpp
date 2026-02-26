@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 15:44:05 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 16:00:42 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -349,8 +349,9 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     httpCreated201(location, json_response.str());
 }
 
-
-
+// applicationXWwwFormUrlencoded
+// applicationJson
+// textPlain
 
 void Response::httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path)
 {
