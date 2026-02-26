@@ -7,7 +7,10 @@ namespace ConfigHelper
     {
         root = StringUtils::trim(value);
     }
-
+    void parseUploadDir(const std::string &value, std::string &upload_dir)
+    {
+        upload_dir = StringUtils::trim(value);
+    }
     void parseIndex(const std::string &value, std::vector<std::string> &index_files)
     {
         std::string index_file;
@@ -56,13 +59,15 @@ namespace ConfigHelper
         else if (key == "client_max_body_size")
             parseClientMaxBodySize(value, server.client_max_body_size);
         else
-            std::runtime_error("invalid directive " + key);
+            throw std::runtime_error("invalid directive " + key);
     }
 
     void parseCommonConfig(const std::string &key, const std::string &value, LocationConfig &location)
     {
         if (key == "root")
             parseRoot(value, location.root);
+        else if (key == "upload_dir")
+            parseUploadDir(value, location.upload_dir);
         else if (key == "index")
             parseIndex(value, location.index_files);
         else if (key == "client_max_body_size")
