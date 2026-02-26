@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 14:27:18 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 12:17:28 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -248,4 +248,160 @@ std::string getFileModifiedDate(const std::string& path)
     
     strftime(buffer, sizeof(buffer), "%a, %d %b %Y %H:%M:%S GMT", tm_info);
     return std::string(buffer);
+}
+
+// ========== POST utilities ==========
+
+bool createDirectory(const std::string& path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) == 0)
+        return S_ISDIR(st.st_mode);
+    
+    // Criar diretório com permissões 755
+    return mkdir(path.c_str(), 0755) == 0;
+}
+
+bool hasWritePermission(const std::string& path)
+{
+    return access(path.c_str(), W_OK) == 0;
+}
+
+std::string generateUniqueFilename(const std::string& original_name)
+{
+    // Timestamp + nome original
+    time_t now = time(NULL);
+    std::ostringstream oss;
+    oss << now << "_" << original_name;
+    return oss.str();
+}
+
+bool writeFileToDisk(const std::string& filepath, const std::string& content)
+{
+    std::ofstream file(filepath.c_str(), std::ios::binary | std::ios::out);
+    if (!file.is_open())
+        return false;
+    
+    file.write(content.c_str(), content.size());
+    file.close();
+    return true;
+}
+
+std::string urlDecode(const std::string& str)
+{
+    std::string result;
+    for (size_t i = 0; i < str.size(); ++i)
+    {
+        if (str[i] == '%' && i + 2 < str.size())
+        {
+            // Converter hex para char
+            int value = 0;
+            std::istringstream iss(str.substr(i + 1, 2));
+            iss >> std::hex >> value;
+            result += static_cast<char>(value);
+            i += 2;
+        }
+        else if (str[i] == '+')
+        {
+            result += ' ';
+        }
+        else
+        {
+            result += str[i];
+        }
+    }
+    return result;
+}
+
+std::string extractBoundary(const std::string& content_type)
+{
+    size_t pos = content_type.find("boundary=");
+    if (pos == std::string::npos)
+        return "";
+    
+    std::string boundary = content_type.substr(pos + 9);
+    
+    // Remover espaços e aspas
+    if (!boundary.empty() && boundary[0] == '"')
+        boundary = boundary.substr(1);
+    if (!boundary.empty() && boundary[boundary.size() - 1] == '"')
+        boundary = boundary.substr(0, boundary.size() - 1);
+    
+    return boundary;
+}
+
+bool parseMultipartData(const std::string& body, const std::string& boundary, std::vector<MultipartFile>& files)
+{
+
+    if (boundary.empty())
+        return false;
+    
+    std::string delimiter = "--" + boundary;
+    std::string end_delimiter = "--" + boundary + "--";
+    
+    size_t pos = 0;
+    while (pos < body.size())
+    {
+        // Encontrar início da parte
+        pos = body.find(delimiter, pos);
+        if (pos == std::string::npos)
+            break;
+        
+        pos += delimiter.size();
+        
+        // Pular \r\n
+        if (pos + 1 < body.size() && body[pos] == '\r' && body[pos + 1] == '\n')
+            pos += 2;
+        
+        // Encontrar fim da parte
+        size_t end_pos = body.find(delimiter, pos);
+        if (end_pos == std::string::npos)
+            break;
+        
+        // Extrair parte completa
+        std::string part = body.substr(pos, end_pos - pos);
+        
+        // Separar headers e content
+        size_t header_end = part.find("\r\n\r\n");
+        if (header_end == std::string::npos)
+            continue;
+        
+        std::string headers = part.substr(0, header_end);
+        std::string content = part.substr(header_end + 4);
+        
+        // Remover \r\n do final do content
+        if (content.size() >= 2 && content[content.size() - 2] == '\r')
+            content = content.substr(0, content.size() - 2);
+        
+        // Extrair filename do Content-Disposition
+        MultipartFile file;
+        size_t filename_pos = headers.find("filename=\"");
+        if (filename_pos != std::string::npos)
+        {
+            filename_pos += 10;
+            size_t filename_end = headers.find("\"", filename_pos);
+            if (filename_end != std::string::npos)
+                file.filename = headers.substr(filename_pos, filename_end - filename_pos);
+        }
+        
+        // Extrair Content-Type
+        size_t ct_pos = headers.find("Content-Type: ");
+        if (ct_pos != std::string::npos)
+        {
+            ct_pos += 14;
+            size_t ct_end = headers.find("\r\n", ct_pos);
+            if (ct_end == std::string::npos)
+                ct_end = headers.size();
+            file.content_type = headers.substr(ct_pos, ct_end - ct_pos);
+        }
+        
+        file.content = content;
+        
+        if (!file.filename.empty())
+            files.push_back(file);
+        
+        pos = end_pos;
+    }
+    
+    return !files.empty();
 }
