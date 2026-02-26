@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 14:16:11 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 15:44:05 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -55,6 +55,36 @@ void Response::buildHttpResponse(const HttpRequest& request)
         std::cout << "[403] Path traversal bloqueado: " << request.getUri() << std::endl;
         return httpForbidden403(file_path);
     }
+    
+    // 3. Buscar location correspondente e validar método permitido
+    const LocationConfig* matched_location = NULL;
+    
+    for (size_t i = 0; i < this->config.locations.size(); i++)
+    {
+        if (request.getUri().find(this->config.locations[i].path) == 0)
+        {
+            matched_location = &this->config.locations[i];
+            break;
+        }
+    }
+    
+    // 4. Validar se método é permitido
+    if (matched_location && !matched_location->allowed_methods.empty())
+    {
+        std::vector<std::string>::const_iterator it = std::find(
+            matched_location->allowed_methods.begin(),
+            matched_location->allowed_methods.end(),
+            request.getMethod()
+        );
+        
+        if (it == matched_location->allowed_methods.end())
+        {
+            std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
+            return methodNotAllowed405(file_path);
+        }
+    }
+    
+    // 5. Executar método
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
     else if (request.getMethod() == "POST")
@@ -204,19 +234,10 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     
     // Determinar diretório de upload (usar root se não houver upload_dir configurado)
     std::string upload_dir = this->config.root;
-    this->config.locations.size();
     for (size_t i = 0; i < this->config.locations.size(); i++)
     {
         if (file_path.find(this->config.locations[i].path) != std::string::npos)
         {
-            // Verificar se método POST é permitido para essa location
-            if (this->config.locations[i].allowed_methods.size() > 0 && 
-                std::find(this->config.locations[i].allowed_methods.begin(), 
-                            this->config.locations[i].allowed_methods.end(), "POST") == this->config.locations[i].allowed_methods.end())
-            {
-                std::cout << "[405] Método POST não permitido para: " << file_path << std::endl;
-                return methodNotAllowed405(file_path);
-            }
             // Verificar client_max_body_size específico da location
             if (this->config.locations[i].client_max_body_size > 0 && request.getBody().size() > this->config.locations[i].client_max_body_size)
             {
@@ -250,42 +271,80 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         return httpForbidden403(upload_dir);
     }
     
-    // Salvar cada arquivo
+    // Extensões de arquivo permitidas (segurança)
+    std::vector<std::string> allowed_extensions;
+    allowed_extensions.push_back(".jpg");
+    allowed_extensions.push_back(".jpeg");
+    allowed_extensions.push_back(".png");
+    allowed_extensions.push_back(".gif");
+    allowed_extensions.push_back(".pdf");
+    allowed_extensions.push_back(".txt");
+    allowed_extensions.push_back(".doc");
+    allowed_extensions.push_back(".docx");
+    allowed_extensions.push_back(".zip");
+    allowed_extensions.push_back(".mp4");
+    allowed_extensions.push_back(".mp3");
+    
+    // Salvar cada arquivo com validação
     std::ostringstream json_response;
     json_response << "{\"files\":[";
+    std::vector<std::string> saved_files;  // Para limpeza em caso de erro
+    size_t success_count = 0;
     
     for (size_t i = 0; i < files.size(); ++i)
     {
+        // Validar extensão do arquivo
+        if (!isAllowedFileExtension(files[i].filename, allowed_extensions))
+        {
+            std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
+            cleanupFiles(saved_files);  // Limpar arquivos já salvos
+            return httpBadRequest400("File extension not allowed: " + getFileExtension(files[i].filename));
+        }
+        
+        // Validar tamanho individual do arquivo (max 10MB por arquivo)
+        if (files[i].content.size() > 10 * 1024 * 1024)
+        {
+            std::cout << "[413] Arquivo muito grande: " << files[i].filename 
+                      << " (" << files[i].content.size() << " bytes)" << std::endl;
+            cleanupFiles(saved_files);
+            return httpPayloadTooLarge413();
+        }
+        
         std::string unique_filename = generateUniqueFilename(files[i].filename);
         std::string full_path = upload_dir + "/" + unique_filename;
         
         if (writeFileToDisk(full_path, files[i].content))
         {
+            saved_files.push_back(full_path);
             std::cout << "[201] Arquivo salvo: " << full_path 
                         << " (" << files[i].content.size() << " bytes)" << std::endl;
             
-            if (i > 0)
+            if (success_count > 0)
                 json_response << ",";
             
             json_response << "{";
             json_response << "\"filename\":\"" << unique_filename << "\",";
             json_response << "\"original_name\":\"" << files[i].filename << "\",";
+            json_response << "\"path\":\"" << full_path << "\",";
             json_response << "\"size\":" << files[i].content.size() << ",";
-            json_response << "\"content_type\":\"" << files[i].content_type << "\"";
+            json_response << "\"mime_type\":\"" << getMimeType(files[i].filename) << "\"";
             json_response << "}";
+            success_count++;
         }
         else
         {
             std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
+            cleanupFiles(saved_files);  // Limpar todos em caso de erro
+            return httpBadRequest400("Failed to save file: " + files[i].filename);
         }
     }
     
-    json_response << "]}";
+    json_response << "],\"success\":true,\"count\":" << success_count << "}";
     
     // Retornar 201 Created com Location do primeiro arquivo
     std::string location = "";
-    if (!files.empty())
-        location = upload_dir + "/" + generateUniqueFilename(files[0].filename);
+    if (!saved_files.empty())
+        location = saved_files[0];
     
     httpCreated201(location, json_response.str());
 }
@@ -438,6 +497,27 @@ void Response::httpUnsupportedMediaType415()
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
     oss << "Server: webserv/1.0\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
+    oss << "Content-Length: " << content.size() << "\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    oss << content;
+    this->response_str = oss.str();
+}
+
+void Response::httpBadRequest400(const std::string& message)
+{
+    // Requisição malformada - retornar 400 Bad Request
+    std::cout << "[400] Bad Request: " << message << std::endl;
+    
+    std::ostringstream json_response;
+    json_response << "{\"error\":\"Bad Request\",\"message\":\"" << message << "\"}";
+    std::string content = json_response.str();
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 400 Bad Request\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Content-Type: application/json; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
     oss << "\r\n";

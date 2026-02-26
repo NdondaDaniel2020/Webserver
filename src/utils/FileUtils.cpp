@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 12:17:28 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 15:44:05 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -404,4 +404,55 @@ bool parseMultipartData(const std::string& body, const std::string& boundary, st
     }
     
     return !files.empty();
+}
+
+// ========== File Validation ==========
+
+std::string getFileExtension(const std::string& filename)
+{
+    size_t dot_pos = filename.find_last_of('.');
+    if (dot_pos == std::string::npos || dot_pos == filename.size() - 1)
+        return "";
+    
+    std::string ext = filename.substr(dot_pos);
+    
+    // Converter para lowercase
+    for (size_t i = 0; i < ext.size(); ++i)
+    {
+        if (ext[i] >= 'A' && ext[i] <= 'Z')
+            ext[i] = ext[i] + ('a' - 'A');
+    }
+    
+    return ext;
+}
+
+bool isAllowedFileExtension(const std::string& filename, const std::vector<std::string>& allowed_extensions)
+{
+    if (allowed_extensions.empty())
+        return true;  // Se não há lista, permite todos
+    
+    std::string file_ext = getFileExtension(filename);
+    
+    for (size_t i = 0; i < allowed_extensions.size(); ++i)
+    {
+        if (file_ext == allowed_extensions[i])
+            return true;
+    }
+    
+    return false;
+}
+
+void cleanupFiles(const std::vector<std::string>& file_paths)
+{
+    for (size_t i = 0; i < file_paths.size(); ++i)
+    {
+        if (remove(file_paths[i].c_str()) == 0)
+        {
+            std::cout << "[CLEANUP] Arquivo removido: " << file_paths[i] << std::endl;
+        }
+        else
+        {
+            std::cout << "[CLEANUP] Erro ao remover arquivo: " << file_paths[i] << std::endl;
+        }
+    }
 }

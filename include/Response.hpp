@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 14:02:24 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 15:44:05 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,6 +42,7 @@ class Response
         void httpCreated201(const std::string& location, const std::string& message);
         void httpPayloadTooLarge413();
         void httpUnsupportedMediaType415();
+        void httpBadRequest400(const std::string& message);
 
         void methodGet(const HttpRequest& request, const std::string& file_path);
         

@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 10:37:32 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/26 15:44:05 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -70,5 +70,10 @@ struct MultipartFile {
 };
 
 bool parseMultipartData(const std::string& body, const std::string& boundary, std::vector<MultipartFile>& files);
+
+// File validation
+bool isAllowedFileExtension(const std::string& filename, const std::vector<std::string>& allowed_extensions);
+std::string getFileExtension(const std::string& filename);
+void cleanupFiles(const std::vector<std::string>& file_paths);
 
 #endif
