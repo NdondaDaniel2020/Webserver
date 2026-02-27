@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 09:11:14 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 10:39:21 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,10 +50,12 @@ Response &Response::operator=(const Response &other)
 }
 
 
+
 std::string Response::getResponseHttp()
 {
     return this->response_str;
 }
+
 
 
 void Response::buildHttpResponse(const HttpRequest& request)
@@ -102,9 +104,19 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
         }
         else
         {
-            // TODO: Implementar autoindex se config permitir
-            std::cout << "[403] Diretório sem arquivo index: " << _file_path << std::endl;
-            return httpForbidden403(_file_path);
+            // 🔍 Buscar location para ver se autoindex está on/off
+            const LocationConfig* location = findMatchingLocation(request.getUri());
+            
+            if (location && location->autoindex)
+            {
+                // ✅ autoindex on → Gerar listagem HTML
+                return generateDirectoryListing(request, file_path, request.getUri());
+            }
+            else
+            {
+                // ❌ autoindex off → 403 Forbidden
+                return httpForbidden403(_file_path);
+            }
         }
     }
     
@@ -488,30 +500,46 @@ void Response::httpBadRequest400(const std::string& message)
 
 
 
-bool Response::validateAllowedMethod(const HttpRequest& request)
+const LocationConfig* Response::findMatchingLocation(const std::string& uri) const
 {
-    // Buscar location correspondente e validar método permitido
-    const LocationConfig* matched_location = NULL;
-
+    // Buscar a location que melhor corresponde ao URI (longest match first)
+    const LocationConfig* best_match = NULL;
+    size_t best_match_length = 0;
+    
     for (size_t i = 0; i < this->config.locations.size(); i++)
     {
-        if (request.getUri().find(this->config.locations[i].path) == 0)
+        const std::string& location_path = this->config.locations[i].path;
+        
+        // Verificar se URI começa com o path da location
+        if (uri.find(location_path) == 0)
         {
-            matched_location = &this->config.locations[i];
-            break;
+            // Preferir match mais longo (mais específico)
+            if (location_path.size() > best_match_length)
+            {
+                best_match = &this->config.locations[i];
+                best_match_length = location_path.size();
+            }
         }
     }
     
+    return best_match;
+}
+
+bool Response::validateAllowedMethod(const HttpRequest& request)
+{
+    // Buscar location correspondente
+    const LocationConfig* location = findMatchingLocation(request.getUri());
+    
     // Se a location tem uma lista de métodos permitidos, verificar se o método da requisição está nela
-    if (matched_location && !matched_location->allowed_methods.empty())
+    if (location && !location->allowed_methods.empty())
     {
         std::vector<std::string>::const_iterator it = std::find(
-            matched_location->allowed_methods.begin(),
-            matched_location->allowed_methods.end(),
+            location->allowed_methods.begin(),
+            location->allowed_methods.end(),
             request.getMethod()
         );
         
-        if (it == matched_location->allowed_methods.end())
+        if (it == location->allowed_methods.end())
             return false;
     }
     return true;
@@ -519,34 +547,63 @@ bool Response::validateAllowedMethod(const HttpRequest& request)
 
 std::string Response::getUploadDir(const HttpRequest& request, const std::string& file_path)
 {
-    // Determinar diretório de upload (usar root se não houver upload_dir configurado)
-    std::string upload_dir = this->config.root;
-    for (size_t i = 0; i < this->config.locations.size(); i++)
+    (void)file_path; // Não usado mais, usamos request.getUri()
+    
+    // Buscar location correspondente
+    const LocationConfig* location = findMatchingLocation(request.getUri());
+    
+    // Verificar client_max_body_size específico da location
+    if (location && location->client_max_body_size > 0 && 
+        request.getBody().size() > location->client_max_body_size)
     {
-        if (file_path.find(this->config.locations[i].path) != std::string::npos)
-        {
-            // Verificar client_max_body_size específico da location
-            if (this->config.locations[i].client_max_body_size > 0 && request.getBody().size() > this->config.locations[i].client_max_body_size)
-            {
-                std::cout << "[413] Body size (" << request.getBody().size() << ") excede limite da location (" 
-                            << this->config.locations[i].client_max_body_size << ")" << std::endl;
-                return "";
-            }
-            // Determinar upload_dir específico da location
-            if (!this->config.locations[i].upload_dir.empty())
-            {
-                if (this->config.locations[i].upload_dir[0] != '/')
-                    upload_dir = this->config.root + "/" + this->config.locations[i].upload_dir;
-                else
-                    upload_dir = this->config.locations[i].upload_dir;
-            }
-            break;
-        }
+        std::cout << "[413] Body size (" << request.getBody().size() 
+                  << ") excede limite da location (" 
+                  << location->client_max_body_size << ")" << std::endl;
+        return "";
     }
+    
+    // Determinar upload_dir
+    std::string upload_dir = this->config.root;
+    
+    if (location && !location->upload_dir.empty())
+    {
+        if (location->upload_dir[0] != '/')
+            upload_dir = this->config.root + "/" + location->upload_dir;
+        else
+            upload_dir = location->upload_dir;
+    }
+    
     return upload_dir;
 }
 
-std::ostringstream saveFiles(const std::vector<MultipartFile> files, const std::string& upload_dir)
+void Response::generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri)
 {
+    // 1. Abrir diretório
+    DIR* dir = opendir(dir_path.c_str());
     
+    // 2. Ler todos os arquivos
+    std::vector<std::string> files;
+    struct dirent* entry;
+    while ((entry = readdir(dir)) != NULL) {
+        files.push_back(entry->d_name);
+    }
+    closedir(dir);
+    
+    // 3. Gerar HTML bonito
+    std::ostringstream html;
+    html << "<html><head><title>Index of " << uri << "</title></head>";
+    html << "<body><h1>Index of " << uri << "</h1><hr><ul>";
+    
+    for (size_t i = 0; i < files.size(); i++) {
+        if (files[i] != ".") {  // Não mostrar "."
+            html << "<li><a href='" << uri << "/" << files[i] << "'>";
+            html << files[i] << "</a></li>";
+        }
+    }
+    
+    html << "</ul><hr></body></html>";
+    
+    // 4. Retornar 200 OK com HTML
+    httpFileFound200(request, html.str(), dir_path);
 }
+

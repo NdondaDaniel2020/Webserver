@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 08:58:35 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 10:37:17 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,7 @@
 
 # include <string>
 # include <sstream>
+# include <dirent.h>
 # include "FileUtils.hpp"
 # include "ConfigParser.hpp"
 # include "HttpRequest.hpp"
@@ -54,8 +55,10 @@ class Response
         void multipartFormData(const HttpRequest& request, const std::string& file_path, const std::string& content_type);
         
         
+        const LocationConfig* findMatchingLocation(const std::string& uri) const;
         bool validateAllowedMethod(const HttpRequest& request);
         std::string getUploadDir(const HttpRequest& request, const std::string& file_path);
+        void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
 };
 
 #endif
