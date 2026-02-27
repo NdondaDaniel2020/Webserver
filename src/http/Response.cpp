@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:14:39 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 12:34:33 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -60,6 +60,9 @@ std::string Response::getResponseHttp()
 
 void Response::buildHttpResponse(const HttpRequest& request)
 {
+    //
+    // Tem erro na verificacao de diretorio. Ler subjet para entender como e que eve estar feito esta parte.
+    //
     // 1. Sanitizar URI para prevenir path traversal
     std::string uri = sanitizePath(request.getUri());
 
@@ -72,6 +75,7 @@ void Response::buildHttpResponse(const HttpRequest& request)
     std::string file_path = root + uri;
 
     // 2. Validar segurança - verificar se o caminho está dentro do root
+    std::cout << "\n\n\n\n[" << file_path << "][" << this->config.root << "]\n\n\n\n" << std::endl;
     if (!isPathSafe(file_path, this->config.root))
     {
         std::cout << "[403] Path traversal bloqueado: " << request.getUri() << std::endl;
