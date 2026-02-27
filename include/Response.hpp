@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:05:43 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 12:14:40 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -16,6 +16,8 @@
 # include <string>
 # include <sstream>
 # include <dirent.h>
+# include <cerrno>
+# include <cstring>
 # include "FileUtils.hpp"
 # include "ConfigParser.hpp"
 # include "HttpRequest.hpp"
@@ -45,6 +47,8 @@ class Response
         void httpPayloadTooLarge413();
         void httpUnsupportedMediaType415();
         void httpBadRequest400(const std::string& message);
+        void httpNoContent204();
+        void httpInternalServerError500(const std::string& message);
 
         
         void methodGet(const HttpRequest& request, const std::string& file_path);

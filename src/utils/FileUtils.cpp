@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 15:44:05 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 12:14:37 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -455,4 +455,20 @@ void cleanupFiles(const std::vector<std::string>& file_paths)
             std::cout << "[CLEANUP] Erro ao remover arquivo: " << file_paths[i] << std::endl;
         }
     }
+}
+
+std::string getParentDirectory(const std::string& path)
+{
+    size_t pos = path.find_last_of('/');
+    if (pos != std::string::npos && pos > 0)
+        return path.substr(0, pos);
+    return ".";
+}
+
+size_t getFileSize(const std::string& path)
+{
+    struct stat st;
+    if (stat(path.c_str(), &st) == 0)
+        return st.st_size;
+    return 0;
 }

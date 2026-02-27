@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:05:58 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 12:14:39 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -231,8 +231,44 @@ void Response::methodPost(const HttpRequest& request)
 
 void Response::methodDelete(const HttpRequest& request, const std::string& file_path)
 {
-    (void)request;
-    (void)file_path;
+    // 1. Verificar se arquivo existe
+    if (!fileExists(file_path))
+    {
+        std::cout << "[404] Arquivo não encontrado para deletar: " << file_path << std::endl;
+        return httpFileNotFound404(request, "", file_path);
+    }
+    
+    // 2. Verificar se é diretório (não permitir deletar diretórios)
+    if (isDirectory(file_path))
+    {
+        std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
+        return httpForbidden403(file_path);
+    }
+    
+    // 3. Verificar permissões de escrita no diretório pai
+    std::string parent_dir = getParentDirectory(file_path);
+    if (!hasWritePermission(parent_dir))
+    {
+        std::cout << "[403] Sem permissão para deletar: " << file_path << std::endl;
+        return httpForbidden403(file_path);
+    }
+    
+    // Log antes de deletar
+    size_t file_size = getFileSize(file_path);
+    std::cout << "[DELETE] Arquivo: " << file_path << std::endl;
+    std::cout << "[DELETE] Tamanho: " << file_size << " bytes" << std::endl;
+    std::cout << "[DELETE] URI: " << request.getUri() << std::endl;
+    
+    // 4. Tentar deletar arquivo
+    if (remove(file_path.c_str()) != 0)
+    {
+        std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
+        return httpInternalServerError500("Failed to delete file: " + std::string(strerror(errno)));
+    }
+    
+    // 5. Sucesso
+    std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
+    return httpNoContent204();
 }
 
 
@@ -515,6 +551,40 @@ void Response::httpBadRequest400(const std::string& message)
     oss << content;
     this->response_str = oss.str();
 }
+
+void Response::httpNoContent204()
+{
+    // Recurso deletado com sucesso - retornar 204 No Content
+    std::cout << "[204] No Content - Recurso deletado" << std::endl;
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 204 No Content\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    this->response_str = oss.str();
+}
+
+void Response::httpInternalServerError500(const std::string& message)
+{
+    // Erro interno do servidor - retornar 500 Internal Server Error
+    std::cout << "[500] Internal Server Error: " << message << std::endl;
+    
+    std::string content = "<html><body><h1>500 Internal Server Error</h1><p>" + message + "</p></body></html>";
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 500 Internal Server Error\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Content-Type: text/html; charset=UTF-8\r\n";
+    oss << "Content-Length: " << content.size() << "\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    oss << content;
+    this->response_str = oss.str();
+}
+
 
 
 
