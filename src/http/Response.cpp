@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 11:23:56 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 12:05:58 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -89,7 +89,7 @@ void Response::buildHttpResponse(const HttpRequest& request)
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
     else if (request.getMethod() == "POST")
-        methodPost(request, file_path);
+        methodPost(request);
     else if (request.getMethod() == "DELETE")
         methodDelete(request, file_path);
     else
@@ -157,7 +157,7 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
     httpFileFound200(request, content, _file_path);
 }
 
-void Response::methodPost(const HttpRequest& request, const std::string& file_path)
+void Response::methodPost(const HttpRequest& request)
 {   
     // 1. Validar client_max_body_size
     size_t body_size = request.getBody().size();
@@ -180,7 +180,7 @@ void Response::methodPost(const HttpRequest& request, const std::string& file_pa
 
     // 3.1 multipart/form-data - Upload de arquivos
     if (content_type.find("multipart/form-data") != std::string::npos)
-        return multipartFormData(request, file_path, content_type);
+        return multipartFormData(request, content_type);
 
     // 3.2 application/x-www-form-urlencoded - Dados de formulário
     else if (content_type.find("application/x-www-form-urlencoded") != std::string::npos)
@@ -239,7 +239,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
 
 
  
-void Response::multipartFormData(const HttpRequest& request, const std::string& file_path, const std::string& content_type)
+void Response::multipartFormData(const HttpRequest& request, const std::string& content_type)
 {
     std::string boundary = extractBoundary(content_type);
     if (boundary.empty())
@@ -256,7 +256,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     }
     
     // Determinar diretório de upload. se estiver vazio significa que o body é muito grande
-    std::string upload_dir = getUploadDir(request, file_path);
+    std::string upload_dir = getUploadDir(request);
     if (upload_dir.empty())
         return httpPayloadTooLarge413();
     
@@ -564,10 +564,8 @@ bool Response::validateAllowedMethod(const HttpRequest& request)
     return true;
 }
 
-std::string Response::getUploadDir(const HttpRequest& request, const std::string& file_path)
-{
-    (void)file_path; // Não usado mais, usamos request.getUri()
-    
+std::string Response::getUploadDir(const HttpRequest& request)
+{   
     // Buscar location correspondente
     const LocationConfig* location = findMatchingLocation(request.getUri());
     

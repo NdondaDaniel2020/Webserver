@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 11:00:34 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 12:05:43 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -48,16 +48,16 @@ class Response
 
         
         void methodGet(const HttpRequest& request, const std::string& file_path);
-        void methodPost(const HttpRequest& request, const std::string& file_path);        
+        void methodPost(const HttpRequest& request);
         void methodDelete(const HttpRequest& request, const std::string& file_path);
 
         
-        void multipartFormData(const HttpRequest& request, const std::string& file_path, const std::string& content_type);
+        void multipartFormData(const HttpRequest& request, const std::string& content_type);
         
         
         const LocationConfig* findMatchingLocation(const std::string& uri) const;
         bool validateAllowedMethod(const HttpRequest& request);
-        std::string getUploadDir(const HttpRequest& request, const std::string& file_path);
+        std::string getUploadDir(const HttpRequest& request);
         void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
         void handleRedirect(int code, const std::string& url);
 };
