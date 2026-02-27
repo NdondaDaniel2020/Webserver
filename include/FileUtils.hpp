@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:14:29 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 14:58:28 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -77,5 +77,6 @@ std::string getFileExtension(const std::string& filename);
 void cleanupFiles(const std::vector<std::string>& file_paths);
 std::string getParentDirectory(const std::string& path);
 size_t getFileSize(const std::string& path);
+std::string getFileName(const std::string& path);
 
 #endif

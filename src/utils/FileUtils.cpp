@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:14:37 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 14:58:50 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -471,4 +471,12 @@ size_t getFileSize(const std::string& path)
     if (stat(path.c_str(), &st) == 0)
         return st.st_size;
     return 0;
+}
+
+std::string getFileName(const std::string& path)
+{
+    size_t pos = path.find_last_of('/');
+    if (pos == std::string::npos)
+        return path;
+    return path.substr(pos + 1);
 }

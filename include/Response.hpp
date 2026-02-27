@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:14:40 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 14:59:23 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@ class Response
     private:
         ServerConfig config;
         std::string response_str;
+        std::vector<std::string> protected_files;
         std::vector<std::string> allowed_extensions;
 
     public:
@@ -64,6 +65,7 @@ class Response
         std::string getUploadDir(const HttpRequest& request);
         void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
         void handleRedirect(int code, const std::string& url);
+        bool isProtectedFile(const std::string& filename);
 };
 
 #endif

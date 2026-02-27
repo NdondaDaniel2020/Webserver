@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 12:34:33 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 15:01:27 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,8 @@ Response::Response(const HttpRequest& request, const ServerConfig& config) : con
     this->allowed_extensions.push_back(".mp4");
     this->allowed_extensions.push_back(".mp3");
 
+    this->protected_files.push_back("index.html");
+
     buildHttpResponse(request);
 }
 
@@ -45,6 +47,8 @@ Response &Response::operator=(const Response &other)
     {
         this->response_str = other.response_str;
         this->config = other.config;
+        this->protected_files = other.protected_files;
+        this->allowed_extensions = other.allowed_extensions;
     }
     return *this;
 }
@@ -241,14 +245,14 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
         std::cout << "[404] Arquivo não encontrado para deletar: " << file_path << std::endl;
         return httpFileNotFound404(request, "", file_path);
     }
-    
+
     // 2. Verificar se é diretório (não permitir deletar diretórios)
     if (isDirectory(file_path))
     {
         std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
         return httpForbidden403(file_path);
     }
-    
+
     // 3. Verificar permissões de escrita no diretório pai
     std::string parent_dir = getParentDirectory(file_path);
     if (!hasWritePermission(parent_dir))
@@ -256,21 +260,29 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
         std::cout << "[403] Sem permissão para deletar: " << file_path << std::endl;
         return httpForbidden403(file_path);
     }
-    
+
     // Log antes de deletar
     size_t file_size = getFileSize(file_path);
     std::cout << "[DELETE] Arquivo: " << file_path << std::endl;
     std::cout << "[DELETE] Tamanho: " << file_size << " bytes" << std::endl;
     std::cout << "[DELETE] URI: " << request.getUri() << std::endl;
-    
-    // 4. Tentar deletar arquivo
+
+    // 4. Verificar se o arquivo é protegido (ex: index.html)
+    std::string filename = getFileName(file_path);
+    if (isProtectedFile(filename))
+    {
+        std::cout << "[403] Arquivo protegido, não pode ser deletado: " << file_path << std::endl;
+        return httpForbidden403(file_path);
+    }
+
+    // 5. Tentar deletar arquivo
     if (remove(file_path.c_str()) != 0)
     {
         std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
         return httpInternalServerError500("Failed to delete file: " + std::string(strerror(errno)));
     }
-    
-    // 5. Sucesso
+
+    // 6. Sucesso
     std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
     return httpNoContent204();
 }
@@ -304,7 +316,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     if (!createDirectory(upload_dir))
     {
         std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
-        return httpForbidden403(upload_dir);
+        return httpInternalServerError500("Failed to create upload directory: " + upload_dir);
     }
     
     // Verificar permissões de escrita
@@ -712,4 +724,14 @@ void Response::handleRedirect(int code, const std::string& url)
     oss << "Content-Length: 0\r\n";
     oss << "Connection: close\r\n\r\n";
     this->response_str = oss.str();
+}
+
+bool Response::isProtectedFile(const std::string& filename)
+{
+    for (size_t i = 0; i < this->protected_files.size(); ++i)
+    {
+        if (filename == this->protected_files[i])
+            return true;
+    }
+    return false;
 }
