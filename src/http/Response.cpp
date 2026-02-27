@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 15:04:26 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 15:48:26 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -64,12 +64,10 @@ std::string Response::getResponseHttp()
 
 void Response::buildHttpResponse(const HttpRequest& request)
 {
-    //
-    // Tem erro na verificacao de diretorio. Ler subjet para entender como e que eve estar feito esta parte.
-    //
     // 1. Sanitizar URI para prevenir path traversal
     std::string uri = sanitizePath(request.getUri());
 
+    // Determinar root (location pode sobrescrever)
     std::string root = this->config.root;
     const LocationConfig* location = findMatchingLocation(request.getUri());
     
@@ -78,13 +76,12 @@ void Response::buildHttpResponse(const HttpRequest& request)
 
     std::string file_path = root + uri;
 
-    // 2. Validar segurança - verificar se o caminho está dentro do root
-    std::cout << "\n\n\n\n[" << file_path << "][" << this->config.root << "]\n\n\n\n" << std::endl;
-    if (!isPathSafe(file_path, this->config.root))
-    {
-        std::cout << "[403] Path traversal bloqueado: " << request.getUri() << std::endl;
-        return httpForbidden403(file_path);
-    }
+    // // 2. Validar segurança - verificar se o caminho está dentro do root (usar root correto que pode ter sido override)
+    // if (!isPathSafe(file_path, root))
+    // {
+    //     std::cout << "[403] Path traversal bloqueado: " << request.getUri() << std::endl;
+    //     return httpForbidden403(file_path);
+    // }
 
     // 3. Validar se método é permitido por location
     if (!validateAllowedMethod(request))
@@ -131,9 +128,7 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
         }
         else
         {
-            // 🔍 Buscar location para ver se autoindex está on/off
-            const LocationConfig* location = findMatchingLocation(request.getUri());
-            
+            // Verificar se autoindex está on/off (location já foi buscada acima)
             if (location && location->autoindex)
             {
                 // ✅ autoindex on → Gerar listagem HTML
@@ -167,12 +162,23 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
 
 void Response::methodPost(const HttpRequest& request)
 {   
-    // 1. Validar client_max_body_size
+    // 1. Validar client_max_body_size (server e location)
     size_t body_size = request.getBody().size();
+    
+    // Validar limite global do servidor
     if (this->config.client_max_body_size > 0 && body_size > this->config.client_max_body_size)
     {
-        std::cout << "[413] Body size (" << body_size << ") excede limite (" 
+        std::cout << "[413] Body size (" << body_size << ") excede limite do servidor (" 
                   << this->config.client_max_body_size << ")" << std::endl;
+        return httpPayloadTooLarge413();
+    }
+    
+    // Validar limite específico da location (mais restritivo)
+    const LocationConfig* location = findMatchingLocation(request.getUri());
+    if (location && location->client_max_body_size > 0 && body_size > location->client_max_body_size)
+    {
+        std::cout << "[413] Body size (" << body_size << ") excede limite da location (" 
+                  << location->client_max_body_size << ")" << std::endl;
         return httpPayloadTooLarge413();
     }
     
@@ -252,12 +258,40 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
         std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
         return httpForbidden403(file_path);
     }
+    
+    // 3. Validar symlinks - resolver path real e verificar segurança
+    std::string real_path = getRealPath(file_path);
+    if (real_path.empty())
+    {
+        std::cout << "[403] Não foi possível resolver path real: " << file_path << std::endl;
+        return httpForbidden403(file_path);
+    }
+    
+    // Validar que o path real ainda está dentro do root permitido
+    std::string root = this->config.root;
+    const LocationConfig* location = findMatchingLocation(request.getUri());
+    if (location && !location->root.empty())
+        root = location->root;
+        
+    if (!isPathSafe(real_path, root))
+    {
+        std::cout << "[403] Symlink aponta para fora do root permitido: " << file_path << " -> " << real_path << std::endl;
+        return httpForbidden403(file_path);
+    }
 
-    // 3. Verificar permissões de escrita no diretório pai
+    // 4. Verificar permissões de escrita no diretório pai
     std::string parent_dir = getParentDirectory(file_path);
     if (!hasWritePermission(parent_dir))
     {
         std::cout << "[403] Sem permissão para deletar: " << file_path << std::endl;
+        return httpForbidden403(file_path);
+    }
+
+    // 5. Verificar se o arquivo é protegido (ex: index.html)
+    std::string filename = getFileName(file_path);
+    if (isProtectedFile(filename))
+    {
+        std::cout << "[403] Arquivo protegido, não pode ser deletado: " << file_path << std::endl;
         return httpForbidden403(file_path);
     }
 
@@ -267,15 +301,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     std::cout << "[DELETE] Tamanho: " << file_size << " bytes" << std::endl;
     std::cout << "[DELETE] URI: " << request.getUri() << std::endl;
 
-    // 4. Verificar se o arquivo é protegido (ex: index.html)
-    std::string filename = getFileName(file_path);
-    if (isProtectedFile(filename))
-    {
-        std::cout << "[403] Arquivo protegido, não pode ser deletado: " << file_path << std::endl;
-        return httpForbidden403(file_path);
-    }
-
-    // 5. Tentar deletar arquivo
+    // 6. Tentar deletar arquivo
     if (remove(file_path.c_str()) != 0)
     {
         std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
@@ -352,8 +378,8 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
             return httpPayloadTooLarge413();
         }
         
-        std::string unique_filename = generateUniqueFilename(files[i].filename);
-        std::string full_path = upload_dir + "/" + unique_filename;
+        // std::string unique_filename = generateUniqueFilename(files[i].filename);
+        std::string full_path = upload_dir + "/" + files[i].filename;
         
         if (writeFileToDisk(full_path, files[i].content))
         {
