@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 15:48:26 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 15:49:54 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -391,8 +391,8 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
                 json_response << ",";
             
             json_response << "{";
-            json_response << "\"filename\":\"" << unique_filename << "\",";
-            json_response << "\"original_name\":\"" << files[i].filename << "\",";
+            json_response << "\"filename\":\"" << files[i].filename << "\",";
+            // json_response << "\"original_name\":\"" << files[i].filename << "\",";
             json_response << "\"path\":\"" << full_path << "\",";
             json_response << "\"size\":" << files[i].content.size() << ",";
             json_response << "\"mime_type\":\"" << getMimeType(files[i].filename) << "\"";
