@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 11:15:01 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 11:23:56 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,7 +62,14 @@ void Response::buildHttpResponse(const HttpRequest& request)
 {
     // 1. Sanitizar URI para prevenir path traversal
     std::string uri = sanitizePath(request.getUri());
-    std::string file_path = this->config.root + uri;
+
+    std::string root = this->config.root;
+    const LocationConfig* location = findMatchingLocation(request.getUri());
+    
+    if (location && !location->root.empty())
+        root = location->root;
+
+    std::string file_path = root + uri;
 
     // 2. Validar segurança - verificar se o caminho está dentro do root
     if (!isPathSafe(file_path, this->config.root))
