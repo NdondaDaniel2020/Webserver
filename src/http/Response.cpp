@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 16:00:42 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 09:11:14 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,6 +14,19 @@
 
 Response::Response(const HttpRequest& request, const ServerConfig& config) : config(config)
 {
+    // Extensões de arquivo permitidas em post (segurança)
+    this->allowed_extensions.push_back(".jpg");
+    this->allowed_extensions.push_back(".jpeg");
+    this->allowed_extensions.push_back(".png");
+    this->allowed_extensions.push_back(".gif");
+    this->allowed_extensions.push_back(".pdf");
+    this->allowed_extensions.push_back(".txt");
+    this->allowed_extensions.push_back(".doc");
+    this->allowed_extensions.push_back(".docx");
+    this->allowed_extensions.push_back(".zip");
+    this->allowed_extensions.push_back(".mp4");
+    this->allowed_extensions.push_back(".mp3");
+
     buildHttpResponse(request);
 }
 
@@ -55,36 +68,15 @@ void Response::buildHttpResponse(const HttpRequest& request)
         std::cout << "[403] Path traversal bloqueado: " << request.getUri() << std::endl;
         return httpForbidden403(file_path);
     }
-    
-    // 3. Buscar location correspondente e validar método permitido
-    const LocationConfig* matched_location = NULL;
-    
-    for (size_t i = 0; i < this->config.locations.size(); i++)
+
+    // 3. Validar se método é permitido por location
+    if (!validateAllowedMethod(request))
     {
-        if (request.getUri().find(this->config.locations[i].path) == 0)
-        {
-            matched_location = &this->config.locations[i];
-            break;
-        }
+        std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
+        return methodNotAllowed405(file_path);
     }
     
-    // 4. Validar se método é permitido
-    if (matched_location && !matched_location->allowed_methods.empty())
-    {
-        std::vector<std::string>::const_iterator it = std::find(
-            matched_location->allowed_methods.begin(),
-            matched_location->allowed_methods.end(),
-            request.getMethod()
-        );
-        
-        if (it == matched_location->allowed_methods.end())
-        {
-            std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
-            return methodNotAllowed405(file_path);
-        }
-    }
-    
-    // 5. Executar método
+    // 4. Executar método
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
     else if (request.getMethod() == "POST")
@@ -232,30 +224,10 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         return httpUnsupportedMediaType415();
     }
     
-    // Determinar diretório de upload (usar root se não houver upload_dir configurado)
-    std::string upload_dir = this->config.root;
-    for (size_t i = 0; i < this->config.locations.size(); i++)
-    {
-        if (file_path.find(this->config.locations[i].path) != std::string::npos)
-        {
-            // Verificar client_max_body_size específico da location
-            if (this->config.locations[i].client_max_body_size > 0 && request.getBody().size() > this->config.locations[i].client_max_body_size)
-            {
-                std::cout << "[413] Body size (" << request.getBody().size() << ") excede limite da location (" 
-                            << this->config.locations[i].client_max_body_size << ")" << std::endl;
-                return httpPayloadTooLarge413();
-            }
-            // Determinar upload_dir específico da location
-            if (!this->config.locations[i].upload_dir.empty())
-            {
-                if (this->config.locations[i].upload_dir[0] != '/')
-                    upload_dir = this->config.root + "/" + this->config.locations[i].upload_dir;
-                else
-                    upload_dir = this->config.locations[i].upload_dir;
-            }
-            break;
-        }
-    }
+    // Determinar diretório de upload. se estiver vazio significa que o body é muito grande
+    std::string upload_dir = getUploadDir(request, file_path);
+    if (upload_dir.empty())
+        return httpPayloadTooLarge413();
     
     // Criar diretório se não existir
     if (!createDirectory(upload_dir))
@@ -270,22 +242,9 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
         return httpForbidden403(upload_dir);
     }
-    
-    // Extensões de arquivo permitidas (segurança)
-    std::vector<std::string> allowed_extensions;
-    allowed_extensions.push_back(".jpg");
-    allowed_extensions.push_back(".jpeg");
-    allowed_extensions.push_back(".png");
-    allowed_extensions.push_back(".gif");
-    allowed_extensions.push_back(".pdf");
-    allowed_extensions.push_back(".txt");
-    allowed_extensions.push_back(".doc");
-    allowed_extensions.push_back(".docx");
-    allowed_extensions.push_back(".zip");
-    allowed_extensions.push_back(".mp4");
-    allowed_extensions.push_back(".mp3");
-    
+      
     // Salvar cada arquivo com validação
+    // std::ostringstream saveFiles(files, upload_dir);
     std::ostringstream json_response;
     json_response << "{\"files\":[";
     std::vector<std::string> saved_files;  // Para limpeza em caso de erro
@@ -294,7 +253,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     for (size_t i = 0; i < files.size(); ++i)
     {
         // Validar extensão do arquivo
-        if (!isAllowedFileExtension(files[i].filename, allowed_extensions))
+        if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
         {
             std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
             cleanupFiles(saved_files);  // Limpar arquivos já salvos
@@ -349,9 +308,9 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     httpCreated201(location, json_response.str());
 }
 
-// applicationXWwwFormUrlencoded
-// applicationJson
-// textPlain
+
+
+
 
 void Response::httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path)
 {
@@ -524,4 +483,70 @@ void Response::httpBadRequest400(const std::string& message)
     oss << "\r\n";
     oss << content;
     this->response_str = oss.str();
+}
+
+
+
+
+bool Response::validateAllowedMethod(const HttpRequest& request)
+{
+    // Buscar location correspondente e validar método permitido
+    const LocationConfig* matched_location = NULL;
+
+    for (size_t i = 0; i < this->config.locations.size(); i++)
+    {
+        if (request.getUri().find(this->config.locations[i].path) == 0)
+        {
+            matched_location = &this->config.locations[i];
+            break;
+        }
+    }
+    
+    // Se a location tem uma lista de métodos permitidos, verificar se o método da requisição está nela
+    if (matched_location && !matched_location->allowed_methods.empty())
+    {
+        std::vector<std::string>::const_iterator it = std::find(
+            matched_location->allowed_methods.begin(),
+            matched_location->allowed_methods.end(),
+            request.getMethod()
+        );
+        
+        if (it == matched_location->allowed_methods.end())
+            return false;
+    }
+    return true;
+}
+
+std::string Response::getUploadDir(const HttpRequest& request, const std::string& file_path)
+{
+    // Determinar diretório de upload (usar root se não houver upload_dir configurado)
+    std::string upload_dir = this->config.root;
+    for (size_t i = 0; i < this->config.locations.size(); i++)
+    {
+        if (file_path.find(this->config.locations[i].path) != std::string::npos)
+        {
+            // Verificar client_max_body_size específico da location
+            if (this->config.locations[i].client_max_body_size > 0 && request.getBody().size() > this->config.locations[i].client_max_body_size)
+            {
+                std::cout << "[413] Body size (" << request.getBody().size() << ") excede limite da location (" 
+                            << this->config.locations[i].client_max_body_size << ")" << std::endl;
+                return "";
+            }
+            // Determinar upload_dir específico da location
+            if (!this->config.locations[i].upload_dir.empty())
+            {
+                if (this->config.locations[i].upload_dir[0] != '/')
+                    upload_dir = this->config.root + "/" + this->config.locations[i].upload_dir;
+                else
+                    upload_dir = this->config.locations[i].upload_dir;
+            }
+            break;
+        }
+    }
+    return upload_dir;
+}
+
+std::ostringstream saveFiles(const std::vector<MultipartFile> files, const std::string& upload_dir)
+{
+    
 }
