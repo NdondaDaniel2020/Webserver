@@ -2,17 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>404 - Web Ninjas</title>
+    <title>405 - Web Ninjas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             height: 100vh;
@@ -33,9 +29,9 @@
 
         .code {
             font-family: 'Orbitron', sans-serif;
-            font-size: 120px;
+            font-size: 110px;
             color: #00FF9C;
-            text-shadow: 0 0 20px rgba(0,255,156,0.7);
+            text-shadow: 0 0 15px rgba(0,255,156,0.6);
         }
 
         h1 {
@@ -45,7 +41,14 @@
 
         p {
             color: #9CA3AF;
+            margin-bottom: 30px;
+        }
+
+        .method {
+            font-family: monospace;
+            color: #00FF9C;
             margin-bottom: 40px;
+            opacity: 0.8;
         }
 
         .btn {
@@ -88,11 +91,18 @@
 <div class="background-lines"></div>
 
 <div class="container">
-    <div class="code">404</div>
-    <h1>Resource Not Found</h1>
-    <p>This resource vanished into the shadows.<br>
-       The ninja could not locate your target.</p>
-    <a href="/index.html" class="btn">Return to Base</a>
+    <div class="code">405</div>
+    <h1>Method Not Allowed</h1>
+
+    <p>
+        The HTTP method used is not permitted on this route.
+    </p>
+
+    <div class="method">
+        Allowed methods are defined by the Web Ninjas configuration.
+    </div>
+
+    <a href="/" class="btn">Return to Base</a>
 </div>
 
 </body>

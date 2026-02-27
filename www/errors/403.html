@@ -2,17 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>404 - Web Ninjas</title>
+    <title>403 - Web Ninjas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
 
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             height: 100vh;
@@ -33,9 +29,9 @@
 
         .code {
             font-family: 'Orbitron', sans-serif;
-            font-size: 120px;
+            font-size: 110px;
             color: #00FF9C;
-            text-shadow: 0 0 20px rgba(0,255,156,0.7);
+            text-shadow: 0 0 15px rgba(0,255,156,0.6);
         }
 
         h1 {
@@ -63,6 +59,15 @@
             box-shadow: 0 0 15px #00FF9C;
         }
 
+        .lock-symbol {
+            font-size: 18px;
+            letter-spacing: 6px;
+            color: #00FF9C;
+            opacity: 0.6;
+            margin-bottom: 20px;
+            font-family: monospace;
+        }
+
         .background-lines {
             position: absolute;
             width: 200%;
@@ -88,11 +93,14 @@
 <div class="background-lines"></div>
 
 <div class="container">
-    <div class="code">404</div>
-    <h1>Resource Not Found</h1>
-    <p>This resource vanished into the shadows.<br>
-       The ninja could not locate your target.</p>
-    <a href="/index.html" class="btn">Return to Base</a>
+    <div class="lock-symbol">&lt; ACCESS_DENIED /&gt;</div>
+    <div class="code">403</div>
+    <h1>Forbidden</h1>
+    <p>
+        This area is protected by the Web Ninjas.<br>
+        Your credentials are not authorized for this route.
+    </p>
+    <a href="/" class="btn">Return to Base</a>
 </div>
 
 </body>
