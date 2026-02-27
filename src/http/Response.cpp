@@ -109,8 +109,13 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
     // 2. Verificar se é diretório
     if (isDirectory(_file_path))
     {
+        // Determinar quais index files usar (location override ou server default)
+        std::vector<std::string> index_files_to_use = this->config.index_files;
+        if (location && !location->index_files.empty())
+            index_files_to_use = location->index_files;  // Override!
+        
         // Buscar arquivo index configurado (index.html, etc)
-        std::string index_path = findIndexFile(_file_path, this->config.index_files);
+        std::string index_path = findIndexFile(_file_path, index_files_to_use);
         
         if (!index_path.empty())
         {
