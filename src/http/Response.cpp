@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 10:39:21 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 11:15:01 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -92,7 +92,14 @@ void Response::buildHttpResponse(const HttpRequest& request)
 void Response::methodGet(const HttpRequest& request, const std::string& file_path)
 {
     std::string _file_path = file_path;
-    // 3. Verificar se é diretório
+
+    const LocationConfig* location = findMatchingLocation(request.getUri());
+
+    // 1. Verificar se tem redirect configurado
+    if (location && location->redirect_code > 0)
+        return handleRedirect(location->redirect_code, location->redirect_url);
+
+    // 2. Verificar se é diretório
     if (isDirectory(_file_path))
     {
         // Buscar arquivo index configurado (index.html, etc)
@@ -120,20 +127,20 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
         }
     }
     
-    // 4. Verificar se arquivo existe
+    // 3. Verificar se arquivo existe
     if (!fileExists(_file_path))
     {
         return httpFileNotFound404(request, "", _file_path);
     }
     
-    // 5. Verificar permissões de leitura
+    // 4. Verificar permissões de leitura
     if (!isReadable(_file_path))
     {
         std::cout << "[403] Sem permissão de leitura: " << _file_path << std::endl;
         return httpForbidden403(_file_path);
     }
     
-    // 6. Ler arquivo e retornar
+    // 5. Ler arquivo e retornar
     std::string content = readFile(_file_path);
     httpFileFound200(request, content, _file_path);
 }
@@ -607,3 +614,18 @@ void Response::generateDirectoryListing(const HttpRequest& request, const std::s
     httpFileFound200(request, html.str(), dir_path);
 }
 
+void Response::handleRedirect(int code, const std::string& url)
+{
+    std::ostringstream oss;
+    oss << "HTTP/1.1 " << code;
+    
+    if (code == 301) oss << " Moved Permanently\r\n";
+    else if (code == 302) oss << " Found\r\n";
+    else if (code == 307) oss << " Temporary Redirect\r\n";
+    else if (code == 308) oss << " Permanent Redirect\r\n";
+    
+    oss << "Location: " << url << "\r\n";
+    oss << "Content-Length: 0\r\n";
+    oss << "Connection: close\r\n\r\n";
+    this->response_str = oss.str();
+}

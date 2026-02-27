@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 10:37:17 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/27 11:00:34 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -59,6 +59,7 @@ class Response
         bool validateAllowedMethod(const HttpRequest& request);
         std::string getUploadDir(const HttpRequest& request, const std::string& file_path);
         void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
+        void handleRedirect(int code, const std::string& url);
 };
 
 #endif
