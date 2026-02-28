@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 15:49:54 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:11:31 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -378,8 +378,9 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
             return httpPayloadTooLarge413();
         }
         
-        // std::string unique_filename = generateUniqueFilename(files[i].filename);
-        std::string full_path = upload_dir + "/" + files[i].filename;
+        // RFC 2388: Servidor pode renomear arquivo por segurança/conflitos
+        std::string unique_filename = generateUniqueFilename(files[i].filename);
+        std::string full_path = upload_dir + "/" + unique_filename;
         
         if (writeFileToDisk(full_path, files[i].content))
         {
@@ -391,8 +392,8 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
                 json_response << ",";
             
             json_response << "{";
-            json_response << "\"filename\":\"" << files[i].filename << "\",";
-            // json_response << "\"original_name\":\"" << files[i].filename << "\",";
+            json_response << "\"filename\":\"" << unique_filename << "\",";
+            json_response << "\"original_name\":\"" << files[i].filename << "\",";
             json_response << "\"path\":\"" << full_path << "\",";
             json_response << "\"size\":" << files[i].content.size() << ",";
             json_response << "\"mime_type\":\"" << getMimeType(files[i].filename) << "\"";
@@ -409,10 +410,18 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     
     json_response << "],\"success\":true,\"count\":" << success_count << "}";
     
-    // Retornar 201 Created com Location do primeiro arquivo
+    // RFC 7231: Location header deve conter URI do recurso criado (não caminho filesystem)
     std::string location = "";
     if (!saved_files.empty())
-        location = saved_files[0];
+    {
+        // Extrair URI relativo: /tmp/uploads/arquivo.pdf -> /uploads/arquivo.pdf
+        std::string first_file = saved_files[0];
+        size_t upload_pos = first_file.find("/uploads/");
+        if (upload_pos != std::string::npos)
+            location = first_file.substr(upload_pos);  // URI relativo ao servidor
+        else
+            location = request.getUri() + "/" + getFileName(first_file);
+    }
     
     httpCreated201(location, json_response.str());
 }
@@ -463,6 +472,28 @@ void Response::httpFileFound200(const HttpRequest& request, const std::string& c
 
     // Detectar MIME type correto baseado na extensão
     std::string mime_type = getMimeType(file_path);
+    
+    // RFC 6266: Content-Disposition sugere nome para download
+    // Extrair nome do arquivo do caminho
+    std::string filename = getFileName(file_path);
+    
+    // Se arquivo tem timestamp (formato: 1234567890_nome.ext), extrair nome original
+    size_t underscore_pos = filename.find('_');
+    if (underscore_pos != std::string::npos && underscore_pos < 15)  // Timestamp tem ~10 dígitos
+    {
+        // Verificar se começa com dígitos (timestamp)
+        bool is_timestamp = true;
+        for (size_t i = 0; i < underscore_pos && i < filename.size(); ++i)
+        {
+            if (!isdigit(filename[i]))
+            {
+                is_timestamp = false;
+                break;
+            }
+        }
+        if (is_timestamp)
+            filename = filename.substr(underscore_pos + 1);  // Remove timestamp_
+    }
 
     std::ostringstream oss;
     oss << "HTTP/1.1 200 OK\r\n";
@@ -470,6 +501,7 @@ void Response::httpFileFound200(const HttpRequest& request, const std::string& c
     oss << "Server: webserv/1.0\r\n";
     oss << "Content-Type: " << mime_type << "\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
+    oss << "Content-Disposition: attachment; filename=\"" << filename << "\"\r\n";
     oss << "Last-Modified: " << getFileModifiedDate(file_path) << "\r\n";
 
     if (request.getHeader("Connection") != "" && request.getHeader("Connection") == "keep-alive")
