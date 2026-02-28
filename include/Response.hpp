@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:39:59 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 11:54:37 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,6 +21,7 @@
 # include "FileUtils.hpp"
 # include "ConfigParser.hpp"
 # include "HttpRequest.hpp"
+# include "StatusCodes.hpp"
 
 class Response
 {
@@ -40,26 +41,12 @@ class Response
         
     private:
         void buildHttpResponse(const HttpRequest& request);
-        void httpOk200(const std::string& message);
-        void httpFileFound200(const HttpRequest& request, const std::string& content, const std::string& file_path);
-        void httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path);
-        void methodNotAllowed405(const std::string& file_path);
-        void httpForbidden403(const std::string& file_path);
-        void httpCreated201(const std::string& location, const std::string& message);
-        void httpPayloadTooLarge413();
-        void httpUnsupportedMediaType415();
-        void httpBadRequest400(const std::string& message);
-        void httpNoContent204();
-        void httpInternalServerError500(const std::string& message);
-
         
         void methodGet(const HttpRequest& request, const std::string& file_path);
         void methodPost(const HttpRequest& request);
         void methodDelete(const HttpRequest& request, const std::string& file_path);
-
         
         void multipartFormData(const HttpRequest& request, const std::string& content_type);
-        
         
         const LocationConfig* findMatchingLocation(const std::string& uri) const;
         bool validateAllowedMethod(const HttpRequest& request);

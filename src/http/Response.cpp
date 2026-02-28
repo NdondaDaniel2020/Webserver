@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:53:45 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 11:53:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -80,7 +80,7 @@ void Response::buildHttpResponse(const HttpRequest& request)
     if (!validateAllowedMethod(request))
     {
         std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
-        return methodNotAllowed405(file_path);
+        return StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
     }
     
     // 3. Executar método
@@ -91,7 +91,7 @@ void Response::buildHttpResponse(const HttpRequest& request)
     else if (request.getMethod() == "DELETE")
         methodDelete(request, file_path);
     else
-        methodNotAllowed405(file_path);
+        StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
 }
 
 void Response::methodGet(const HttpRequest& request, const std::string& file_path)
@@ -130,7 +130,7 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
             else
             {
                 // ❌ autoindex off → 403 Forbidden
-                return httpForbidden403(_file_path);
+                return StatusCodes::http403Forbidden(this->response_str, _file_path);
             }
         }
     }
@@ -138,19 +138,19 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
     // 3. Verificar se arquivo existe
     if (!fileExists(_file_path))
     {
-        return httpFileNotFound404(request, "", _file_path);
+        return StatusCodes::http404NotFound(this->response_str, request, "", _file_path, this->config);
     }
     
     // 4. Verificar permissões de leitura
     if (!isReadable(_file_path))
     {
         std::cout << "[403] Sem permissão de leitura: " << _file_path << std::endl;
-        return httpForbidden403(_file_path);
+        return StatusCodes::http403Forbidden(this->response_str, _file_path);
     }
     
     // 5. Ler arquivo e retornar
     std::string content = readFile(_file_path);
-    httpFileFound200(request, content, _file_path);
+    StatusCodes::http200FileFound(this->response_str, request, content, _file_path);
 }
 
 void Response::methodPost(const HttpRequest& request)
@@ -163,7 +163,7 @@ void Response::methodPost(const HttpRequest& request)
     {
         std::cout << "[413] Body size (" << body_size << ") excede limite do servidor (" 
                   << this->config.client_max_body_size << ")" << std::endl;
-        return httpPayloadTooLarge413();
+        return StatusCodes::http413PayloadTooLarge(this->response_str);
     }
     
     // Validar limite específico da location (mais restritivo)
@@ -172,7 +172,7 @@ void Response::methodPost(const HttpRequest& request)
     {
         std::cout << "[413] Body size (" << body_size << ") excede limite da location (" 
                   << location->client_max_body_size << ")" << std::endl;
-        return httpPayloadTooLarge413();
+        return StatusCodes::http413PayloadTooLarge(this->response_str);
     }
     
     // 2. Obter Content-Type
@@ -181,7 +181,7 @@ void Response::methodPost(const HttpRequest& request)
     {
         // RFC 7231: 400 Bad Request para header obrigatório ausente
         std::cout << "[400] Content-Type header é obrigatório" << std::endl;
-        return httpBadRequest400("Content-Type header is required");
+        return StatusCodes::http400BadRequest(this->response_str, "Content-Type header is required");
     }
     
     // 3. Processar conforme Content-Type
@@ -201,7 +201,7 @@ void Response::methodPost(const HttpRequest& request)
         json_response << "{\"message\":\"Form data recebido\",";
         json_response << "\"size\":" << decoded_body.size() << "}";
         
-        return httpOk200(json_response.str());
+        return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
     
     // 3.3 application/json - Dados JSON
@@ -214,7 +214,7 @@ void Response::methodPost(const HttpRequest& request)
         json_response << "{\"message\":\"JSON recebido\",";
         json_response << "\"size\":" << json_body.size() << "}";
         
-        return httpOk200(json_response.str());
+        return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
     
     // 3.4 text/plain - Texto simples
@@ -224,14 +224,14 @@ void Response::methodPost(const HttpRequest& request)
         json_response << "{\"message\":\"Text data recebido\",";
         json_response << "\"size\":" << request.getBody().size() << "}";
         
-        return httpOk200(json_response.str());
+        return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
     
     // Content-Type não suportado
     else
     {
         std::cout << "[415] Content-Type não suportado: " << content_type << std::endl;
-        return httpUnsupportedMediaType415();
+        return StatusCodes::http415UnsupportedMediaType(this->response_str);
     }
 }
 
@@ -241,14 +241,14 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     if (!fileExists(file_path))
     {
         std::cout << "[404] Arquivo não encontrado para deletar: " << file_path << std::endl;
-        return httpFileNotFound404(request, "", file_path);
+        return StatusCodes::http404NotFound(this->response_str, request, "", file_path, this->config);
     }
 
     // 2. Verificar se é diretório (não permitir deletar diretórios)
     if (isDirectory(file_path))
     {
         std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
-        return httpForbidden403(file_path);
+        return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
     
     // 3. Validar symlinks - resolver path real e verificar segurança
@@ -256,7 +256,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     if (real_path.empty())
     {
         std::cout << "[403] Não foi possível resolver path real: " << file_path << std::endl;
-        return httpForbidden403(file_path);
+        return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
     
     // Validar que o path real ainda está dentro do root permitido
@@ -268,7 +268,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     if (!isPathSafe(real_path, root))
     {
         std::cout << "[403] Symlink aponta para fora do root permitido: " << file_path << " -> " << real_path << std::endl;
-        return httpForbidden403(file_path);
+        return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
     // 4. Verificar permissões de escrita no diretório pai
@@ -276,7 +276,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     if (!hasWritePermission(parent_dir))
     {
         std::cout << "[403] Sem permissão para deletar: " << file_path << std::endl;
-        return httpForbidden403(file_path);
+        return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
     // 5. Verificar se o arquivo é protegido (ex: index.html)
@@ -284,7 +284,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     if (isProtectedFile(filename))
     {
         std::cout << "[403] Arquivo protegido, não pode ser deletado: " << file_path << std::endl;
-        return httpForbidden403(file_path);
+        return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
     // Log antes de deletar
@@ -297,12 +297,12 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
     if (remove(file_path.c_str()) != 0)
     {
         std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
-        return httpInternalServerError500("Failed to delete file: " + std::string(strerror(errno)));
+        return StatusCodes::http500InternalServerError(this->response_str, "Failed to delete file: " + std::string(strerror(errno)));
     }
 
     // 6. Sucesso
     std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
-    return httpNoContent204();
+    return StatusCodes::http204NoContent(this->response_str);
 }
 
 
@@ -315,33 +315,33 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
     if (boundary.empty())
     {
         std::cout << "[400] Boundary não encontrado no Content-Type" << std::endl;
-        return httpUnsupportedMediaType415();
+        return StatusCodes::http415UnsupportedMediaType(this->response_str);
     }
     
     std::vector<MultipartFile> files;
     if (!parseMultipartData(request.getBody(), boundary, files))
     {
         std::cout << "[400] Erro ao parsear multipart data" << std::endl;
-        return httpUnsupportedMediaType415();
+        return StatusCodes::http415UnsupportedMediaType(this->response_str);
     }
     
     // Determinar diretório de upload. se estiver vazio significa que o body é muito grande
     std::string upload_dir = getUploadDir(request);
     if (upload_dir.empty())
-        return httpPayloadTooLarge413();
+        return StatusCodes::http413PayloadTooLarge(this->response_str);
     
     // Criar diretório se não existir
     if (!createDirectory(upload_dir))
     {
         std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
-        return httpInternalServerError500("Failed to create upload directory: " + upload_dir);
+        return StatusCodes::http500InternalServerError(this->response_str, "Failed to create upload directory: " + upload_dir);
     }
     
     // Verificar permissões de escrita
     if (!hasWritePermission(upload_dir))
     {
         std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
-        return httpForbidden403(upload_dir);
+        return StatusCodes::http403Forbidden(this->response_str, upload_dir);
     }
       
     // Salvar cada arquivo com validação
@@ -358,7 +358,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         {
             std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
             cleanupFiles(saved_files);  // Limpar arquivos já salvos
-            return httpBadRequest400("File extension not allowed: " + getFileExtension(files[i].filename));
+            return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename));
         }
         
         // Validar tamanho individual do arquivo (max 10MB por arquivo)
@@ -367,7 +367,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
             std::cout << "[413] Arquivo muito grande: " << files[i].filename 
                       << " (" << files[i].content.size() << " bytes)" << std::endl;
             cleanupFiles(saved_files);
-            return httpPayloadTooLarge413();
+            return StatusCodes::http413PayloadTooLarge(this->response_str);
         }
         
         // RFC 2388: Servidor pode renomear arquivo por segurança/conflitos
@@ -396,7 +396,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         {
             std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
             cleanupFiles(saved_files);  // Limpar todos em caso de erro
-            return httpBadRequest400("Failed to save file: " + files[i].filename);
+            return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + files[i].filename);
         }
     }
     
@@ -415,257 +415,7 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
             location = request.getUri() + "/" + getFileName(first_file);
     }
     
-    httpCreated201(location, json_response.str());
-}
-
-
-
-
-
-void Response::httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path)
-{
-    // Arquivo não encontrado - retornar 404
-    std::cout << "[404] Arquivo não encontrado: " << file_path << std::endl;
-    
-    // Buscar página de erro 404 personalizada
-    std::string error_page_404;
-    std::map<std::string, std::string>::const_iterator it = this->config.error_pages.find("404");
-    if (it != this->config.error_pages.end())
-        error_page_404 = this->config.root + it->second;
-    
-    std::string final_content = content;
-    if (!error_page_404.empty())
-        final_content = readFile(error_page_404);
-    
-    if (final_content.empty())
-        final_content = "<html><body><h1>404 Not Found</h1></body></html>";
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 404 Not Found\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: text/html; charset=UTF-8\r\n";
-    oss << "Content-Length: " << final_content.size() << "\r\n";
-    
-    if (request.getHeader("Connection") != "" && request.getHeader("Connection") == "keep-alive")
-        oss << "Connection: keep-alive\r\n";
-    else
-        oss << "Connection: close\r\n";
-
-    oss << "\r\n";
-    oss << final_content;
-    this->response_str = oss.str();
-}
-
-void Response::httpOk200(const std::string& message)
-{
-    // RFC 7231: 200 OK para processamento bem-sucedido sem criar recurso
-    std::cout << "[200] OK - Requisição processada" << std::endl;
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 200 OK\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: application/json; charset=UTF-8\r\n";
-    oss << "Content-Length: " << message.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << message;
-    this->response_str = oss.str();
-}
-
-void Response::httpFileFound200(const HttpRequest& request, const std::string& content, const std::string& file_path)
-{
-    // Arquivo encontrado - retornar 200 OK
-    std::cout << "[200] Arquivo encontrado: " << file_path << " (" << content.size() << " bytes)" << std::endl;
-
-    // Detectar MIME type correto baseado na extensão
-    std::string mime_type = getMimeType(file_path);
-    
-    // RFC 6266: Content-Disposition sugere nome para download
-    // Extrair nome do arquivo do caminho
-    std::string filename = getFileName(file_path);
-    
-    // Se arquivo tem timestamp (formato: 1234567890_nome.ext), extrair nome original
-    size_t underscore_pos = filename.find('_');
-    if (underscore_pos != std::string::npos && underscore_pos < 15)  // Timestamp tem ~10 dígitos
-    {
-        // Verificar se começa com dígitos (timestamp)
-        bool is_timestamp = true;
-        for (size_t i = 0; i < underscore_pos && i < filename.size(); ++i)
-        {
-            if (!isdigit(filename[i]))
-            {
-                is_timestamp = false;
-                break;
-            }
-        }
-        if (is_timestamp)
-            filename = filename.substr(underscore_pos + 1);  // Remove timestamp_
-    }
-
-    std::ostringstream oss;
-    oss << "HTTP/1.1 200 OK\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: " << mime_type << "\r\n";
-    oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Content-Disposition: attachment; filename=\"" << filename << "\"\r\n";
-    oss << "Last-Modified: " << getFileModifiedDate(file_path) << "\r\n";
-
-    if (request.getHeader("Connection") != "" && request.getHeader("Connection") == "keep-alive")
-        oss << "Connection: keep-alive\r\n";
-    else
-        oss << "Connection: close\r\n";
-
-    oss << "\r\n";
-    oss << content;
-    this->response_str = oss.str();
-}
-
-void Response::methodNotAllowed405(const std::string& file_path)
-{
-    // Método não permitido - retornar 405 Method Not Allowed
-    std::cout << "[405] Método não permitido para: " << file_path << std::endl;
-
-    std::ostringstream oss;
-    oss << "HTTP/1.1 405 Method Not Allowed\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: text/html; charset=UTF-8\r\n";
-    oss << "Content-Length: 0\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    this->response_str = oss.str();
-}
-
-void Response::httpForbidden403(const std::string& file_path)
-{
-    // Acesso proibido - retornar 403 Forbidden
-    std::cout << "[403] Acesso proibido: " << file_path << std::endl;
-    
-    std::string content = "<html><body><h1>403 Forbidden</h1><p>Access Denied</p></body></html>";
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 403 Forbidden\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: text/html; charset=UTF-8\r\n";
-    oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << content;
-    this->response_str = oss.str();
-}
-
-void Response::httpCreated201(const std::string& location, const std::string& message)
-{
-    // Recurso criado - retornar 201 Created
-    std::cout << "[201] Recurso criado: " << location << std::endl;
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 201 Created\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Location: " << location << "\r\n";
-    oss << "Content-Type: application/json; charset=UTF-8\r\n";
-    oss << "Content-Length: " << message.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << message;
-    this->response_str = oss.str();
-}
-
-void Response::httpPayloadTooLarge413()
-{
-    // Body muito grande - retornar 413 Payload Too Large
-    std::cout << "[413] Payload Too Large" << std::endl;
-    
-    std::string content = "<html><body><h1>413 Payload Too Large</h1></body></html>";
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 413 Payload Too Large\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: text/html; charset=UTF-8\r\n";
-    oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << content;
-    this->response_str = oss.str();
-}
-
-void Response::httpUnsupportedMediaType415()
-{
-    // Content-Type não suportado - retornar 415 Unsupported Media Type
-    std::cout << "[415] Unsupported Media Type" << std::endl;
-    
-    std::string content = "<html><body><h1>415 Unsupported Media Type</h1></body></html>";
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 415 Unsupported Media Type\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: text/html; charset=UTF-8\r\n";
-    oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << content;
-    this->response_str = oss.str();
-}
-
-void Response::httpBadRequest400(const std::string& message)
-{
-    // Requisição malformada - retornar 400 Bad Request
-    std::cout << "[400] Bad Request: " << message << std::endl;
-    
-    std::ostringstream json_response;
-    json_response << "{\"error\":\"Bad Request\",\"message\":\"" << message << "\"}";
-    std::string content = json_response.str();
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 400 Bad Request\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: application/json; charset=UTF-8\r\n";
-    oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << content;
-    this->response_str = oss.str();
-}
-
-void Response::httpNoContent204()
-{
-    // Recurso deletado com sucesso - retornar 204 No Content
-    std::cout << "[204] No Content - Recurso deletado" << std::endl;
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 204 No Content\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    this->response_str = oss.str();
-}
-
-void Response::httpInternalServerError500(const std::string& message)
-{
-    // Erro interno do servidor - retornar 500 Internal Server Error
-    std::cout << "[500] Internal Server Error: " << message << std::endl;
-    
-    std::string content = "<html><body><h1>500 Internal Server Error</h1><p>" + message + "</p></body></html>";
-    
-    std::ostringstream oss;
-    oss << "HTTP/1.1 500 Internal Server Error\r\n";
-    oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
-    oss << "Content-Type: text/html; charset=UTF-8\r\n";
-    oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Connection: close\r\n";
-    oss << "\r\n";
-    oss << content;
-    this->response_str = oss.str();
+    StatusCodes::http201Created(this->response_str, location, json_response.str());
 }
 
 
@@ -774,7 +524,7 @@ void Response::generateDirectoryListing(const HttpRequest& request, const std::s
     html << "</ul><hr></body></html>";
     
     // 4. Retornar 200 OK com HTML
-    httpFileFound200(request, html.str(), dir_path);
+    StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path);
 }
 
 void Response::handleRedirect(int code, const std::string& url)
