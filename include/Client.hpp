@@ -28,7 +28,8 @@ class Client
             READING_BODY,       // Headers completos, recebendo body (POST)
             PROCESSING,         // Processando requisição
             SENDING_RESPONSE,   // Enviando resposta ao cliente
-            DONE                // Resposta enviada, pode fechar ou reutilizar
+            DONE,               // Resposta enviada, pode fechar ou reutilizar
+            ERROR_413           // Payload Too Large - Content-Length excedeu limite
         };
 
     private:

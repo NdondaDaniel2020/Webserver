@@ -11,6 +11,7 @@
 /* ************************************************************************** */
 
 #include "Client.hpp"
+#include "StatusCodes.hpp"
 #include <iostream>
 #include <cstring>
 
@@ -112,6 +113,10 @@ bool Client::isRequestComplete()
         {
             parseHeaders();
             
+            // Se parseHeaders detectou erro 413, marcar como completo
+            if (state == ERROR_413)
+                return true;
+            
             // Se não tem body (GET, POST, DELETE) e Content-Length: 0
             if ((request.getMethod() == "GET" || 
                 request.getMethod() == "POST" ||
@@ -161,6 +166,22 @@ void Client::parseHeaders()
     {
         std::istringstream iss(request.getHeader("Content-Length"));
         iss >> content_length;
+        
+        // ✅ VALIDAR Content-Length ANTES de receber o body
+        if (config)
+        {
+            const ServerConfig& server_cfg = config->getServerConfig(0);
+            size_t max_size = server_cfg.client_max_body_size;
+            
+            if (max_size > 0 && content_length > max_size)
+            {
+                std::cout << "[413] Content-Length (" << content_length 
+                          << ") excede limite (" << max_size 
+                          << ") - Rejeitando ANTES de receber body" << std::endl;
+                state = ERROR_413;
+                return;
+            }
+        }
     }
     
     // Verificar keep-alive
@@ -187,6 +208,23 @@ bool Client::checkBodyComplete()
 
 void Client::processRequest(const ServerConfig& server_config)
 {
+    // ✅ Tratar erro 413 detectado ANTES de receber o body
+    if (state == ERROR_413)
+    {
+        std::cout << "[CLIENT " << fd << "] Gerando resposta 413 (Content-Length excedeu limite)" << std::endl;
+        
+        // Criar resposta 413 diretamente
+        std::string response_str;
+        StatusCodes::http413PayloadTooLarge(response_str);
+        
+        send_buffer = response_str;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        keep_alive = false;  // Forçar fechamento da conexão
+        
+        return;
+    }
+    
     if (state != PROCESSING)
         return;
     

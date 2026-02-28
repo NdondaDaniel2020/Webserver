@@ -201,7 +201,7 @@ void Server::handleClientData(int fd)
         // Verificar se requisição está completa
         if (client->isRequestComplete())
         {
-            // Processar requisição
+            // Processar requisição (inclusive erros como 413)
             client->processRequest(this->config.getServerConfig(0));
         }
     }
