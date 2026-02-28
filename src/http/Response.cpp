@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:39:57 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:53:45 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -179,8 +179,9 @@ void Response::methodPost(const HttpRequest& request)
     std::string content_type = request.getHeader("Content-Type");
     if (content_type.empty())
     {
-        std::cout << "[415] Content-Type não especificado" << std::endl;
-        return httpUnsupportedMediaType415();
+        // RFC 7231: 400 Bad Request para header obrigatório ausente
+        std::cout << "[400] Content-Type header é obrigatório" << std::endl;
+        return httpBadRequest400("Content-Type header is required");
     }
     
     // 3. Processar conforme Content-Type
@@ -195,14 +196,12 @@ void Response::methodPost(const HttpRequest& request)
         // Decodificar form data
         std::string decoded_body = urlDecode(request.getBody());
         
-        // Aqui você pode processar os dados do formulário
-        // Por exemplo, salvar em um arquivo ou processar conforme necessário
-        
+        // RFC 7231: 200 OK para processamento sem criar recurso
         std::ostringstream json_response;
         json_response << "{\"message\":\"Form data recebido\",";
         json_response << "\"size\":" << decoded_body.size() << "}";
         
-        return httpCreated201("/form", json_response.str());
+        return httpOk200(json_response.str());
     }
     
     // 3.3 application/json - Dados JSON
@@ -215,7 +214,7 @@ void Response::methodPost(const HttpRequest& request)
         json_response << "{\"message\":\"JSON recebido\",";
         json_response << "\"size\":" << json_body.size() << "}";
         
-        return httpCreated201("/api", json_response.str());
+        return httpOk200(json_response.str());
     }
     
     // 3.4 text/plain - Texto simples
@@ -225,7 +224,7 @@ void Response::methodPost(const HttpRequest& request)
         json_response << "{\"message\":\"Text data recebido\",";
         json_response << "\"size\":" << request.getBody().size() << "}";
         
-        return httpCreated201("/text", json_response.str());
+        return httpOk200(json_response.str());
     }
     
     // Content-Type não suportado
@@ -455,6 +454,23 @@ void Response::httpFileNotFound404(const HttpRequest& request, const std::string
 
     oss << "\r\n";
     oss << final_content;
+    this->response_str = oss.str();
+}
+
+void Response::httpOk200(const std::string& message)
+{
+    // RFC 7231: 200 OK para processamento bem-sucedido sem criar recurso
+    std::cout << "[200] OK - Requisição processada" << std::endl;
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 200 OK\r\n";
+    oss << "Date: " << getCurrentHttpDate() << "\r\n";
+    oss << "Server: webserv/1.0\r\n";
+    oss << "Content-Type: application/json; charset=UTF-8\r\n";
+    oss << "Content-Length: " << message.size() << "\r\n";
+    oss << "Connection: close\r\n";
+    oss << "\r\n";
+    oss << message;
     this->response_str = oss.str();
 }
 

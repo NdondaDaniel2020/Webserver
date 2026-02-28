@@ -40,6 +40,7 @@ class Response
         
     private:
         void buildHttpResponse(const HttpRequest& request);
+        void httpOk200(const std::string& message);
         void httpFileFound200(const HttpRequest& request, const std::string& content, const std::string& file_path);
         void httpFileNotFound404(const HttpRequest& request, const std::string& content, const std::string& file_path);
         void methodNotAllowed405(const std::string& file_path);
