@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:23:24 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:39:57 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -76,21 +76,14 @@ void Response::buildHttpResponse(const HttpRequest& request)
 
     std::string file_path = root + removeLocationInUri(uri, location);
 
-    // // 2. Validar segurança - verificar se o caminho está dentro do root (usar root correto que pode ter sido override)
-    // if (!isPathSafe(file_path, root))
-    // {
-    //     std::cout << "[403] Path traversal bloqueado: " << request.getUri() << std::endl;
-    //     return httpForbidden403(file_path);
-    // }
-
-    // 3. Validar se método é permitido por location
+    // 2. Validar se método é permitido por location
     if (!validateAllowedMethod(request))
     {
         std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
         return methodNotAllowed405(file_path);
     }
     
-    // 4. Executar método
+    // 3. Executar método
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
     else if (request.getMethod() == "POST")
@@ -792,4 +785,20 @@ bool Response::isProtectedFile(const std::string& filename)
             return true;
     }
     return false;
+}
+
+std::string Response::removeLocationInUri(const std::string& uri, const LocationConfig* location) const
+{
+    // Comportamento alias: remove prefixo do location do URI
+    std::string uri_without_location = uri;
+    if (location && !location->path.empty())
+    {
+        if (uri.find(location->path) == 0)
+        {
+            uri_without_location = uri.substr(location->path.length());
+            if (uri_without_location.empty() || uri_without_location[0] != '/')
+                uri_without_location = "/" + uri_without_location;
+        }
+    }
+    return uri_without_location;
 }

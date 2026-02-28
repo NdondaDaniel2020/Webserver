@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:21:50 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:39:28 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -481,17 +481,3 @@ std::string getFileName(const std::string& path)
     return path.substr(pos + 1);
 }
 
-std::string removeLocationInUri(const std::string& uri,  const LocationConfig* location)
-{
-    std::string uri_without_location = uri;
-    if (location && !location->path.empty())
-    {
-        if (uri.find(location->path) == 0)
-        {
-            uri_without_location = uri.substr(location->path.length());
-            if (uri_without_location.empty() || uri_without_location[0] != '/')
-                uri_without_location = "/" + uri_without_location;
-        }
-    }
-    return uri_without_location;
-}

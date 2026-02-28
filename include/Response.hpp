@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 14:59:23 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:39:59 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -66,6 +66,7 @@ class Response
         void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
         void handleRedirect(int code, const std::string& url);
         bool isProtectedFile(const std::string& filename);
+        std::string removeLocationInUri(const std::string& uri, const LocationConfig* location) const;
 };
 
 #endif
