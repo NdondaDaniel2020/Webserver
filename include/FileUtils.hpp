@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/27 14:58:28 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:22:23 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@
 # include <unistd.h>
 # include <limits.h>
 # include <ctime>
+# include "ConfigParser.hpp"
 
 # define ERROR_OPENING_FILE "Error: Could not open file"
 
@@ -78,5 +79,6 @@ void cleanupFiles(const std::vector<std::string>& file_paths);
 std::string getParentDirectory(const std::string& path);
 size_t getFileSize(const std::string& path);
 std::string getFileName(const std::string& path);
+std::string removeLocationInUri(const std::string& uri,  const LocationConfig* location);
 
 #endif

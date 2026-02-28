@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:11:31 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:23:24 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -74,7 +74,7 @@ void Response::buildHttpResponse(const HttpRequest& request)
     if (location && !location->root.empty())
         root = location->root;
 
-    std::string file_path = root + uri;
+    std::string file_path = root + removeLocationInUri(uri, location);
 
     // // 2. Validar segurança - verificar se o caminho está dentro do root (usar root correto que pode ter sido override)
     // if (!isPathSafe(file_path, root))
