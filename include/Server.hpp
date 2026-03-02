@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/26 09:21:14 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/02 12:20:08 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,6 +39,7 @@ class Server
         epoll_event events[64];
         ConfigParser config;
         std::map<int, Client*> clients;  // fd -> Client*
+        int TIMEOUT_SECONDS;
 
     public:
         Server(const ConfigParser& config);
@@ -55,6 +56,7 @@ class Server
         void handleClientData(int fd);
         void closeClient(int fd);
         bool isServerSocket(int fd) const;
+        void checkTimeout();
 };
 
 #endif

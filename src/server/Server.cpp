@@ -6,14 +6,14 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 12:05:45 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/02 12:38:32 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-Server::Server(const ConfigParser& config) : port_count(config.getServerCount()), config(config)
-{
+Server::Server(const ConfigParser& config) : port_count(config.getServerCount()), config(config), TIMEOUT_SECONDS(120)
+{   
     // ---------- Portas ----------
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
@@ -58,6 +58,7 @@ Server::~Server()
 
 Server::Server(const Server& other) : port_count(other.port_count)
 {
+    this->TIMEOUT_SECONDS = other.TIMEOUT_SECONDS;
     this->ports = new int[this->port_count];
     std::memcpy(this->ports, other.ports, sizeof(int) * this->port_count);
     this->epoll_fd = other.epoll_fd;
@@ -81,6 +82,7 @@ Server& Server::operator=(const Server& other)
         this->epoll_fd = other.epoll_fd;
         this->servers = new int[this->port_count];
         this->interface = new std::string[this->port_count];
+        this->TIMEOUT_SECONDS = other.TIMEOUT_SECONDS;
         for (int i = 0; i < this->port_count; i++)
             this->interface[i] = other.interface[i];
         std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
@@ -95,6 +97,9 @@ void Server::start()
     
     while (true)
     {
+        // ✅ Verificar timeouts de clientes a cada iteração
+        checkTimeout();
+
         int n = epoll_wait(this->epoll_fd, this->events, 64, -1);
         if (n < 0) { perror("epoll_wait"); break; }
 
@@ -253,4 +258,34 @@ bool Server::isServerSocket(int fd) const
             return true;
     }
     return false;
+}
+
+void Server::checkTimeout()
+{
+    time_t now = time(NULL);
+    
+    // Iterar sobre todos os clientes
+    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); )
+    {
+        Client* client = it->second;
+        int client_fd = it->first;
+        
+        // Verificar se o cliente está inativo por mais tempo que TIMEOUT_SECONDS
+        time_t time_inactive = now - client->getLastActivity();
+        
+        if (time_inactive > TIMEOUT_SECONDS)
+        {
+            std::cout << "[TIMEOUT] Cliente " << client_fd << " inativo por " 
+                      << time_inactive << " segundos (limite: " 
+                      << TIMEOUT_SECONDS << ")" << std::endl;
+            
+            // Fechar o cliente
+            closeClient(client_fd);
+            
+            // Iterador seguro: apagar e avançar
+            clients.erase(it++);
+        }
+        else
+            ++it;
+    }
 }
