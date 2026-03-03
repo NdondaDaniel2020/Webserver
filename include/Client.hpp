@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/19 12:33:49 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 12:05:45 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,7 +28,8 @@ class Client
             READING_BODY,       // Headers completos, recebendo body (POST)
             PROCESSING,         // Processando requisição
             SENDING_RESPONSE,   // Enviando resposta ao cliente
-            DONE                // Resposta enviada, pode fechar ou reutilizar
+            DONE,               // Resposta enviada, pode fechar ou reutilizar
+            ERROR_413           // Payload Too Large - Content-Length excedeu limite
         };
 
     private:

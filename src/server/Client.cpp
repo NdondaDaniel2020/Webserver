@@ -6,11 +6,12 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/19 12:33:15 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 12:05:45 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Client.hpp"
+#include "StatusCodes.hpp"
 #include <iostream>
 #include <cstring>
 
@@ -112,10 +113,14 @@ bool Client::isRequestComplete()
         {
             parseHeaders();
             
-            // Se não tem body (GET, POST, DELETE) ou Content-Length: 0
-            if (request.getMethod() == "GET" || 
+            // Se parseHeaders detectou erro 413, marcar como completo
+            if (state == ERROR_413)
+                return true;
+            
+            // Se não tem body (GET, POST, DELETE) e Content-Length: 0
+            if ((request.getMethod() == "GET" || 
                 request.getMethod() == "POST" ||
-                request.getMethod() == "DELETE" ||
+                request.getMethod() == "DELETE") &&
                 content_length == 0)
             {
                 state = PROCESSING;
@@ -161,6 +166,22 @@ void Client::parseHeaders()
     {
         std::istringstream iss(request.getHeader("Content-Length"));
         iss >> content_length;
+        
+        // ✅ VALIDAR Content-Length ANTES de receber o body
+        if (config)
+        {
+            const ServerConfig& server_cfg = config->getServerConfig(0);
+            size_t max_size = server_cfg.client_max_body_size;
+            
+            if (max_size > 0 && content_length > max_size)
+            {
+                std::cout << "[413] Content-Length (" << content_length 
+                          << ") excede limite (" << max_size 
+                          << ") - Rejeitando ANTES de receber body" << std::endl;
+                state = ERROR_413;
+                return;
+            }
+        }
     }
     
     // Verificar keep-alive
@@ -187,14 +208,36 @@ bool Client::checkBodyComplete()
 
 void Client::processRequest(const ServerConfig& server_config)
 {
+    // ✅ Tratar erro 413 detectado ANTES de receber o body
+    if (state == ERROR_413)
+    {
+        std::cout << "[CLIENT " << fd << "] Gerando resposta 413 (Content-Length excedeu limite)" << std::endl;
+        
+        // Criar resposta 413 diretamente
+        std::string response_str;
+        StatusCodes::http413PayloadTooLarge(response_str);
+        
+        send_buffer = response_str;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        keep_alive = false;  // Forçar fechamento da conexão
+        
+        return;
+    }
+    
     if (state != PROCESSING)
         return;
     
-    // Se tem body, adicionar ao request
+    // Se tem body, extrair do recv_buffer e adicionar ao request
     if (content_length > 0 && headers_end_pos > 0)
     {
-        // TODO: Adicionar método setBody no HttpRequest
-        // Por enquanto, o body já foi parseado
+        size_t body_size = recv_buffer.size() - headers_end_pos;
+        if (body_size >= content_length)
+        {
+            std::string body = recv_buffer.substr(headers_end_pos, content_length);
+            request.setBody(body);
+            std::cout << "[CLIENT " << fd << "] Body extraído: " << body.size() << " bytes" << std::endl;
+        }
     }
     
     // Criar resposta

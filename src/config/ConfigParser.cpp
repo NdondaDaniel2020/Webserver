@@ -87,7 +87,7 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
                 size_t pos = value.find(":");
                 if (value.substr(0, pos).size() == 1)
                     server.interface = "0.0.0.0";
-                server.interface = value.substr(0, pos);
+                server.interface = StringUtils::trim(value.substr(0, pos));
                 server.port = atoi(StringUtils::trim(value.substr(pos +1)).c_str());
             }
             else

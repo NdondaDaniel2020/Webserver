@@ -139,6 +139,12 @@ const std::string& HttpRequest::getBody() const
     return this->body;
 }
 
+// Setters
+void HttpRequest::setBody(const std::string& body)
+{
+    this->body = body;
+}
+
 // Header utilities
 bool HttpRequest::hasHeader(const std::string& key) const
 {

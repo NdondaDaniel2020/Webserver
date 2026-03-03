@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 11:25:41 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/02/28 09:40:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,6 +27,7 @@
 # include <unistd.h>
 # include <limits.h>
 # include <ctime>
+# include "ConfigParser.hpp"
 
 # define ERROR_OPENING_FILE "Error: Could not open file"
 
@@ -54,5 +55,29 @@ std::string getMimeType(const std::string& path);
 // HTTP date
 std::string getCurrentHttpDate();
 std::string getFileModifiedDate(const std::string& path);
+
+// POST utilities
+bool createDirectory(const std::string& path);
+bool hasWritePermission(const std::string& path);
+std::string generateUniqueFilename(const std::string& original_name);
+bool writeFileToDisk(const std::string& filepath, const std::string& content);
+std::string urlDecode(const std::string& str);
+std::string extractBoundary(const std::string& content_type);
+
+struct MultipartFile {
+    std::string filename;
+    std::string content_type;
+    std::string content;
+};
+
+bool parseMultipartData(const std::string& body, const std::string& boundary, std::vector<MultipartFile>& files);
+
+// File validation
+bool isAllowedFileExtension(const std::string& filename, const std::vector<std::string>& allowed_extensions);
+std::string getFileExtension(const std::string& filename);
+void cleanupFiles(const std::vector<std::string>& file_paths);
+std::string getParentDirectory(const std::string& path);
+size_t getFileSize(const std::string& path);
+std::string getFileName(const std::string& path);
 
 #endif

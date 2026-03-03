@@ -31,6 +31,7 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/config/ConfigValidator.cpp \
 			  $(SRCDIR)/utils/StringUtils.cpp \
 			  $(SRCDIR)/http/Response.cpp \
+			  $(SRCDIR)/http/StatusCodes.cpp \
 			  $(SRCDIR)/http/HttpRequest.cpp \
 			  $(SRCDIR)/server/Client.cpp \
 

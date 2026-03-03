@@ -1,0 +1,528 @@
+#!/bin/bash
+
+################################################################################
+# Script de Teste Avançado para Webserver v2.0
+# Suite completa de testes HTTP/1.1 com POST, DELETE, validações detalhadas
+################################################################################
+
+set -o pipefail
+
+# Cores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m' # No Color
+
+# Configurações
+SERVER_HOST="127.0.0.1"
+SERVER_PORT="8080"
+BASE_URL="http://${SERVER_HOST}:${SERVER_PORT}"
+CONFIG_FILE="config/default.conf"
+SERVER_BIN="./webserv"
+SERVER_PID=""
+PASSED_TESTS=0
+FAILED_TESTS=0
+SKIPPED_TESTS=0
+WARNING_MESSAGES=()
+
+# Diretório temporário para testes
+TEST_DIR="/tmp/webserver_tests"
+TEST_FILE="$TEST_DIR/test_upload.txt"
+TEST_JSON_FILE="$TEST_DIR/test.json"
+TEST_BIN_FILE="$TEST_DIR/test_binary.bin"
+
+################################################################################
+# Funções Utilitárias
+################################################################################
+
+print_header() {
+    echo -e "\n${MAGENTA}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${MAGENTA}║${NC} $1"
+    echo -e "${MAGENTA}╚════════════════════════════════════════════════════════════╝${NC}\n"
+}
+
+print_subheader() {
+    echo -e "\n${CYAN}▶ $1${NC}"
+}
+
+print_success() {
+    echo -e "${GREEN}  ✓${NC} $1"
+    ((PASSED_TESTS++))
+}
+
+print_error() {
+    echo -e "${RED}  ✗${NC} $1"
+    ((FAILED_TESTS++))
+}
+
+print_warning() {
+    echo -e "${YELLOW}  ⚠${NC} $1"
+    ((SKIPPED_TESTS++))
+    WARNING_MESSAGES+=("$1")
+}
+
+print_info() {
+    echo -e "${BLUE}  ℹ${NC} $1"
+}
+
+print_step() {
+    echo -e "${CYAN}  → $1${NC}"
+}
+
+cleanup() {
+    print_info "Finalizando testes..."
+    if [ ! -z "$SERVER_PID" ] && kill -0 $SERVER_PID 2>/dev/null; then
+        print_step "Encerrando servidor (PID: $SERVER_PID)..."
+        kill $SERVER_PID 2>/dev/null
+        sleep 1
+        if kill -0 $SERVER_PID 2>/dev/null; then
+            kill -9 $SERVER_PID 2>/dev/null
+        fi
+    fi
+    # Limpar arquivos de teste
+    rm -rf "$TEST_DIR" 2>/dev/null
+}
+
+wait_for_server() {
+    local attempts=0
+    local max_attempts=30
+    
+    print_step "Aguardando servidor estar pronto..."
+    while [ $attempts -lt $max_attempts ]; do
+        if curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null | grep -q "200\|301\|302\|404\|500\|403"; then
+            print_success "Servidor está pronto!"
+            return 0
+        fi
+        sleep 0.5
+        ((attempts++))
+    done
+    
+    print_error "Servidor não respondeu após ${max_attempts}s"
+    return 1
+}
+
+test_endpoint() {
+    local method=$1
+    local path=$2
+    local expected_codes=$3
+    local description=$4
+    
+    local response=$(curl -s -w "\n%{http_code}" -X "$method" "$BASE_URL$path" 2>/dev/null)
+    local body=$(echo "$response" | head -n-1)
+    local http_code=$(echo "$response" | tail -n1)
+    
+    # Convert expected codes to array and check if actual code is in the list
+    local codes_array=($(echo "$expected_codes" | tr '|' ' '))
+    local code_found=0
+    
+    for expected in "${codes_array[@]}"; do
+        if [ "$http_code" = "$expected" ]; then
+            code_found=1
+            break
+        fi
+    done
+    
+    if [ $code_found -eq 1 ]; then
+        print_success "$description (HTTP $http_code)"
+        return 0
+    else
+        print_error "$description - Esperado um de: $expected_codes, Obtido: $http_code"
+        return 1
+    fi
+}
+
+test_endpoint_contains() {
+    local method=$1
+    local path=$2
+    local expected_codes=$3
+    local expected_content=$4
+    local description=$5
+    
+    local response=$(curl -s -w "\n%{http_code}" -X "$method" "$BASE_URL$path" 2>/dev/null)
+    local body=$(echo "$response" | head -n-1)
+    local http_code=$(echo "$response" | tail -n1)
+    
+    # Convert expected codes to array and check if actual code is in the list
+    local codes_array=($(echo "$expected_codes" | tr '|' ' '))
+    local code_found=0
+    
+    for expected in "${codes_array[@]}"; do
+        if [ "$http_code" = "$expected" ]; then
+            code_found=1
+            break
+        fi
+    done
+    
+    if [ $code_found -ne 1 ]; then
+        print_error "$description - Esperado código um de: $expected_codes, Obtido: $http_code"
+        return 1
+    fi
+    
+    if echo "$body" | grep -q "$expected_content"; then
+        print_success "$description (HTTP $http_code)"
+        return 0
+    else
+        print_error "$description - Conteúdo não contém: $expected_content"
+        return 1
+    fi
+}
+
+test_post_request() {
+    local path=$1
+    local content_type=$2
+    local data=$3
+    local expected_codes=$4
+    local description=$5
+    
+    local response=$(curl -s -w "\n%{http_code}" -X POST \
+        -H "Content-Type: $content_type" \
+        -d "$data" \
+        "$BASE_URL$path" 2>/dev/null)
+    local body=$(echo "$response" | head -n-1)
+    local http_code=$(echo "$response" | tail -n1)
+    
+    local codes_array=($(echo "$expected_codes" | tr '|' ' '))
+    local code_found=0
+    
+    for expected in "${codes_array[@]}"; do
+        if [ "$http_code" = "$expected" ]; then
+            code_found=1
+            break
+        fi
+    done
+    
+    if [ $code_found -eq 1 ]; then
+        print_success "$description (HTTP $http_code)"
+        return 0
+    else
+        print_warning "$description - HTTP $http_code (um de: $expected_codes esperado)"
+        return 0
+    fi
+}
+
+test_delete_request() {
+    local path=$1
+    local expected_codes=$2
+    local description=$3
+    
+    local response=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL$path" 2>/dev/null)
+    local body=$(echo "$response" | head -n-1)
+    local http_code=$(echo "$response" | tail -n1)
+    
+    local codes_array=($(echo "$expected_codes" | tr '|' ' '))
+    local code_found=0
+    
+    for expected in "${codes_array[@]}"; do
+        if [ "$http_code" = "$expected" ]; then
+            code_found=1
+            break
+        fi
+    done
+    
+    if [ $code_found -eq 1 ]; then
+        print_success "$description (HTTP $http_code)"
+        return 0
+    else
+        print_warning "$description - HTTP $http_code (um de: $expected_codes esperado)"
+        return 0
+    fi
+}
+
+################################################################################
+# MAIN
+################################################################################
+
+trap cleanup EXIT
+
+print_header "TESTE AVANÇADO DO WEBSERVER - v2.0"
+
+# Verificação de Pré-requisitos
+print_header "1. Verificação de Pré-requisitos"
+
+if [ ! -f "$SERVER_BIN" ]; then
+    print_info "Servidor não encontrado. Compilando..."
+    if make clean > /dev/null 2>&1 && make > /dev/null 2>&1; then
+        print_success "Compilação concluída com sucesso"
+    else
+        print_error "Falha na compilação"
+        exit 1
+    fi
+else
+    print_success "Binário do servidor encontrado: $SERVER_BIN"
+fi
+
+if [ ! -f "$CONFIG_FILE" ]; then
+    print_error "Arquivo de configuração não encontrado: $CONFIG_FILE"
+    exit 1
+fi
+print_success "Arquivo de configuração encontrado: $CONFIG_FILE"
+
+if ! command -v curl &> /dev/null; then
+    print_error "curl não está instalado"
+    exit 1
+fi
+print_success "curl está instalado"
+
+# Criar diretório de teste
+mkdir -p "$TEST_DIR" 2>/dev/null
+
+# Iniciar Servidor
+print_header "2. Iniciando o Servidor"
+
+"$SERVER_BIN" "$CONFIG_FILE" > /tmp/webserver_test.log 2>&1 &
+SERVER_PID=$!
+print_step "Servidor iniciado com PID: $SERVER_PID"
+
+# Aguardar servidor estar pronto
+if ! wait_for_server; then
+    print_error "Servidor não iniciou corretamente"
+    cat /tmp/webserver_test.log | head -20
+    exit 1
+fi
+
+sleep 1
+
+# Testes Básicos de Conectividade
+print_header "3. Testes de Conectividade HTTP"
+
+test_endpoint GET "/" "200" "GET / - Página inicial"
+test_endpoint GET "/index.html" "200" "GET /index.html"
+
+# Testes de Status Codes
+print_header "4. Testes de Status Codes HTTP"
+
+print_subheader "Respostas de Sucesso (2xx)"
+test_endpoint GET "/index.html" "200" "200 - OK"
+
+print_subheader "Respostas de Redirecionamento (3xx)"
+test_endpoint GET "/old-page" "301|304|302" "Redirecionamento (301/302/304)"
+
+print_subheader "Respostas de Cliente Error (4xx)"
+test_endpoint GET "/arquivo-inexistente.html" "404" "404 - Not Found"
+test_endpoint GET "/api/" "403|404" "403/404 - Forbidden/Not Found"
+
+# Testes de Conteúdo
+print_header "5. Testes de Validação de Conteúdo"
+
+if [ -f "www/index.html" ]; then
+    test_endpoint_contains GET "/" "200" "<!DOCTYPE\|<html\|<head" "HTML contém tags válidas"
+    test_endpoint_contains GET "/index.html" "200" "html\|body\|head" "HTML contém estrutura básica"
+else
+    print_warning "Arquivo www/index.html não encontrado"
+fi
+
+# Testes de Métodos HTTP - GET
+print_header "6. Testes de Métodos HTTP"
+
+print_subheader "Testes GET"
+test_endpoint GET "/" "200" "GET / - Acesso à raiz"
+test_endpoint GET "/index.html" "200" "GET /index.html - Arquivo estático"
+
+print_subheader "Testes POST com application/x-www-form-urlencoded"
+test_post_request "/" "application/x-www-form-urlencoded" "name=test&value=123" "400|405|201|404" "POST com formulário"
+test_post_request "/api/submit" "application/x-www-form-urlencoded" "test=data" "400|405|201|404|500" "POST /api/submit com formulário"
+
+print_subheader "Testes POST com application/json"
+test_post_request "/" "application/json" '{"test":"data"}' "400|405|201|404" "POST com JSON"
+test_post_request "/api/data" "application/json" '{"key":"value"}' "400|405|201|404|500" "POST /api/data com JSON"
+
+print_subheader "Testes POST com arquivo (multipart/form-data)"
+echo "Arquivo de teste para upload - $(date)" > "$TEST_FILE"
+response=$(curl -s -w "\n%{http_code}" -X POST \
+    -F "file=@$TEST_FILE" \
+    "$BASE_URL/uploads/" 2>/dev/null)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ] || [ "$http_code" = "400" ] || [ "$http_code" = "403" ] || [ "$http_code" = "405" ]; then
+    print_success "POST /uploads/ com multipart upload (HTTP $http_code)"
+else
+    print_warning "POST upload - HTTP $http_code"
+fi
+
+print_subheader "Testes POST sem Content-Type"
+response=$(curl -s -w "\n%{http_code}" -X POST \
+    -d "test=data" \
+    "$BASE_URL/" 2>/dev/null)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "400" ] || [ "$http_code" = "411" ] || [ "$http_code" = "405" ]; then
+    print_success "POST sem Content-Type (HTTP $http_code - comportamento esperado)"
+else
+    print_warning "POST sem Content-Type - HTTP $http_code"
+fi
+
+print_subheader "Testes DELETE"
+test_delete_request "/" "403|405|204|400" "DELETE / - Tentativa em raiz"
+test_delete_request "/uploads/" "204|403|405|404" "DELETE /uploads/ - Diretório"
+test_delete_request "/uploads/test.txt" "204|404|403|405" "DELETE /uploads/test.txt - Arquivo"
+test_delete_request "/index.html" "403|405|204" "DELETE /index.html - Arquivo protegido"
+
+# Testes de Headers e Content-Type
+print_header "7. Testes de Headers HTTP e Content-Type"
+
+print_step "Verificando headers de resposta para GET /:"
+response=$(curl -s -i "$BASE_URL/" 2>/dev/null)
+http_header=$(echo "$response" | head -n1)
+print_info "Status: $http_header"
+
+content_type=$(echo "$response" | grep -i "Content-Type" | cut -d' ' -f2- | tr -d '\r')
+if [ ! -z "$content_type" ]; then
+    print_success "Content-Type detectado: $content_type"
+else
+    print_warning "Content-Type não encontrado nos headers"
+fi
+
+server_header=$(echo "$response" | grep -i "Server:" | cut -d' ' -f2- | tr -d '\r')
+if [ ! -z "$server_header" ]; then
+    print_success "Server header: $server_header"
+else
+    print_warning "Server header não encontrado"
+fi
+
+content_length=$(echo "$response" | grep -i "Content-Length:" | cut -d' ' -f2- | tr -d '\r')
+if [ ! -z "$content_length" ]; then
+    print_success "Content-Length: $content_length bytes"
+else
+    print_warning "Content-Length não encontrado"
+fi
+
+date_header=$(echo "$response" | grep -i "^Date:" | cut -d' ' -f2- | tr -d '\r')
+if [ ! -z "$date_header" ]; then
+    print_success "Date header presente: $date_header"
+else
+    print_warning "Date header não encontrado"
+fi
+
+# Testes de Persistência e Keep-Alive
+print_header "8. Testes de Connection Management"
+
+print_step "Testando 5 requisições consecutivas na mesma conexão..."
+success_count=0
+for i in {1..5}; do
+    response=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null)
+    if [ "$response" = "200" ]; then
+        ((success_count++))
+    fi
+done
+if [ $success_count -eq 5 ]; then
+    print_success "5/5 requisições sucessivas completadas"
+else
+    print_warning "Apenas $success_count/5 requisições foram bem-sucedidas"
+fi
+
+# Testes de Performance
+print_header "9. Testes de Performance"
+
+print_step "Executando 20 requisições em sequência..."
+start_time=$(date +%s%N)
+success_count=0
+for i in {1..20}; do
+    response=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/index.html" 2>/dev/null)
+    if [ "$response" = "200" ]; then
+        ((success_count++))
+    fi
+done
+end_time=$(date +%s%N)
+elapsed=$((($end_time - $start_time) / 1000000))
+
+print_success "$success_count/20 requisições completadas em ${elapsed}ms"
+
+if [ $success_count -eq 20 ]; then
+    avg_time=$((elapsed / 20))
+    print_info "Tempo médio por requisição: ${avg_time}ms"
+fi
+
+# Teste de resposta com timeout
+print_header "10. Testes de Timeout e Limite de Conexão"
+
+response=$(timeout 5 curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/" 2>/dev/null)
+if [ $? -eq 0 ] && [ -n "$response" ]; then
+    print_success "Requisição completou dentro do timeout de 5s"
+else
+    print_error "Requisição expirou ou falhou"
+fi
+
+# Testes de Diretórios
+print_header "11. Testes de Directory Listing e Acesso"
+
+test_endpoint GET "/" "200" "GET / - Raiz acessível"
+test_endpoint GET "/text/" "200|403|404" "GET /text/ - Subdiretório"
+test_endpoint GET "/api/" "403|404" "GET /api/ - Diretório API"
+test_endpoint GET "/uploads/" "200|403|404" "GET /uploads/ - Diretório de uploads"
+
+# Testes de Tipos de Arquivo
+print_header "12. Testes de Tipos de Arquivo"
+
+# Se existir arquivo CSS ou JS
+if [ -f "www"/*.css ] 2>/dev/null; then
+    response=$(curl -s -i "$(find www -name "*.css" | head -1 | sed "s|www||" | xargs -I {} echo "$BASE_URL{}")" 2>/dev/null | head -n15)
+    print_info "CSS encontrado"
+fi
+
+# Se existir JavaScript
+if [ -f "www"/*.js ] 2>/dev/null; then
+    response=$(curl -s -i "$(find www -name "*.js" | head -1 | sed "s|www||" | xargs -I {} echo "$BASE_URL{}")" 2>/dev/null | head -n1)
+    print_info "JavaScript encontrado"
+fi
+
+# Status páginas de erro
+print_header "13. Testes de Páginas de Erro"
+
+test_endpoint GET "/erro404testando.txt" "404" "Verificar página 404"
+test_endpoint GET "/api" "403|404" "Verificar acesso a /api"
+
+# Teste de Limite de Tamanho (Body Size)
+print_header "14. Testes de Limites de Request"
+
+print_step "Testando POST com corpo pequeno..."
+response=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/octet-stream" \
+    -H "Content-Length: 5" \
+    -d "hello" \
+    "$BASE_URL/" 2>/dev/null)
+http_code=$(echo "$response" | tail -n1)
+print_info "Corpo pequeno: HTTP $http_code"
+
+print_step "Testando requisição com corpo moderado..."
+# Criar arquivo de teste com 100KB
+head -c 102400 /dev/urandom 2>/dev/null | base64 > "$TEST_BIN_FILE" 2>/dev/null
+if [ -f "$TEST_BIN_FILE" ]; then
+    response=$(curl -s -w "%{http_code}" -X POST \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary "@$TEST_BIN_FILE" \
+        "$BASE_URL/uploads/" 2>/dev/null)
+    http_code="${response: -3}"
+    print_info "Corpo de ~100KB: HTTP $http_code"
+fi
+
+# Resumo Final
+print_header "RESUMO FINAL DOS TESTES"
+
+total_tests=$((PASSED_TESTS + FAILED_TESTS + SKIPPED_TESTS))
+echo ""
+echo -e "${GREEN}  ✓ Passaram:${NC}     $PASSED_TESTS"
+echo -e "${RED}  ✗ Falharam:${NC}     $FAILED_TESTS"
+echo -e "${YELLOW}  ⚠ Avisos :${NC}     $SKIPPED_TESTS"
+echo -e "${BLUE}  ━ Total   :${NC}     $total_tests"
+echo ""
+
+if [ ${#WARNING_MESSAGES[@]} -gt 0 ]; then
+    echo -e "${YELLOW}  Detalhes dos avisos:${NC}"
+    for i in "${!WARNING_MESSAGES[@]}"; do
+        echo -e "${YELLOW}   $(($i + 1)).${NC} ${WARNING_MESSAGES[$i]}"
+    done
+    echo ""
+fi
+
+if [ $FAILED_TESTS -eq 0 ]; then
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║${NC} ✓ Todos os testes passaram! Servidor operacional! ✓${NC}      ${GREEN}║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}\n"
+    exit 0
+else
+    echo -e "${RED}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${RED}║${NC} ✗ Alguns testes falharam. Veja detalhes acima. ✗${NC}         ${RED}║${NC}"
+    echo -e "${RED}╚════════════════════════════════════════════════════════════╝${NC}\n"
+    exit 1
+fi

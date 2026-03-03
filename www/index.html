@@ -1,54 +1,151 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
+    <title>Web Ninjas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Servidor Web - C++</title>
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: Arial, sans-serif;
+            height: 100vh;
+            background: radial-gradient(circle at top left, #111827, #0D0F14 70%);
+            color: #E5E7EB;
+            font-family: 'Inter', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .hero {
+            text-align: center;
             max-width: 800px;
-            margin: 50px auto;
             padding: 20px;
-            background: #f4f4f4;
         }
-        .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+
+        .logo-symbol {
+            font-family: monospace;
+            font-size: 22px;
+            color: #00FF9C;
+            margin-bottom: 20px;
+            letter-spacing: 4px;
+            opacity: 0.8;
         }
+
         h1 {
-            color: #2c3e50;
-            border-bottom: 3px solid #3498db;
-            padding-bottom: 10px;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 64px;
+            font-weight: 700;
+            letter-spacing: 4px;
+            margin-bottom: 20px;
         }
-        .info {
-            background: #e8f4f8;
-            padding: 15px;
-            border-left: 4px solid #3498db;
-            margin: 20px 0;
+
+        .highlight {
+            color: #00FF9C;
+            text-shadow: 0 0 10px rgba(0, 255, 156, 0.7);
+        }
+
+        p {
+            font-size: 18px;
+            color: #9CA3AF;
+            margin-bottom: 40px;
+        }
+
+        .buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .btn {
+            padding: 12px 28px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: 0.3s ease;
+            border: 1px solid #00FF9C;
+        }
+
+        .btn-primary {
+            background-color: #00FF9C;
+            color: #0D0F14;
+        }
+
+        .btn-primary:hover {
+            background-color: transparent;
+            color: #00FF9C;
+            box-shadow: 0 0 15px #00FF9C;
+        }
+
+        .btn-secondary {
+            background-color: transparent;
+            color: #00FF9C;
+        }
+
+        .btn-secondary:hover {
+            background-color: #00FF9C;
+            color: #0D0F14;
+            box-shadow: 0 0 15px #00FF9C;
+        }
+
+        /* Subtle animated background lines */
+        .background-lines {
+            position: absolute;
+            width: 200%;
+            height: 200%;
+            background: repeating-linear-gradient(
+                45deg,
+                rgba(0,255,156,0.03),
+                rgba(0,255,156,0.03) 1px,
+                transparent 1px,
+                transparent 50px
+            );
+            animation: move 20s linear infinite;
+        }
+
+        @keyframes move {
+            from {
+                transform: translate(0, 0);
+            }
+            to {
+                transform: translate(-50px, -50px);
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🚀 Servidor Web C++ Funcionando!</h1>
-        <div class="info">
-            <p><strong>Status:</strong> ✅ Online</p>
-            <p><strong>Porta:</strong> 8080</p>
-            <p><strong>Servidor:</strong> localhost</p>
-            <p><strong>Root:</strong> www/</p>
-        </div>
-        <p>Seu servidor web em C++ está funcionando corretamente!</p>
-        <p>O ServerConfig está sendo usado para:</p>
-        <ul>
-            <li>Porta configurável (8080)</li>
-            <li>Diretório root (www/)</li>
-            <li>Páginas de erro personalizadas</li>
-            <li>Índice padrão (index.html)</li>
-            <li>Limite de body size (10MB)</li>
-        </ul>
+
+<div class="background-lines"></div>
+
+<section class="hero">
+
+    <img src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png" alt="Web Ninjas Logo" style="margin-bottom: 20px;">
+    
+    <div class="logo-symbol">&lt; WEB_NINJAS /&gt;</div>
+
+    <h1>
+        <span class="highlight">WEB</span> NINJAS
+    </h1>
+
+    <p>
+        Mastering HTTP in Silence.<br>
+        A high-performance non-blocking HTTP server built in C++98.
+    </p>
+
+    <div class="buttons">
+        <a href="#" class="btn btn-primary">View Documentation</a>
+        <a href="#" class="btn btn-secondary">Run Demo</a>
     </div>
+</section>
+
 </body>
 </html>

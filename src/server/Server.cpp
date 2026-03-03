@@ -6,19 +6,22 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/25 09:40:56 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/02 12:38:32 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-Server::Server(const ConfigParser& config) : port_count(config.getServerCount()), config(config)
-{
+Server::Server(const ConfigParser& config) : port_count(config.getServerCount()), config(config), TIMEOUT_SECONDS(120)
+{   
     // ---------- Portas ----------
     this->ports = new int[this->port_count];
-    
+    this->interface = new std::string[this->port_count];
     for (int i = 0; i < this->port_count; i++)
+    {
         this->ports[i] = config.getServerConfig(i).port;
+        this->interface[i] = config.getServerConfig(i).interface;
+    }
 
     // ---------- Criar epoll ----------
     this->epoll_fd = epoll_create(1);
@@ -29,7 +32,7 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
     this->servers = new int[this->port_count];
     for (int i = 0; i < this->port_count; i++) 
     {
-        this->servers[i] = createServerSocket(this->ports[i]);
+        this->servers[i] = createServerSocket(this->interface[i], this->ports[i]);
         if (this->servers[i] < 0) 
             return ;
         epoll_event ev;
@@ -48,18 +51,22 @@ Server::~Server()
         delete it->second;
     }
     clients.clear();
-    
     delete[] this->ports;
     delete[] this->servers;
+    delete[] this->interface;
 }
 
 Server::Server(const Server& other) : port_count(other.port_count)
 {
+    this->TIMEOUT_SECONDS = other.TIMEOUT_SECONDS;
     this->ports = new int[this->port_count];
     std::memcpy(this->ports, other.ports, sizeof(int) * this->port_count);
     this->epoll_fd = other.epoll_fd;
     this->servers = new int[this->port_count];
     std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
+    this->interface = new std::string[this->port_count];
+    for (int i = 0; i < this->port_count; i++)
+        this->interface[i] = other.interface[i];
     std::memcpy(this->events, other.events, sizeof(other.events));
 }
 
@@ -74,6 +81,10 @@ Server& Server::operator=(const Server& other)
         std::memcpy(this->ports, other.ports, sizeof(int) * this->port_count);
         this->epoll_fd = other.epoll_fd;
         this->servers = new int[this->port_count];
+        this->interface = new std::string[this->port_count];
+        this->TIMEOUT_SECONDS = other.TIMEOUT_SECONDS;
+        for (int i = 0; i < this->port_count; i++)
+            this->interface[i] = other.interface[i];
         std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
         std::memcpy(this->events, other.events, sizeof(other.events));
     }
@@ -86,6 +97,9 @@ void Server::start()
     
     while (true)
     {
+        // ✅ Verificar timeouts de clientes a cada iteração
+        checkTimeout();
+
         int n = epoll_wait(this->epoll_fd, this->events, 64, -1);
         if (n < 0) { perror("epoll_wait"); break; }
 
@@ -108,7 +122,7 @@ void Server::stop()
     close(this->epoll_fd);
 }
 
-int Server::createServerSocket(int port)
+int Server::createServerSocket(const std::string& interface, int port)
 {
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (server_fd < 0) { perror("socket"); return -1; }
@@ -119,7 +133,7 @@ int Server::createServerSocket(int port)
     sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = INADDR_ANY; // htonl(ipToHex(interface))
+    addr.sin_addr.s_addr = htonl(ipToHex(interface));
     addr.sin_port = htons(port);
 
     if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
@@ -134,10 +148,8 @@ int Server::createServerSocket(int port)
         return -1;
     }
 
-    // std::cout << "Servidor ouvindo na porta " << port 
-    //           << " http://"<< interface << ":" << port << std::endl;
     std::cout << "Servidor ouvindo na porta " << port 
-              << " http://localhost:" << port << std::endl;
+              << " http://"<< interface << ":" << port << std::endl;
     return server_fd;
 }
 
@@ -194,7 +206,7 @@ void Server::handleClientData(int fd)
         // Verificar se requisição está completa
         if (client->isRequestComplete())
         {
-            // Processar requisição
+            // Processar requisição (inclusive erros como 413)
             client->processRequest(this->config.getServerConfig(0));
         }
     }
@@ -246,4 +258,34 @@ bool Server::isServerSocket(int fd) const
             return true;
     }
     return false;
+}
+
+void Server::checkTimeout()
+{
+    time_t now = time(NULL);
+    
+    // Iterar sobre todos os clientes
+    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); )
+    {
+        Client* client = it->second;
+        int client_fd = it->first;
+        
+        // Verificar se o cliente está inativo por mais tempo que TIMEOUT_SECONDS
+        time_t time_inactive = now - client->getLastActivity();
+        
+        if (time_inactive > TIMEOUT_SECONDS)
+        {
+            std::cout << "[TIMEOUT] Cliente " << client_fd << " inativo por " 
+                      << time_inactive << " segundos (limite: " 
+                      << TIMEOUT_SECONDS << ")" << std::endl;
+            
+            // Fechar o cliente
+            closeClient(client_fd);
+            
+            // Iterador seguro: apagar e avançar
+            clients.erase(it++);
+        }
+        else
+            ++it;
+    }
 }
