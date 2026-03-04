@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 11:30:00 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/04 10:18:27 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -62,18 +62,24 @@ void StatusCodes::http200FileFound(std::string& response_str, const HttpRequest&
     oss << "HTTP/1.1 200 OK\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
     oss << "Server: webserv/1.0\r\n";
+    // Adicionar charset para tipos de texto
+    if (mime_type.find("text/") == 0)
+        mime_type += "; charset=UTF-8";
+    
     oss << "Content-Type: " << mime_type << "\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
-    oss << "Content-Disposition: attachment; filename=\"" << filename << "\"\r\n";
+    // oss << "Content-Disposition: attachment; filename=\"" << filename << "\"\r\n";
     oss << "Last-Modified: " << getFileModifiedDate(file_path) << "\r\n";
-
-    if (request.getHeader("Connection") != "" && request.getHeader("Connection") == "keep-alive")
-        oss << "Connection: keep-alive\r\n";
-    else
+    if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
+    else if (request.getVersion() == "HTTP/1.0")
+        oss << "Connection: close\r\n";
+    else
+        oss << "Connection: keep-alive\r\n";
 
     oss << "\r\n";
     oss << content;
+    
     response_str = oss.str();
 }
 
@@ -250,10 +256,12 @@ void StatusCodes::http404NotFound(std::string& response_str, const HttpRequest& 
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << final_content.size() << "\r\n";
     
-    if (request.getHeader("Connection") != "" && request.getHeader("Connection") == "keep-alive")
-        oss << "Connection: keep-alive\r\n";
-    else
+    if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
+    else if (request.getVersion() == "HTTP/1.0")
+        oss << "Connection: close\r\n";
+    else
+        oss << "Connection: keep-alive\r\n";
 
     oss << "\r\n";
     oss << final_content;
