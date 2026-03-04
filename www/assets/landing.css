@@ -1,6 +1,7 @@
-
 /* ===== RESET & BASE ===== */
-*, *::before, *::after {
+*,
+*::before,
+*::after {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
@@ -45,21 +46,24 @@ a {
     left: 0;
     width: 200%;
     height: 200%;
-    background: repeating-linear-gradient(
-        45deg,
-        rgba(0,255,156,0.02),
-        rgba(0,255,156,0.02) 1px,
-        transparent 1px,
-        transparent 60px
-    );
+    background: repeating-linear-gradient(45deg,
+            rgba(0, 255, 156, 0.02),
+            rgba(0, 255, 156, 0.02) 1px,
+            transparent 1px,
+            transparent 60px);
     animation: bgMove 25s linear infinite;
     pointer-events: none;
     z-index: 0;
 }
 
 @keyframes bgMove {
-    from { transform: translate(0, 0); }
-    to { transform: translate(-60px, -60px); }
+    from {
+        transform: translate(0, 0);
+    }
+
+    to {
+        transform: translate(-60px, -60px);
+    }
 }
 
 /* ===== HEADER / NAVBAR ===== */
@@ -343,43 +347,24 @@ section {
     background: var(--bg-card);
     border: 1px solid rgba(0, 255, 156, 0.1);
     border-radius: 12px;
-    padding: 40px 30px;
+    padding: 20px;
     position: relative;
-}
-
-.diagram-flow {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0;
+    justify-content: center;
+    overflow: hidden;
 }
 
-.diagram-node {
-    background: var(--bg-primary);
-    border: 1px solid rgba(0, 255, 156, 0.25);
-    border-radius: 8px;
-    padding: 14px 28px;
-    font-family: var(--font-mono);
-    font-size: 13px;
-    color: var(--neon);
-    letter-spacing: 1px;
-    text-align: center;
-    transition: all 0.3s ease;
+.architecture-img {
     width: 100%;
-    max-width: 240px;
+    height: auto;
+    border-radius: 8px;
+    filter: drop-shadow(0 0 10px rgba(0, 255, 156, 0.2));
+    transition: transform 0.5s ease;
 }
 
-.diagram-node:hover {
-    border-color: var(--neon);
-    box-shadow: 0 0 12px var(--neon-dim);
-}
-
-.diagram-arrow {
-    color: var(--neon);
-    font-size: 20px;
-    opacity: 0.5;
-    line-height: 1;
-    padding: 6px 0;
+.about-diagram:hover .architecture-img {
+    transform: scale(1.02);
 }
 
 /* ===== STATS SECTION ===== */
