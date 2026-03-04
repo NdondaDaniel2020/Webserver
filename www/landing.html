@@ -19,7 +19,7 @@
 <!-- ===== NAVBAR ===== -->
 <nav class="navbar">
     <div class="navbar-inner">
-        <a href="#hero" class="nav-logo">
+        <a href="/index.html" class="nav-logo">
             <img src="https://img.icons8.com/ios-filled/50/00ff9c/ninja-head.png" alt="Ninja Logo">
             <div class="nav-logo-text">
                 <span class="web">WEB</span> <span class="ninjas">NINJAS</span>
@@ -31,7 +31,7 @@
             <li><a href="#stats">Estatísticas</a></li>
             <li><a href="#architecture">Arquitetura</a></li>
             <li><a href="#team">Equipa</a></li>
-            <li><a href="#footer">Contacto</a></li>
+            <li><a href="/arena.html" class="nav-cta">⚡ Testar Servidor</a></li>
         </ul>
         <div class="nav-hamburger" id="hamburger" onclick="document.getElementById('navLinks').classList.toggle('open')">
             <span></span><span></span><span></span>
@@ -47,8 +47,8 @@
         <h1>Mastering <span class="highlight">HTTP</span><br>in Silence</h1>
         <p>A high-performance non-blocking HTTP server built in C++98.<br>Engineered for precision. Deployed in stealth.</p>
         <div class="hero-buttons">
-            <a href="#about" class="btn btn-primary">View Documentation</a>
-            <a href="#architecture" class="btn btn-secondary">Explore Architecture</a>
+            <a href="#about" class="btn btn-primary">Explorar Projeto</a>
+            <a href="/arena.html" class="btn btn-secondary">⚡ Testar Servidor</a>
         </div>
     </div>
 </section>
@@ -214,9 +214,18 @@
 
 <!-- ===== FOOTER ===== -->
 <footer class="footer" id="footer">
-    <div class="footer-brand">WEB NINJAS</div>
-    <p>&copy; 2026 Web Ninjas &mdash; Built as part of the 42 curriculum.</p>
-    <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; poll()</div>
+    <div class="footer-inner">
+        <div class="footer-brand">WEB NINJAS</div>
+        <p>&copy; 2026 Web Ninjas &mdash; Built as part of the 42 curriculum.</p>
+        <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; poll()</div>
+        <div class="footer-nav">
+            <a href="/index.html">Início</a>
+            <span>|</span>
+            <a href="/landing.html">Projeto</a>
+            <span>|</span>
+            <a href="/arena.html">Arena</a>
+        </div>
+    </div>
 </footer>
 
 <!-- ===== SCROLL ANIMATION JS ===== -->

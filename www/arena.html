@@ -19,7 +19,7 @@
 <!-- ===== NAVBAR ===== -->
 <nav class="navbar">
     <div class="navbar-inner">
-        <a href="/" class="nav-logo">
+        <a href="/index.html" class="nav-logo">
             <img src="https://img.icons8.com/ios-filled/50/00ff9c/ninja-head.png" alt="Ninja Logo">
             <div class="nav-logo-text">
                 <span class="web">WEB</span> <span class="ninjas">NINJAS</span>
@@ -30,7 +30,7 @@
             <li><a href="/landing.html#about">Sobre</a></li>
             <li><a href="/landing.html#team">Equipa</a></li>
             <li><a href="/landing.html#stats">Estatísticas</a></li>
-            <li><a href="/arena.html" class="active">Testar Servidor</a></li>
+            <li><a href="/arena.html" class="active">⚡ Testar Servidor</a></li>
         </ul>
         <div class="nav-hamburger" id="hamburger" onclick="document.getElementById('navLinks').classList.toggle('open')">
             <span></span><span></span><span></span>
@@ -748,6 +748,22 @@ document.getElementById('delete-url').addEventListener('keydown', e => {
     if (e.key === 'Enter') sendDelete();
 });
 </script>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer" id="footer">
+    <div class="footer-inner">
+        <div class="footer-brand">WEB NINJAS</div>
+        <p>&copy; 2026 Web Ninjas &mdash; Built as part of the 42 curriculum.</p>
+        <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; poll()</div>
+        <div class="footer-nav">
+            <a href="/index.html">Início</a>
+            <span>|</span>
+            <a href="/landing.html">Projeto</a>
+            <span>|</span>
+            <a href="/arena.html">Arena</a>
+        </div>
+    </div>
+</footer>
 
 </body>
 </html>
