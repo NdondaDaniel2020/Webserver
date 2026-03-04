@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 11:53:00 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/04 11:25:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -515,7 +515,7 @@ void Response::generateDirectoryListing(const HttpRequest& request, const std::s
     html << "<body><h1>Index of " << uri << "</h1><hr><ul>";
     
     for (size_t i = 0; i < files.size(); i++) {
-        if (files[i] != ".") {  // Não mostrar "."
+        if (files[i] != "." && files[i] != "..") {
             html << "<li><a href='" << uri << "/" << files[i] << "'>";
             html << files[i] << "</a></li>";
         }
