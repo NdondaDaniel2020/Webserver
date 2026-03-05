@@ -26,6 +26,8 @@ class HttpRequest
         static HttpRequest parse(const std::string& raw_request);
 
         // Getters
+        const std::string& getQuery() const;
+        const std::string& getPath() const;
         const std::string& getMethod() const;
         const std::string& getUri() const;
         const std::string& getVersion() const;
