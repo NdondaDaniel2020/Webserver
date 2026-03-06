@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   CGIHandler.cpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ajacinto <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/03/05 12:17:14 by ajacinto          #+#    #+#             */
+/*   Updated: 2026/03/05 12:17:18 by ajacinto         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "CGIHandler.hpp"
 #include "EnvBuilder.hpp"
 #include <unistd.h>
@@ -10,7 +22,7 @@
 
 namespace CGIHandler {
 
-bool execute(const HttpRequest& request,
+bool executeCgi(const HttpRequest& request,
              const std::string& scriptPath,
              const LocationConfig& location,
              std::string& outResponse)

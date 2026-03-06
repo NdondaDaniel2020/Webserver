@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   EnvBuilder.hpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ajacinto <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/03/05 12:18:28 by ajacinto          #+#    #+#             */
+/*   Updated: 2026/03/05 12:18:35 by ajacinto         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #ifndef ENVBUILDER_HPP
 # define ENVBUILDER_HPP
 
@@ -7,9 +19,6 @@
 # include "ConfigParser.hpp"
 
 namespace EnvBuilder {
-    // Build a list of environment variable strings suitable for passing to
-    // execve when running a CGI script. The returned vector owns the strings
-    // (caller must keep it alive while using the C pointers).
     std::vector<std::string> build(const HttpRequest& request,
                                    const LocationConfig& location,
                                    const std::string& scriptPath);

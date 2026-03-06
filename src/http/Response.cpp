@@ -12,7 +12,7 @@
 
 #include "Response.hpp"
 
-Response::Response(const HttpRequest& request, const ServerConfig& config) : config(config)
+Response::Response(const HttpRequest &request, const ServerConfig &config) : config(config)
 {
     // Extensões de arquivo permitidas em post (segurança)
     this->allowed_extensions.push_back(".jpg");
@@ -53,24 +53,38 @@ Response &Response::operator=(const Response &other)
     return *this;
 }
 
-
-
 std::string Response::getResponseHttp()
 {
     return this->response_str;
 }
 
+ bool Response::isCgiRequest (const std::string file_path, const LocationConfig* location)
+ {
+    if (!location)
+        return false;
+    if (file_path.empty())
+        return false;
+    size_t pos = file_path.find_first_of('.');
+    if (pos == std::string::npos)
+        return false;
+    std::string extension = file_path.substr(0, pos);
+    for (size_t i = 0; i < location->cgi_extensions.size(); i++)
+    {
+        if (extension != location->cgi_extensions[i])
+            return true;
+    }
+    return false;
+ }
 
-
-void Response::buildHttpResponse(const HttpRequest& request)
+void Response::buildHttpResponse(const HttpRequest &request)
 {
     // 1. Sanitizar URI para prevenir path traversal
     std::string uri = sanitizePath(request.getUri());
 
     // Determinar root (location pode sobrescrever)
     std::string root = this->config.root;
-    const LocationConfig* location = findMatchingLocation(request.getUri());
-    
+    const LocationConfig *location = findMatchingLocation(request.getUri());
+
     if (location && !location->root.empty())
         root = location->root;
 
@@ -82,7 +96,7 @@ void Response::buildHttpResponse(const HttpRequest& request)
         std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
         return StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
     }
-    
+
     // 3. Executar método
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
@@ -94,11 +108,26 @@ void Response::buildHttpResponse(const HttpRequest& request)
         StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
 }
 
-void Response::methodGet(const HttpRequest& request, const std::string& file_path)
+void Response::methodGet(const HttpRequest &request, const std::string &file_path)
 {
     std::string _file_path = file_path;
 
-    const LocationConfig* location = findMatchingLocation(request.getUri());
+    const LocationConfig *location = findMatchingLocation(request.getUri());
+
+     if (isCgiRequest(_file_path, location))
+     {
+        std::string cgi_output;
+        if (CGIHandler::executeCgi(request, _file_path, *location, cgi_output))
+        {
+            this->response_str = cgi_output;
+            return ;
+        }
+        else
+        {
+            StatusCodes::http500InternalServerError(this->response_str, "CGI extension not suported ");
+            return ;
+        }
+     }
 
     // 1. Verificar se tem redirect configurado
     if (location && location->redirect_code > 0)
@@ -110,11 +139,11 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
         // Determinar quais index files usar (location override ou server default)
         std::vector<std::string> index_files_to_use = this->config.index_files;
         if (location && !location->index_files.empty())
-            index_files_to_use = location->index_files;  // Override!
-        
+            index_files_to_use = location->index_files; // Override!
+
         // Buscar arquivo index configurado (index.html, etc)
         std::string index_path = findIndexFile(_file_path, index_files_to_use);
-        
+
         if (!index_path.empty())
         {
             _file_path = index_path;
@@ -134,47 +163,48 @@ void Response::methodGet(const HttpRequest& request, const std::string& file_pat
             }
         }
     }
-    
+
     // 3. Verificar se arquivo existe
     if (!fileExists(_file_path))
     {
         return StatusCodes::http404NotFound(this->response_str, request, "", _file_path, this->config);
     }
-    
+
     // 4. Verificar permissões de leitura
     if (!isReadable(_file_path))
     {
         std::cout << "[403] Sem permissão de leitura: " << _file_path << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, _file_path);
     }
-    
+
     // 5. Ler arquivo e retornar
     std::string content = readFile(_file_path);
     StatusCodes::http200FileFound(this->response_str, request, content, _file_path);
 }
 
-void Response::methodPost(const HttpRequest& request)
-{   
+void Response::methodPost(const HttpRequest &request)
+{
     // 1. Validar client_max_body_size (server e location)
     size_t body_size = request.getBody().size();
-    
+
     // Validar limite global do servidor
     if (this->config.client_max_body_size > 0 && body_size > this->config.client_max_body_size)
     {
-        std::cout << "[413] Body size (" << body_size << ") excede limite do servidor (" 
+        std::cout << "[413] Body size (" << body_size << ") excede limite do servidor ("
                   << this->config.client_max_body_size << ")" << std::endl;
         return StatusCodes::http413PayloadTooLarge(this->response_str);
     }
-    
+
     // Validar limite específico da location (mais restritivo)
-    const LocationConfig* location = findMatchingLocation(request.getUri());
+    const LocationConfig *location = findMatchingLocation(request.getUri());
+   
     if (location && location->client_max_body_size > 0 && body_size > location->client_max_body_size)
     {
-        std::cout << "[413] Body size (" << body_size << ") excede limite da location (" 
+        std::cout << "[413] Body size (" << body_size << ") excede limite da location ("
                   << location->client_max_body_size << ")" << std::endl;
         return StatusCodes::http413PayloadTooLarge(this->response_str);
     }
-    
+
     // 2. Obter Content-Type
     std::string content_type = request.getHeader("Content-Type");
     if (content_type.empty())
@@ -183,7 +213,7 @@ void Response::methodPost(const HttpRequest& request)
         std::cout << "[400] Content-Type header é obrigatório" << std::endl;
         return StatusCodes::http400BadRequest(this->response_str, "Content-Type header is required");
     }
-    
+
     // 3. Processar conforme Content-Type
 
     // 3.1 multipart/form-data - Upload de arquivos
@@ -195,38 +225,38 @@ void Response::methodPost(const HttpRequest& request)
     {
         // Decodificar form data
         std::string decoded_body = urlDecode(request.getBody());
-        
+
         // RFC 7231: 200 OK para processamento sem criar recurso
         std::ostringstream json_response;
         json_response << "{\"message\":\"Form data recebido\",";
         json_response << "\"size\":" << decoded_body.size() << "}";
-        
+
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-    
+
     // 3.3 application/json - Dados JSON
     else if (content_type.find("application/json") != std::string::npos)
     {
         // Processar JSON (validação básica)
         std::string json_body = request.getBody();
-        
+
         std::ostringstream json_response;
         json_response << "{\"message\":\"JSON recebido\",";
         json_response << "\"size\":" << json_body.size() << "}";
-        
+
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-    
+
     // 3.4 text/plain - Texto simples
     else if (content_type.find("text/plain") != std::string::npos)
     {
         std::ostringstream json_response;
         json_response << "{\"message\":\"Text data recebido\",";
         json_response << "\"size\":" << request.getBody().size() << "}";
-        
+
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-    
+
     // Content-Type não suportado
     else
     {
@@ -235,7 +265,7 @@ void Response::methodPost(const HttpRequest& request)
     }
 }
 
-void Response::methodDelete(const HttpRequest& request, const std::string& file_path)
+void Response::methodDelete(const HttpRequest &request, const std::string &file_path)
 {
     // 1. Verificar se arquivo existe
     if (!fileExists(file_path))
@@ -250,7 +280,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
         std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
-    
+
     // 3. Validar symlinks - resolver path real e verificar segurança
     std::string real_path = getRealPath(file_path);
     if (real_path.empty())
@@ -258,13 +288,13 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
         std::cout << "[403] Não foi possível resolver path real: " << file_path << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
-    
+
     // Validar que o path real ainda está dentro do root permitido
     std::string root = this->config.root;
-    const LocationConfig* location = findMatchingLocation(request.getUri());
+    const LocationConfig *location = findMatchingLocation(request.getUri());
     if (location && !location->root.empty())
         root = location->root;
-        
+
     if (!isPathSafe(real_path, root))
     {
         std::cout << "[403] Symlink aponta para fora do root permitido: " << file_path << " -> " << real_path << std::endl;
@@ -307,9 +337,7 @@ void Response::methodDelete(const HttpRequest& request, const std::string& file_
 
 
 
-
- 
-void Response::multipartFormData(const HttpRequest& request, const std::string& content_type)
+void Response::multipartFormData(const HttpRequest &request, const std::string &content_type)
 {
     std::string boundary = extractBoundary(content_type);
     if (boundary.empty())
@@ -317,72 +345,72 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         std::cout << "[400] Boundary não encontrado no Content-Type" << std::endl;
         return StatusCodes::http415UnsupportedMediaType(this->response_str);
     }
-    
+
     std::vector<MultipartFile> files;
     if (!parseMultipartData(request.getBody(), boundary, files))
     {
         std::cout << "[400] Erro ao parsear multipart data" << std::endl;
         return StatusCodes::http415UnsupportedMediaType(this->response_str);
     }
-    
+
     // Determinar diretório de upload. se estiver vazio significa que o body é muito grande
     std::string upload_dir = getUploadDir(request);
     if (upload_dir.empty())
         return StatusCodes::http413PayloadTooLarge(this->response_str);
-    
+
     // Criar diretório se não existir
     if (!createDirectory(upload_dir))
     {
         std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
         return StatusCodes::http500InternalServerError(this->response_str, "Failed to create upload directory: " + upload_dir);
     }
-    
+
     // Verificar permissões de escrita
     if (!hasWritePermission(upload_dir))
     {
         std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, upload_dir);
     }
-      
+
     // Salvar cada arquivo com validação
     // std::ostringstream saveFiles(files, upload_dir);
     std::ostringstream json_response;
     json_response << "{\"files\":[";
-    std::vector<std::string> saved_files;  // Para limpeza em caso de erro
+    std::vector<std::string> saved_files; // Para limpeza em caso de erro
     size_t success_count = 0;
-    
+
     for (size_t i = 0; i < files.size(); ++i)
     {
         // Validar extensão do arquivo
         if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
         {
             std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
-            cleanupFiles(saved_files);  // Limpar arquivos já salvos
+            cleanupFiles(saved_files); // Limpar arquivos já salvos
             return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename));
         }
-        
+
         // Validar tamanho individual do arquivo (max 10MB por arquivo)
         if (files[i].content.size() > 10 * 1024 * 1024)
         {
-            std::cout << "[413] Arquivo muito grande: " << files[i].filename 
+            std::cout << "[413] Arquivo muito grande: " << files[i].filename
                       << " (" << files[i].content.size() << " bytes)" << std::endl;
             cleanupFiles(saved_files);
             return StatusCodes::http413PayloadTooLarge(this->response_str);
         }
-        
+
         // RFC 2388: Servidor pode renomear arquivo por segurança/conflitos
         std::string unique_filename = generateUniqueFilename(files[i].filename);
         std::string full_path = upload_dir + "/" + unique_filename;
-        
+
         if (writeFileToDisk(full_path, files[i].content))
         {
             saved_files.push_back(full_path);
-            std::cout << "[201] Arquivo salvo: " << full_path 
-                        << " (" << files[i].content.size() << " bytes)" << std::endl;
-            
+            std::cout << "[201] Arquivo salvo: " << full_path
+                      << " (" << files[i].content.size() << " bytes)" << std::endl;
+
             if (success_count > 0)
                 json_response << ",";
-            
+
             json_response << "{";
             json_response << "\"filename\":\"" << unique_filename << "\",";
             json_response << "\"original_name\":\"" << files[i].filename << "\",";
@@ -395,13 +423,13 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         else
         {
             std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
-            cleanupFiles(saved_files);  // Limpar todos em caso de erro
+            cleanupFiles(saved_files); // Limpar todos em caso de erro
             return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + files[i].filename);
         }
     }
-    
+
     json_response << "],\"success\":true,\"count\":" << success_count << "}";
-    
+
     // RFC 7231: Location header deve conter URI do recurso criado (não caminho filesystem)
     std::string location = "";
     if (!saved_files.empty())
@@ -410,28 +438,31 @@ void Response::multipartFormData(const HttpRequest& request, const std::string& 
         std::string first_file = saved_files[0];
         size_t upload_pos = first_file.find("/uploads/");
         if (upload_pos != std::string::npos)
-            location = first_file.substr(upload_pos);  // URI relativo ao servidor
+            location = first_file.substr(upload_pos); // URI relativo ao servidor
         else
             location = request.getUri() + "/" + getFileName(first_file);
     }
-    
+
     StatusCodes::http201Created(this->response_str, location, json_response.str());
 }
 
-
-
-
-
-const LocationConfig* Response::findMatchingLocation(const std::string& uri) const
+const LocationConfig *Response::findMatchingLocation(const std::string &uri) const
 {
     // Buscar a location que melhor corresponde ao URI (longest match first)
-    const LocationConfig* best_match = NULL;
+    const LocationConfig *best_match = NULL;
     size_t best_match_length = 0;
-    
+
+    for (std::vector<LocationConfig>::const_iterator it = config.locations.begin(); 
+     it != config.locations.end(); 
+     ++it)
+    {
+        std::cout << "Path: " << it->path << std::endl;
+    }
+
     for (size_t i = 0; i < this->config.locations.size(); i++)
     {
-        const std::string& location_path = this->config.locations[i].path;
-        
+        const std::string &location_path = this->config.locations[i].path;
+
         // Verificar se URI começa com o path da location
         if (uri.find(location_path) == 0)
         {
@@ -443,48 +474,47 @@ const LocationConfig* Response::findMatchingLocation(const std::string& uri) con
             }
         }
     }
-    
+
     return best_match;
 }
 
-bool Response::validateAllowedMethod(const HttpRequest& request)
+bool Response::validateAllowedMethod(const HttpRequest &request)
 {
     // Buscar location correspondente
-    const LocationConfig* location = findMatchingLocation(request.getUri());
-    
+    const LocationConfig *location = findMatchingLocation(request.getUri());
+
     // Se a location tem uma lista de métodos permitidos, verificar se o método da requisição está nela
     if (location && !location->allowed_methods.empty())
     {
         std::vector<std::string>::const_iterator it = std::find(
             location->allowed_methods.begin(),
             location->allowed_methods.end(),
-            request.getMethod()
-        );
-        
+            request.getMethod());
+
         if (it == location->allowed_methods.end())
             return false;
     }
     return true;
 }
 
-std::string Response::getUploadDir(const HttpRequest& request)
-{   
+std::string Response::getUploadDir(const HttpRequest &request)
+{
     // Buscar location correspondente
-    const LocationConfig* location = findMatchingLocation(request.getUri());
-    
+    const LocationConfig *location = findMatchingLocation(request.getUri());
+
     // Verificar client_max_body_size específico da location
-    if (location && location->client_max_body_size > 0 && 
+    if (location && location->client_max_body_size > 0 &&
         request.getBody().size() > location->client_max_body_size)
     {
-        std::cout << "[413] Body size (" << request.getBody().size() 
-                  << ") excede limite da location (" 
+        std::cout << "[413] Body size (" << request.getBody().size()
+                  << ") excede limite da location ("
                   << location->client_max_body_size << ")" << std::endl;
         return "";
     }
-    
+
     // Determinar upload_dir
     std::string upload_dir = this->config.root;
-    
+
     if (location && !location->upload_dir.empty())
     {
         if (location->upload_dir[0] != '/')
@@ -492,58 +522,65 @@ std::string Response::getUploadDir(const HttpRequest& request)
         else
             upload_dir = location->upload_dir;
     }
-    
+
     return upload_dir;
 }
 
-void Response::generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri)
+void Response::generateDirectoryListing(const HttpRequest &request, const std::string &dir_path, const std::string &uri)
 {
     // 1. Abrir diretório
-    DIR* dir = opendir(dir_path.c_str());
-    
+    DIR *dir = opendir(dir_path.c_str());
+
     // 2. Ler todos os arquivos
     std::vector<std::string> files;
-    struct dirent* entry;
-    while ((entry = readdir(dir)) != NULL) {
+    struct dirent *entry;
+    while ((entry = readdir(dir)) != NULL)
+    {
         files.push_back(entry->d_name);
     }
     closedir(dir);
-    
+
     // 3. Gerar HTML bonito
     std::ostringstream html;
     html << "<html><head><title>Index of " << uri << "</title></head>";
     html << "<body><h1>Index of " << uri << "</h1><hr><ul>";
-    
-    for (size_t i = 0; i < files.size(); i++) {
-        if (files[i] != "." && files[i] != "..") {
+
+    for (size_t i = 0; i < files.size(); i++)
+    {
+        if (files[i] != "." && files[i] != "..")
+        {
             html << "<li><a href='" << uri << "/" << files[i] << "'>";
             html << files[i] << "</a></li>";
         }
     }
-    
+
     html << "</ul><hr></body></html>";
-    
+
     // 4. Retornar 200 OK com HTML
     StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path);
 }
 
-void Response::handleRedirect(int code, const std::string& url)
+void Response::handleRedirect(int code, const std::string &url)
 {
     std::ostringstream oss;
     oss << "HTTP/1.1 " << code;
-    
-    if (code == 301) oss << " Moved Permanently\r\n";
-    else if (code == 302) oss << " Found\r\n";
-    else if (code == 307) oss << " Temporary Redirect\r\n";
-    else if (code == 308) oss << " Permanent Redirect\r\n";
-    
+
+    if (code == 301)
+        oss << " Moved Permanently\r\n";
+    else if (code == 302)
+        oss << " Found\r\n";
+    else if (code == 307)
+        oss << " Temporary Redirect\r\n";
+    else if (code == 308)
+        oss << " Permanent Redirect\r\n";
+
     oss << "Location: " << url << "\r\n";
     oss << "Content-Length: 0\r\n";
     oss << "Connection: close\r\n\r\n";
     this->response_str = oss.str();
 }
 
-bool Response::isProtectedFile(const std::string& filename)
+bool Response::isProtectedFile(const std::string &filename)
 {
     for (size_t i = 0; i < this->protected_files.size(); ++i)
     {
@@ -553,7 +590,7 @@ bool Response::isProtectedFile(const std::string& filename)
     return false;
 }
 
-std::string Response::removeLocationInUri(const std::string& uri, const LocationConfig* location) const
+std::string Response::removeLocationInUri(const std::string &uri, const LocationConfig *location) const
 {
     // Comportamento alias: remove prefixo do location do URI
     std::string uri_without_location = uri;

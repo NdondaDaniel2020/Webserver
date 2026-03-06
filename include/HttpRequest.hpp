@@ -10,6 +10,8 @@
 class HttpRequest
 {
     private:
+        std::string query;
+        std::string path;
         std::string method;
         std::string uri;
         std::string version;

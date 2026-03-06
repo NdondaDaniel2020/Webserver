@@ -1,3 +1,15 @@
+/* ************************************************************************** */
+/*                                                                            */
+/*                                                        :::      ::::::::   */
+/*   EnvBuilder.cpp                                     :+:      :+:    :+:   */
+/*                                                    +:+ +:+         +:+     */
+/*   By: ajacinto <marvin@42.fr>                    +#+  +:+       +#+        */
+/*                                                +#+#+#+#+#+   +#+           */
+/*   Created: 2026/03/05 12:17:35 by ajacinto          #+#    #+#             */
+/*   Updated: 2026/03/05 12:17:37 by ajacinto         ###   ########.fr       */
+/*                                                                            */
+/* ************************************************************************** */
+
 #include "EnvBuilder.hpp"
 
 #include <algorithm>
@@ -5,11 +17,11 @@
 
 namespace EnvBuilder {
 
-static std::string toUpper(const std::string& s)
+static std::string toUpper(const std::string& str)
 {
-    std::string r = s;
-    std::transform(r.begin(), r.end(), r.begin(), ::toupper);
-    return r;
+    std::string ret = str;
+    std::transform(ret.begin(), ret.end(), ret.begin(), ::toupper);
+    return ret;
 }
 
 std::vector<std::string> build(const HttpRequest& request,

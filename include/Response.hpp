@@ -22,6 +22,7 @@
 # include "ConfigParser.hpp"
 # include "HttpRequest.hpp"
 # include "StatusCodes.hpp"
+# include "CGIHandler.hpp"
 
 class Response
 {
@@ -55,6 +56,7 @@ class Response
         void handleRedirect(int code, const std::string& url);
         bool isProtectedFile(const std::string& filename);
         std::string removeLocationInUri(const std::string& uri, const LocationConfig* location) const;
+        bool isCgiRequest (const std::string file_path, const LocationConfig* location);
 };
 
 #endif

@@ -119,6 +119,16 @@ const std::string& HttpRequest::getMethod() const
     return this->method;
 }
 
+ const std::string& HttpRequest::getQuery() const
+ {
+    return this->query;
+ }
+
+ const std::string& HttpRequest::getPath() const
+ {
+    return this->path;
+ }
+
 const std::string& HttpRequest::getUri() const
 {
     return this->uri;
