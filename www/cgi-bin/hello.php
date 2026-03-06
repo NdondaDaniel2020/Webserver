@@ -1,4 +1,3 @@
-<?php
-header("Content-Type: text/plain");
-echo "Hello from PHP CGI!\n";
-?>
+#!/usr/bin/env python3
+print("Content-Type: text/plain\r\n")
+print("Hello from PHP CGI!\r\n")

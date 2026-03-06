@@ -58,23 +58,24 @@ std::string Response::getResponseHttp()
     return this->response_str;
 }
 
- bool Response::isCgiRequest (const std::string file_path, const LocationConfig* location)
- {
+bool Response::isCgiRequest(const std::string& uri, const LocationConfig* location)
+{
     if (!location)
         return false;
-    if (file_path.empty())
-        return false;
-    size_t pos = file_path.find_first_of('.');
+
+    size_t pos = uri.find_last_of('.');
     if (pos == std::string::npos)
         return false;
-    std::string extension = file_path.substr(0, pos);
+
+    std::string extension = uri.substr(pos);
+
     for (size_t i = 0; i < location->cgi_extensions.size(); i++)
     {
-        if (extension != location->cgi_extensions[i])
+        if (extension == location->cgi_extensions[i])
             return true;
     }
     return false;
- }
+}
 
 void Response::buildHttpResponse(const HttpRequest &request)
 {
@@ -89,7 +90,7 @@ void Response::buildHttpResponse(const HttpRequest &request)
         root = location->root;
 
     std::string file_path = root + removeLocationInUri(uri, location);
-
+    
     // 2. Validar se método é permitido por location
     if (!validateAllowedMethod(request))
     {
@@ -114,7 +115,7 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
     const LocationConfig *location = findMatchingLocation(request.getUri());
 
-     if (isCgiRequest(_file_path, location))
+     if (isCgiRequest(request.getUri(), location))
      {
         std::string cgi_output;
         if (CGIHandler::executeCgi(request, _file_path, *location, cgi_output))
@@ -124,7 +125,7 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
         }
         else
         {
-            StatusCodes::http500InternalServerError(this->response_str, "CGI extension not suported ");
+            StatusCodes::http500InternalServerError(this->response_str, "CGI execution failed");
             return ;
         }
      }
@@ -451,13 +452,6 @@ const LocationConfig *Response::findMatchingLocation(const std::string &uri) con
     // Buscar a location que melhor corresponde ao URI (longest match first)
     const LocationConfig *best_match = NULL;
     size_t best_match_length = 0;
-
-    for (std::vector<LocationConfig>::const_iterator it = config.locations.begin(); 
-     it != config.locations.end(); 
-     ++it)
-    {
-        std::cout << "Path: " << it->path << std::endl;
-    }
 
     for (size_t i = 0; i < this->config.locations.size(); i++)
     {

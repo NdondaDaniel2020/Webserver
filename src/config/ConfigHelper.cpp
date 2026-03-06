@@ -79,6 +79,15 @@ namespace ConfigHelper
             while (iss >> method)
                 location.allowed_methods.push_back(method);
         }
+        else if (key == "cgi_path")
+            location.cgi_path = StringUtils::trim(value);
+        else if (key == "cgi_extension" || key == "cgi_extensions")
+        {
+            std::istringstream iss(StringUtils::trim(value));
+            std::string ext;
+            while (iss >> ext)
+                location.cgi_extensions.push_back(ext);
+        }
     }
 
     void extractKeyValue(const std::string &line, std::string &key, std::string &value)
