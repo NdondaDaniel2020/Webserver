@@ -58,22 +58,24 @@ std::string Response::getResponseHttp()
     return this->response_str;
 }
 
-bool Response::isCgiRequest(const std::string& uri, const LocationConfig* location)
+bool Response::isCgiRequest(const std::string &uri, const LocationConfig *location)
 {
     if (!location)
         return false;
 
-    size_t pos = uri.find_last_of('.');
+    if (location->cgi_path.empty())
+        return false;
+
+    size_t pos = uri.rfind('.');
+
     if (pos == std::string::npos)
         return false;
 
-    std::string extension = uri.substr(pos);
+    std::string ext = uri.substr(pos);
 
-    for (size_t i = 0; i < location->cgi_extensions.size(); i++)
-    {
-        if (extension == location->cgi_extensions[i])
-            return true;
-    }
+    if (ext == ".php" || ext == ".py")
+        return true;
+
     return false;
 }
 
@@ -115,72 +117,75 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
     const LocationConfig *location = findMatchingLocation(request.getUri());
 
-     if (isCgiRequest(request.getUri(), location))
-     {
+    // ---------- CGI ----------
+    if (isCgiRequest(request.getUri(), location))
+    {
         std::string cgi_output;
+
         if (CGIHandler::executeCgi(request, _file_path, *location, cgi_output))
         {
             this->response_str = cgi_output;
-            return ;
+            return;
         }
         else
         {
-            StatusCodes::http500InternalServerError(this->response_str, "CGI execution failed");
-            return ;
+            StatusCodes::http500InternalServerError(
+                this->response_str,
+                "CGI execution failed");
+            return;
         }
-     }
+    }
 
-    // 1. Verificar se tem redirect configurado
+    // ---------- redirect ----------
     if (location && location->redirect_code > 0)
         return handleRedirect(location->redirect_code, location->redirect_url);
 
-    // 2. Verificar se é diretório
+    // ---------- diretório ----------
     if (isDirectory(_file_path))
     {
-        // Determinar quais index files usar (location override ou server default)
-        std::vector<std::string> index_files_to_use = this->config.index_files;
-        if (location && !location->index_files.empty())
-            index_files_to_use = location->index_files; // Override!
+        std::vector<std::string> index_files = this->config.index_files;
 
-        // Buscar arquivo index configurado (index.html, etc)
-        std::string index_path = findIndexFile(_file_path, index_files_to_use);
+        if (location && !location->index_files.empty())
+            index_files = location->index_files;
+
+        std::string index_path = findIndexFile(_file_path, index_files);
 
         if (!index_path.empty())
-        {
             _file_path = index_path;
-        }
         else
         {
-            // Verificar se autoindex está on/off (location já foi buscada acima)
             if (location && location->autoindex)
-            {
-                // ✅ autoindex on → Gerar listagem HTML
                 return generateDirectoryListing(request, file_path, request.getUri());
-            }
             else
-            {
-                // ❌ autoindex off → 403 Forbidden
                 return StatusCodes::http403Forbidden(this->response_str, _file_path);
-            }
         }
     }
 
-    // 3. Verificar se arquivo existe
+    // ---------- arquivo existe ----------
     if (!fileExists(_file_path))
     {
-        return StatusCodes::http404NotFound(this->response_str, request, "", _file_path, this->config);
+        return StatusCodes::http404NotFound(
+            this->response_str,
+            request,
+            "",
+            _file_path,
+            this->config);
     }
 
-    // 4. Verificar permissões de leitura
+    // ---------- permissão ----------
     if (!isReadable(_file_path))
     {
-        std::cout << "[403] Sem permissão de leitura: " << _file_path << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, _file_path);
     }
 
-    // 5. Ler arquivo e retornar
+    // ---------- arquivo estático ----------
     std::string content = readFile(_file_path);
-    StatusCodes::http200FileFound(this->response_str, request, content, _file_path);
+
+    StatusCodes::http200FileFound(
+        this->response_str,
+        request,
+        content,
+        _file_path);
 }
 
 void Response::methodPost(const HttpRequest &request)

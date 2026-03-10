@@ -34,6 +34,7 @@ std::vector<std::string> build(const HttpRequest& request,
     std::vector<std::string> env;
 
     // standard CGI variables
+    env.push_back("REDIRECT_STATUS=200");
     env.push_back("REQUEST_METHOD=" + request.getMethod());
     env.push_back("QUERY_STRING=" + request.getQuery());
     env.push_back("SERVER_PROTOCOL=" + request.getVersion());

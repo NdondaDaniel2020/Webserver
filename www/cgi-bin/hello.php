@@ -1,3 +1,6 @@
-#!/usr/bin/env python3
-print("Content-Type: text/plain\r\n")
-print("Hello from PHP CGI!\r\n")
+<?php
+
+echo "Content-Type: text/html\r\n\r\n";
+echo "<h1>Hello from CGI</h1>";
+
+?>
