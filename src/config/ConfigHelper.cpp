@@ -79,16 +79,19 @@ namespace ConfigHelper
             while (iss >> method)
                 location.allowed_methods.push_back(method);
         }
-        else if (key == "cgi_path")
-            location.cgi_path = StringUtils::trim(value);
         else if (key == "cgi_extension" || key == "cgi_extensions")
         {
-            std::istringstream iss(StringUtils::trim(value));
-
-            std::string ext;
-            std::string path;
-            iss >> ext >> path;
-            location.cgi_handlers[ext] = path;
+            std::string ext = StringUtils::trim(value);
+            location.cgi_handlers[ext] = "";
+            location.cgi_path = ext;
+        }
+        else if (key == "cgi_path")
+        {
+            // associa o path à última extensão lida
+            std::string path = StringUtils::trim(value);
+            if (!location.cgi_path.empty())
+                location.cgi_handlers[location.cgi_path] = path;
+            location.cgi_path = path;
         }
     }
 

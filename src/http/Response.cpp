@@ -93,7 +93,7 @@ void Response::buildHttpResponse(const HttpRequest &request)
         root = location->root;
 
     std::string file_path = root + removeLocationInUri(uri, location);
-    
+
     // 2. Validar se método é permitido por location
     if (!validateAllowedMethod(request))
     {
@@ -117,12 +117,9 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
     std::string _file_path = file_path;
 
     const LocationConfig *location = findMatchingLocation(request.getUri());
-
-    // ---------- CGI ----------
     if (isCgiRequest(request.getUri(), location))
     {
         std::string cgi_output;
-
         if (CGIHandler::executeCgi(request, _file_path, *location, cgi_output))
         {
             this->response_str = cgi_output;
@@ -136,21 +133,14 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
             return;
         }
     }
-
-    // ---------- redirect ----------
     if (location && location->redirect_code > 0)
         return handleRedirect(location->redirect_code, location->redirect_url);
-
-    // ---------- diretório ----------
     if (isDirectory(_file_path))
     {
         std::vector<std::string> index_files = this->config.index_files;
-
         if (location && !location->index_files.empty())
             index_files = location->index_files;
-
         std::string index_path = findIndexFile(_file_path, index_files);
-
         if (!index_path.empty())
             _file_path = index_path;
         else
@@ -161,8 +151,6 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
                 return StatusCodes::http403Forbidden(this->response_str, _file_path);
         }
     }
-
-    // ---------- arquivo existe ----------
     if (!fileExists(_file_path))
     {
         return StatusCodes::http404NotFound(
@@ -172,16 +160,9 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
             _file_path,
             this->config);
     }
-
-    // ---------- permissão ----------
     if (!isReadable(_file_path))
-    {
         return StatusCodes::http403Forbidden(this->response_str, _file_path);
-    }
-
-    // ---------- arquivo estático ----------
     std::string content = readFile(_file_path);
-
     StatusCodes::http200FileFound(
         this->response_str,
         request,
@@ -204,7 +185,25 @@ void Response::methodPost(const HttpRequest &request)
 
     // Validar limite específico da location (mais restritivo)
     const LocationConfig *location = findMatchingLocation(request.getUri());
-   
+
+    if (location && isCgiRequest(request.getUri(), location))
+    {
+        std::string scriptPath =
+            location->root + request.getUri().substr(location->path.size());
+
+        std::string cgiResponse;
+
+        if (CGIHandler::executeCgi(request, scriptPath, *location, cgiResponse))
+        {
+            this->response_str = cgiResponse;
+            return;
+        }
+
+        return StatusCodes::http500InternalServerError(
+            this->response_str,
+            "CGI Error");
+    }
+
     if (location && location->client_max_body_size > 0 && body_size > location->client_max_body_size)
     {
         std::cout << "[413] Body size (" << body_size << ") excede limite da location ("
@@ -341,8 +340,6 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
     return StatusCodes::http204NoContent(this->response_str);
 }
-
-
 
 void Response::multipartFormData(const HttpRequest &request, const std::string &content_type)
 {
