@@ -50,7 +50,7 @@ namespace ConfigHelper
         code = atoi(code_str.c_str());
     }
 
-    void parseCommonConfig(const std::string& key, const std::string& value, ServerConfig& server)
+    void parseCommonConfig(const std::string &key, const std::string &value, ServerConfig &server)
     {
         if (key == "root")
             parseRoot(value, server.root);
@@ -84,9 +84,11 @@ namespace ConfigHelper
         else if (key == "cgi_extension" || key == "cgi_extensions")
         {
             std::istringstream iss(StringUtils::trim(value));
+
             std::string ext;
-            while (iss >> ext)
-                location.cgi_extensions.push_back(ext);
+            std::string path;
+            iss >> ext >> path;
+            location.cgi_handlers[ext] = path;
         }
     }
 

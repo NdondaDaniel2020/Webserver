@@ -21,7 +21,7 @@ struct LocationConfig {
     std::string cgi_path;
     int redirect_code;
     std::string redirect_url;
-    std::vector<std::string> cgi_extensions;
+    std::map<std::string, std::string> cgi_handlers;
     size_t client_max_body_size;
     std::string upload_dir;
 

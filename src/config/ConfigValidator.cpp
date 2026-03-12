@@ -71,8 +71,8 @@ namespace ConfigValidator
         }
         if (str_red[0] != '/' && str_red[0] != 'h')
             return false;
-        int num_redirect =  atoi(num_red.c_str());
-        if (num_redirect < 300 || num_redirect  > 308 )
+        int num_redirect = atoi(num_red.c_str());
+        if (num_redirect < 300 || num_redirect > 308)
             return false;
         return true;
     }
@@ -140,10 +140,15 @@ namespace ConfigValidator
     }
     bool validateCgiConfig(const LocationConfig &location)
     {
-        if (!location.cgi_path.empty() && location.cgi_extensions.empty())
-            return false;
-        if (location.cgi_path.empty() && !location.cgi_extensions.empty())
-            return false;
+        if (!location.cgi_handlers.empty())
+        {
+            std::map<std::string, std::string>::const_iterator it;
+            for (it = location.cgi_handlers.begin(); it != location.cgi_handlers.end(); ++it)
+            {
+                if (it->first.empty() || it->second.empty())
+                    return false;
+            }
+        }
         return true;
     }
     bool validateUploadDir(const LocationConfig &location)

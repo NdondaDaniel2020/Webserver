@@ -58,12 +58,13 @@ std::string Response::getResponseHttp()
     return this->response_str;
 }
 
-bool Response::isCgiRequest(const std::string &uri, const LocationConfig *location)
+bool Response::isCgiRequest(const std::string &uri,
+                            const LocationConfig *location)
 {
     if (!location)
         return false;
 
-    if (location->cgi_path.empty())
+    if (location->cgi_handlers.empty())
         return false;
 
     size_t pos = uri.rfind('.');
@@ -73,7 +74,7 @@ bool Response::isCgiRequest(const std::string &uri, const LocationConfig *locati
 
     std::string ext = uri.substr(pos);
 
-    if (ext == ".php" || ext == ".py")
+    if (location->cgi_handlers.find(ext) != location->cgi_handlers.end())
         return true;
 
     return false;

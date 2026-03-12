@@ -18,10 +18,10 @@
 # include "ConfigParser.hpp"
 
 namespace CGIHandler {
-    bool executeCgi(const HttpRequest& request,
-                 const std::string& scriptPath,
-                 const LocationConfig& location,
-                 std::string& outResponse);
+    bool executeCgi(const HttpRequest &request,
+                            const std::string &scriptPath,
+                            const LocationConfig &location,
+                            std::string &outResponse);
 }
 
 #endif
