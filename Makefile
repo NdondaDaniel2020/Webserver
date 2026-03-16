@@ -34,7 +34,6 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/http/StatusCodes.cpp \
 			  $(SRCDIR)/http/HttpRequest.cpp \
 			  $(SRCDIR)/server/Client.cpp \
-			  $(SRCDIR)/cgi/CGIHandler.cpp \
 			  $(SRCDIR)/cgi/EnvBuilder.cpp \
 
 # Arquivos futuros (descomente conforme forem sendo criados)
@@ -60,7 +59,6 @@ HEADERS		= include/Server.hpp \
 			  include/HttpRequest.hpp \
 			  include/Client.hpp \
 			  include/ConfigValidator.hpp \
-			  include/CGIHandler.hpp \
 			  include/EnvBuilder.hpp \
 # Headers futuros (descomente conforme forem sendo criados)
 
