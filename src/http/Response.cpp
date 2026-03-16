@@ -6,11 +6,140 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/04 11:25:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/16 14:49:50 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Response.hpp"
+
+#include <algorithm>
+#include <cctype>
+#include <ctime>
+#include <iomanip>
+#include <sys/stat.h>
+
+namespace
+{
+    struct DirectoryEntry
+    {
+        std::string name;
+        bool is_directory;
+        off_t size;
+        time_t mtime;
+    };
+
+    static bool directoryEntryLess(const DirectoryEntry &a, const DirectoryEntry &b)
+    {
+        if (a.name == "..")
+            return true;
+        if (b.name == "..")
+            return false;
+        if (a.is_directory != b.is_directory)
+            return a.is_directory;
+        return a.name < b.name;
+    }
+
+    static std::string htmlEscape(const std::string &value)
+    {
+        std::string escaped;
+
+        for (size_t i = 0; i < value.size(); ++i)
+        {
+            if (value[i] == '&')
+                escaped += "&amp;";
+            else if (value[i] == '<')
+                escaped += "&lt;";
+            else if (value[i] == '>')
+                escaped += "&gt;";
+            else if (value[i] == '"')
+                escaped += "&quot;";
+            else
+                escaped += value[i];
+        }
+        return escaped;
+    }
+
+    static std::string encodeUriSegment(const std::string &name)
+    {
+        std::ostringstream encoded;
+        const char *hex = "0123456789ABCDEF";
+
+        for (size_t i = 0; i < name.size(); ++i)
+        {
+            unsigned char c = static_cast<unsigned char>(name[i]);
+
+            if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+                encoded << name[i];
+            else
+            {
+                encoded << '%';
+                encoded << hex[c >> 4];
+                encoded << hex[c & 0x0F];
+            }
+        }
+        return encoded.str();
+    }
+
+    static std::string normalizeDirectoryUri(const std::string &uri)
+    {
+        std::string normalized = uri;
+
+        if (normalized.empty() || normalized[0] != '/')
+            normalized = "/" + normalized;
+        if (normalized[normalized.size() - 1] != '/')
+            normalized += '/';
+        return normalized;
+    }
+
+    static std::string parentDirectoryUri(const std::string &uri)
+    {
+        std::string normalized = normalizeDirectoryUri(uri);
+
+        if (normalized == "/")
+            return "/";
+
+        size_t end = normalized.size() - 1;
+        size_t pos = normalized.rfind('/', end - 1);
+
+        if (pos == std::string::npos)
+            return "/";
+        if (pos == 0)
+            return "/";
+        return normalized.substr(0, pos + 1);
+    }
+
+    static std::string formatIndexDate(time_t timestamp)
+    {
+        char buffer[32];
+        std::tm *tm_info = std::localtime(&timestamp);
+
+        if (!tm_info)
+            return "-";
+        if (std::strftime(buffer, sizeof(buffer), "%Y-%b-%d %H:%M", tm_info) == 0)
+            return "-";
+        return buffer;
+    }
+
+    static std::string formatIndexSize(off_t size)
+    {
+        static const char *units[] = {"B", "KiB", "MiB", "GiB", "TiB"};
+        double display = static_cast<double>(size);
+        size_t unit = 0;
+
+        while (display >= 1024.0 && unit < 4)
+        {
+            display /= 1024.0;
+            ++unit;
+        }
+
+        std::ostringstream oss;
+        if (unit == 0)
+            oss << size << ' ' << units[unit];
+        else
+            oss << std::fixed << std::setprecision(1) << display << ' ' << units[unit];
+        return oss.str();
+    }
+}
 
 Response::Response(const HttpRequest &request, const ServerConfig &config) : config(config)
 {
@@ -474,35 +603,106 @@ std::string Response::getUploadDir(const HttpRequest &request)
 
 void Response::generateDirectoryListing(const HttpRequest &request, const std::string &dir_path, const std::string &uri)
 {
-    // 1. Abrir diretório
     DIR *dir = opendir(dir_path.c_str());
+    if (!dir)
+    {
+        StatusCodes::http500InternalServerError(this->response_str, "Failed to open directory");
+        return;
+    }
 
-    // 2. Ler todos os arquivos
-    std::vector<std::string> files;
-    struct dirent *entry;
+    std::vector<DirectoryEntry> entries;
+    struct dirent *entry = NULL;
+
     while ((entry = readdir(dir)) != NULL)
     {
-        files.push_back(entry->d_name);
+        std::string name = entry->d_name;
+
+        if (name == ".")
+            continue;
+
+        DirectoryEntry item;
+        item.name = name;
+        item.is_directory = false;
+        item.size = 0;
+        item.mtime = 0;
+
+        if (name == "..")
+        {
+            item.is_directory = true;
+            entries.push_back(item);
+            continue;
+        }
+
+        std::string full_path = dir_path;
+        if (!full_path.empty() && full_path[full_path.size() - 1] != '/')
+            full_path += '/';
+        full_path += name;
+
+        struct stat file_stat;
+        if (stat(full_path.c_str(), &file_stat) == 0)
+        {
+            item.is_directory = S_ISDIR(file_stat.st_mode);
+            item.size = file_stat.st_size;
+            item.mtime = file_stat.st_mtime;
+        }
+
+        entries.push_back(item);
     }
     closedir(dir);
 
-    // 3. Gerar HTML bonito
-    std::ostringstream html;
-    html << "<html><head><title>Index of " << uri << "</title></head>";
-    html << "<body><h1>Index of " << uri << "</h1><hr><ul>";
+    std::sort(entries.begin(), entries.end(), directoryEntryLess);
 
-    for (size_t i = 0; i < files.size(); i++)
+    const std::string current_uri = normalizeDirectoryUri(uri);
+    const std::string parent_uri = parentDirectoryUri(current_uri);
+
+    std::ostringstream html;
+    html << "<!doctype html><html><head><meta charset='UTF-8'>";
+    html << "<meta name='viewport' content='width=device-width'>";
+    html << "<style type='text/css'>";
+    html << "body,html {background:#fff;font-family:\"Bitstream Vera Sans\",\"Lucida Grande\",\"Lucida Sans Unicode\",Lucidux,Verdana,Lucida,sans-serif;}";
+    html << "tr:nth-child(even) {background:#f4f4f4;}";
+    html << "th,td {padding:0.1em 0.5em;}";
+    html << "th {text-align:left;font-weight:bold;background:#eee;border-bottom:1px solid #aaa;}";
+    html << "#list {border:1px solid #aaa;width:100%;}";
+    html << "a {color:#a33;}a:hover {color:#e33;}";
+    html << "</style>";
+    html << "<title>Index of " << htmlEscape(current_uri) << "</title></head><body>";
+    html << "<h1>Index of " << htmlEscape(current_uri) << "</h1>";
+    html << "<table id='list'><thead><tr>";
+    html << "<th style='width:55%'><a href='?C=N&amp;O=A'>File Name</a>&nbsp;<a href='?C=N&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
+    html << "<th style='width:20%'><a href='?C=S&amp;O=A'>File Size</a>&nbsp;<a href='?C=S&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
+    html << "<th style='width:25%'><a href='?C=M&amp;O=A'>Date</a>&nbsp;<a href='?C=M&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
+    html << "</tr></thead><tbody>";
+
+    html << "<tr><td class='link'><a href='" << htmlEscape(parent_uri)
+         << "'>Parent directory/</a></td><td class='size'>-</td><td class='date'>-</td></tr>";
+
+    for (size_t i = 0; i < entries.size(); ++i)
     {
-        if (files[i] != "." && files[i] != "..")
+        if (entries[i].name == "..")
+            continue;
+
+        std::string label = entries[i].name;
+        std::string href = current_uri + encodeUriSegment(entries[i].name);
+        if (entries[i].is_directory)
         {
-            html << "<li><a href='" << uri << "/" << files[i] << "'>";
-            html << files[i] << "</a></li>";
+            label += '/';
+            href += '/';
         }
+
+        html << "<tr><td class='link'><a href='" << htmlEscape(href) << "' title='" << htmlEscape(label) << "'>"
+             << htmlEscape(label) << "</a></td>";
+
+        if (entries[i].is_directory)
+            html << "<td class='size'>-</td>";
+        else
+            html << "<td class='size'>" << formatIndexSize(entries[i].size) << "</td>";
+
+        html << "<td class='date'>" << htmlEscape(formatIndexDate(entries[i].mtime)) << "</td></tr>";
     }
 
-    html << "</ul><hr></body></html>";
+    html << "</tbody></table></body></html>";
 
-    // 4. Retornar 200 OK com HTML
     StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path);
 }
 
