@@ -12,14 +12,23 @@
 
 #include "Client.hpp"
 #include "StatusCodes.hpp"
-#include <iostream>
-#include <cstring>
-
-// ========== Constructor / Destructor ==========
+#include "EnvBuilder.hpp"  // para gerar envp correto para CGI
 
 Client::Client(int fd, const ConfigParser* config)
-    : fd(fd), state(READING_HEADERS), send_offset(0), response(NULL),
-      keep_alive(false), content_length(0), headers_end_pos(0), config(config)
+    : fd(fd),
+      state(READING_HEADERS),
+      last_activity(0),                  // ← corrigido
+      recv_buffer(),
+      send_buffer(),
+      send_offset(0),
+      request(),
+      response(NULL),
+      keep_alive(false),
+      content_length(0),
+      headers_end_pos(0),
+      config(config),
+      cgi(),                             // default constructor
+      is_cgi_active(false)
 {
     updateLastActivity();
 }
@@ -30,18 +39,27 @@ Client::~Client()
         delete response;
 }
 
-Client::Client(const Client& other)
-    : fd(other.fd), state(other.state), recv_buffer(other.recv_buffer),
-      send_buffer(other.send_buffer), send_offset(other.send_offset),
-      request(other.request), response(NULL), keep_alive(other.keep_alive),
-      content_length(other.content_length), headers_end_pos(other.headers_end_pos),
-      last_activity(other.last_activity), config(other.config)
+Client::Client(const Client &other)
+    : fd(other.fd),
+      state(other.state),
+      last_activity(other.last_activity),         // ← agora na posição correta
+      recv_buffer(other.recv_buffer),
+      send_buffer(other.send_buffer),
+      send_offset(other.send_offset),
+      request(other.request),
+      response(NULL),                             // cuidado com deep copy abaixo
+      keep_alive(other.keep_alive),
+      content_length(other.content_length),       // ← agora depois de keep_alive
+      headers_end_pos(other.headers_end_pos),
+      config(other.config),
+      cgi(other.cgi),
+      is_cgi_active(other.is_cgi_active)
 {
     if (other.response)
         response = new Response(*other.response);
 }
 
-Client& Client::operator=(const Client& other)
+Client &Client::operator=(const Client &other)
 {
     if (this != &other)
     {
@@ -51,18 +69,52 @@ Client& Client::operator=(const Client& other)
         send_buffer = other.send_buffer;
         send_offset = other.send_offset;
         request = other.request;
-        
+
         if (response)
             delete response;
         response = other.response ? new Response(*other.response) : NULL;
-        
+
         keep_alive = other.keep_alive;
         content_length = other.content_length;
         headers_end_pos = other.headers_end_pos;
         last_activity = other.last_activity;
         config = other.config;
+        cgi = other.cgi;
+        is_cgi_active = other.is_cgi_active;
     }
     return *this;
+}
+
+void Client::cleanupCgiIfActive(int epoll_fd)
+{
+    if (!is_cgi_active)
+        return;
+
+    if (cgi.pid > 0)
+    {
+        kill(cgi.pid, SIGKILL);
+        waitpid(cgi.pid, NULL, WNOHANG);
+        cgi.pid = -1;
+    }
+
+    if (cgi.pipe_in[1] >= 0)
+    {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+        close(cgi.pipe_in[1]);
+        cgi.pipe_in[1] = -1;
+    }
+
+    if (cgi.pipe_out[0] >= 0)
+    {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+        close(cgi.pipe_out[0]);
+        cgi.pipe_out[0] = -1;
+    }
+
+    is_cgi_active = false;
+
+    std::cout << "[CGI CLEANUP] Processo filho do cliente fd=" << fd
+              << " terminado (SIGKILL enviado)" << std::endl;
 }
 
 // ========== Getters ==========
@@ -70,6 +122,16 @@ Client& Client::operator=(const Client& other)
 int Client::getFd() const
 {
     return fd;
+}
+
+int Client::getCgiOutFd() const
+{
+    return cgi.pipe_out[0];
+}
+
+int Client::getCgiInFd() const
+{
+    return cgi.pipe_in[1];
 }
 
 Client::State Client::getState() const
@@ -99,7 +161,7 @@ bool Client::hasDataToSend() const
 
 // ========== Recepção de dados ==========
 
-void Client::appendRecvData(const char* data, size_t len)
+void Client::appendRecvData(const char *data, size_t len)
 {
     recv_buffer.append(data, len);
     updateLastActivity();
@@ -112,26 +174,26 @@ bool Client::isRequestComplete()
         if (findHeadersEnd())
         {
             parseHeaders();
-            
+
             // Se parseHeaders detectou erro 413, marcar como completo
             if (state == ERROR_413)
                 return true;
-            
+
             // Se não tem body (GET, POST, DELETE) e Content-Length: 0
-            if ((request.getMethod() == "GET" || 
-                request.getMethod() == "POST" ||
-                request.getMethod() == "DELETE") &&
+            if ((request.getMethod() == "GET" ||
+                 request.getMethod() == "POST" ||
+                 request.getMethod() == "DELETE") &&
                 content_length == 0)
             {
                 state = PROCESSING;
                 return true;
             }
-            
+
             // Se tem body, muda para READING_BODY
             state = READING_BODY;
         }
     }
-    
+
     if (state == READING_BODY)
     {
         if (checkBodyComplete())
@@ -140,7 +202,7 @@ bool Client::isRequestComplete()
             return true;
         }
     }
-    
+
     return false;
 }
 
@@ -149,7 +211,7 @@ bool Client::findHeadersEnd()
     size_t pos = recv_buffer.find("\r\n\r\n");
     if (pos != std::string::npos)
     {
-        headers_end_pos = pos + 4;  // +4 para pular o \r\n\r\n
+        headers_end_pos = pos + 4; // +4 para pular o \r\n\r\n
         return true;
     }
     return false;
@@ -160,30 +222,30 @@ void Client::parseHeaders()
     // Parse apenas os headers (até headers_end_pos)
     std::string headers_only = recv_buffer.substr(0, headers_end_pos);
     request = HttpRequest::parse(headers_only);
-    
+
     // Verificar Content-Length
     if (request.hasHeader("Content-Length"))
     {
         std::istringstream iss(request.getHeader("Content-Length"));
         iss >> content_length;
-        
+
         // ✅ VALIDAR Content-Length ANTES de receber o body
         if (config)
         {
-            const ServerConfig& server_cfg = config->getServerConfig(0);
+            const ServerConfig &server_cfg = config->getServerConfig(0);
             size_t max_size = server_cfg.client_max_body_size;
-            
+
             if (max_size > 0 && content_length > max_size)
             {
-                std::cout << "[413] Content-Length (" << content_length 
-                          << ") excede limite (" << max_size 
+                std::cout << "[413] Content-Length (" << content_length
+                          << ") excede limite (" << max_size
                           << ") - Rejeitando ANTES de receber body" << std::endl;
                 state = ERROR_413;
                 return;
             }
         }
     }
-    
+
     // Verificar keep-alive
     if (request.hasHeader("Connection"))
     {
@@ -206,28 +268,46 @@ bool Client::checkBodyComplete()
 
 // ========== Processamento ==========
 
-void Client::processRequest(const ServerConfig& server_config)
+static const LocationConfig *findMatchingLocation(const ServerConfig &config, const std::string &uri)
+{
+    const LocationConfig *best_match = NULL;
+    size_t best_match_length = 0;
+
+    for (size_t i = 0; i < config.locations.size(); i++)
+    {
+        const std::string &location_path = config.locations[i].path;
+        if (uri.find(location_path) == 0 && location_path.size() > best_match_length)
+        {
+            best_match = &config.locations[i];
+            best_match_length = location_path.size();
+        }
+    }
+
+    return best_match;
+}
+
+void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 {
     // ✅ Tratar erro 413 detectado ANTES de receber o body
     if (state == ERROR_413)
     {
         std::cout << "[CLIENT " << fd << "] Gerando resposta 413 (Content-Length excedeu limite)" << std::endl;
-        
+
         // Criar resposta 413 diretamente
         std::string response_str;
         StatusCodes::http413PayloadTooLarge(response_str);
-        
+
         send_buffer = response_str;
         send_offset = 0;
         state = SENDING_RESPONSE;
-        keep_alive = false;  // Forçar fechamento da conexão
-        
+        keep_alive = false; // Forçar fechamento da conexão
+
         return;
     }
-    
+
     if (state != PROCESSING)
         return;
-    
+
     // Se tem body, extrair do recv_buffer e adicionar ao request
     if (content_length > 0 && headers_end_pos > 0)
     {
@@ -239,18 +319,28 @@ void Client::processRequest(const ServerConfig& server_config)
             std::cout << "[CLIENT " << fd << "] Body extraído: " << body.size() << " bytes" << std::endl;
         }
     }
-    
-    // Criar resposta
+
+    // Se é CGI, iniciar processamento não-bloqueante
+    const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
+    if (location && !location->cgi_handlers.empty())
+    {
+        std::cout << "[CLIENT " << fd << "] Iniciando CGI para " << request.getUri() << std::endl;
+        state = CGI_RUNNING;
+        startCgi(request, *location, epoll_fd);
+        return;
+    }
+
+    // Criar resposta estática/normal
     if (response)
         delete response;
-    
+
     response = new Response(request, server_config);
     send_buffer = response->getResponseHttp();
     send_offset = 0;
-    
+
     state = SENDING_RESPONSE;
-    
-    std::cout << "[CLIENT " << fd << "] Resposta criada: " 
+
+    std::cout << "[CLIENT " << fd << "] Resposta criada: "
               << send_buffer.size() << " bytes" << std::endl;
 }
 
@@ -260,22 +350,22 @@ bool Client::sendData()
 {
     if (state != SENDING_RESPONSE || !hasDataToSend())
         return false;
-    
+
     // Enviar chunk do buffer
     size_t remaining = send_buffer.size() - send_offset;
-    size_t to_send = remaining;  // Pode limitar aqui (ex: 8192 bytes por vez)
-    
+    size_t to_send = remaining; // Pode limitar aqui (ex: 8192 bytes por vez)
+
     ssize_t sent = write(fd, send_buffer.c_str() + send_offset, to_send);
-    
+
     if (sent < 0)
     {
         std::cerr << "[CLIENT " << fd << "] Erro ao enviar dados" << std::endl;
         return false;
     }
-    
+
     send_offset += sent;
     updateLastActivity();
-    
+
     // Verificar se terminou de enviar
     if (send_offset >= send_buffer.size())
     {
@@ -283,31 +373,32 @@ bool Client::sendData()
         state = DONE;
         return true;
     }
-    
+
     return false;
 }
 
 // ========== Reset para keep-alive ==========
 
+void Client::setState(State s) { state = s; }
 void Client::reset()
 {
     recv_buffer.clear();
     send_buffer.clear();
     send_offset = 0;
-    
+
     if (response)
     {
         delete response;
         response = NULL;
     }
-    
+
     request = HttpRequest();
     content_length = 0;
     headers_end_pos = 0;
     state = READING_HEADERS;
-    
+
     updateLastActivity();
-    
+
     std::cout << "[CLIENT " << fd << "] Reset para keep-alive" << std::endl;
 }
 
@@ -316,4 +407,238 @@ void Client::reset()
 void Client::updateLastActivity()
 {
     last_activity = time(NULL);
+}
+
+// Cria envp usando EnvBuilder para suportar php-cgi com force-cgi-redirect
+static char **buildEnvp(const HttpRequest &req, const std::string &script, const LocationConfig &loc)
+{
+    std::vector<std::string> envStrings = EnvBuilder::build(req, loc, script);
+    char **envp = new char *[envStrings.size() + 1];
+    size_t i = 0;
+    for (; i < envStrings.size(); ++i)
+    {
+        envp[i] = new char[envStrings[i].size() + 1];
+        std::strcpy(envp[i], envStrings[i].c_str());
+    }
+    envp[i] = NULL;
+    return envp;
+}
+
+static void freeEnvp(char **envp)
+{
+    for (size_t i = 0; envp[i]; ++i)
+        delete[] envp[i];
+    delete[] envp;
+}
+
+void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epoll_fd)
+{
+    std::string error_msg = "Fail CGI";
+    std::string script_path = loc.root + req.getUri().substr(loc.path.size());
+    size_t dot = script_path.rfind('.');
+    std::string ext = (dot != std::string::npos) ? script_path.substr(dot) : "";
+
+    std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
+    if (it == loc.cgi_handlers.end())
+    {
+        // não é CGI válido → erro
+        StatusCodes::http502BadGateway(error_msg, "CGI");
+        state = SENDING_RESPONSE;
+        return;
+    }
+    std::string interpreter = it->second;
+
+    if (pipe(cgi.pipe_in) < 0 || pipe(cgi.pipe_out) < 0)
+    {
+        StatusCodes::http502BadGateway(error_msg, "CGI");
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    fcntl(cgi.pipe_in[1], F_SETFL, O_NONBLOCK);
+    fcntl(cgi.pipe_out[0], F_SETFL, O_NONBLOCK);
+
+    char **envp = buildEnvp(req, script_path, loc);
+    pid_t pid = fork();
+    if (pid < 0)
+    {
+        freeEnvp(envp);
+        StatusCodes::http502BadGateway(error_msg, "CGI");
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (pid == 0)
+    { // filho
+        dup2(cgi.pipe_in[0], STDIN_FILENO);
+        dup2(cgi.pipe_out[1], STDOUT_FILENO);
+        dup2(cgi.pipe_out[1], STDERR_FILENO);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+
+        char *argv[3];
+        argv[0] = const_cast<char *>(interpreter.c_str());
+        argv[1] = const_cast<char *>(script_path.c_str());
+        argv[2] = NULL;
+
+        execve(interpreter.c_str(), argv, envp);
+        freeEnvp(envp);
+        exit(127);
+    }
+
+    // pai
+    freeEnvp(envp);
+
+    // pai
+    close(cgi.pipe_in[0]);
+    close(cgi.pipe_out[1]);
+
+    cgi.pid = pid;
+    cgi.body_written = 0;
+    cgi.finished = false;
+    cgi.start_time = time(NULL);
+    cgi.output = "";
+    is_cgi_active = true;
+
+    // Adiciona pipes ao epoll (level-triggered; evita perda de eventos com EPOLLET)
+    epoll_event ev;
+    ev.events = EPOLLOUT | EPOLLHUP;
+    ev.data.fd = cgi.pipe_in[1];
+    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_in[1], &ev);
+
+    ev.events = EPOLLIN | EPOLLHUP;
+    ev.data.fd = cgi.pipe_out[0];
+    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_out[0], &ev);
+}
+
+void Client::handleCgiStdinWritable(int epoll_fd)
+{
+    if (!is_cgi_active)
+        return;
+
+    std::cout << "[CLIENT " << fd << "] CGI stdin writable" << std::endl;
+
+    const std::string &body = request.getBody();
+    if (body.empty())
+    {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+        close(cgi.pipe_in[1]);
+        cgi.pipe_in[1] = -1;
+        return;
+    }
+
+    if (cgi.body_written >= body.size())
+        return;
+
+    ssize_t w = write(cgi.pipe_in[1], body.c_str() + cgi.body_written,
+                      body.size() - cgi.body_written);
+
+    if (w > 0)
+    {
+        cgi.body_written += static_cast<size_t>(w);
+        if (cgi.body_written >= body.size())
+        {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+            close(cgi.pipe_in[1]);
+            cgi.pipe_in[1] = -1;
+        }
+    }
+}
+
+void Client::handleCgiStdoutReadable(int epoll_fd)
+{
+    if (!is_cgi_active)
+        return;
+
+    std::cout << "[CLIENT " << fd << "] CGI stdout readable" << std::endl;
+
+    char buf[8192];
+    ssize_t r;
+    while ((r = read(cgi.pipe_out[0], buf, sizeof(buf))) > 0)
+    {
+        std::cout << "[CLIENT " << fd << "] CGI read " << r << " bytes" << std::endl;
+        cgi.output.append(buf, r);
+    }
+
+    if (r == 0)
+    {
+        std::cout << "[CLIENT " << fd << "] CGI stdout EOF" << std::endl;
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+        close(cgi.pipe_out[0]);
+        cgi.pipe_out[0] = -1;
+        finishCgiAndGenerateResponse(epoll_fd);
+        return;
+    }
+
+    if (errno == EAGAIN || errno == EWOULDBLOCK)
+    {
+        int status;
+        pid_t result = waitpid(cgi.pid, &status, WNOHANG);
+        if (result == cgi.pid)
+        {
+            std::cout << "[CLIENT " << fd << "] CGI processo terminou, drenando pipe..." << std::endl;
+            while ((r = read(cgi.pipe_out[0], buf, sizeof(buf))) > 0)
+                cgi.output.append(buf, r);
+
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+            close(cgi.pipe_out[0]);
+            cgi.pipe_out[0] = -1;
+            cgi.pid = -1;
+            finishCgiAndGenerateResponse(epoll_fd);
+        }
+    }
+    else
+    {
+        std::cerr << "[CLIENT " << fd << "] CGI read error: " << strerror(errno) << std::endl;
+    }
+}
+
+void Client::finishCgiAndGenerateResponse(int epoll_fd)
+{
+    (void)epoll_fd;
+    int status;
+    if (cgi.pid > 0)
+    {
+        waitpid(cgi.pid, &status, WNOHANG);
+        cgi.pid = -1;
+    }
+
+    is_cgi_active = false;
+
+    // Parseia output do CGI
+    size_t pos = cgi.output.find("\r\n\r\n");
+    if (pos == std::string::npos)
+        pos = cgi.output.find("\n\n");
+    std::string cgi_headers = (pos != std::string::npos) ? cgi.output.substr(0, pos) : "";
+    std::string cgi_body = (pos != std::string::npos) ? cgi.output.substr(pos + (cgi.output[pos] == '\r' ? 4 : 2)) : cgi.output;
+
+    std::string status_line = "200 OK";
+    std::string extra_headers;
+
+    std::istringstream iss(cgi_headers);
+    std::string line;
+    while (std::getline(iss, line))
+    {
+        if (line.find("Status: ") == 0)
+        {
+            status_line = line.substr(8);
+        }
+        else if (!line.empty() && line[line.size() - 1] == '\r')
+        {
+            line.erase(line.size() - 1);
+            extra_headers += line + "\r\n";
+        }
+    }
+
+    std::ostringstream oss;
+    oss << "HTTP/1.1 " << status_line << "\r\n"
+        << extra_headers
+        << "Content-Length: " << cgi_body.size() << "\r\n"
+        << "Connection: " << (keep_alive ? "keep-alive" : "close") << "\r\n"
+        << "\r\n"
+        << cgi_body;
+
+    send_buffer = oss.str();
+    send_offset = 0;
+    state = SENDING_RESPONSE;
 }

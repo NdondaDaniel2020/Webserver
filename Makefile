@@ -81,7 +81,7 @@ all: $(NAME)
 
 $(NAME): $(OBJECTS)
 	@echo "🔗 Linking $(NAME)..."
-	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(NAME)
+	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(NAME) -lpthread
 	@echo "✅ $(NAME) compiled successfully!"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(HEADERS)

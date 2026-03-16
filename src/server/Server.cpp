@@ -6,14 +6,17 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/02 12:38:32 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/16 00:00:00 by copilot          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
-Server::Server(const ConfigParser& config) : port_count(config.getServerCount()), config(config), TIMEOUT_SECONDS(120)
-{   
+Server::Server(const ConfigParser &config)
+    : port_count(config.getServerCount()),
+      config(config),
+      TIMEOUT_SECONDS(120)
+{
     // ---------- Portas ----------
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
@@ -25,16 +28,17 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
 
     // ---------- Criar epoll ----------
     this->epoll_fd = epoll_create(1);
-    if (this->epoll_fd < 0) 
+    if (this->epoll_fd < 0)
         perror("epoll_create");
 
     // ---------- Criar sockets servidores ----------
     this->servers = new int[this->port_count];
-    for (int i = 0; i < this->port_count; i++) 
+    for (int i = 0; i < this->port_count; i++)
     {
         this->servers[i] = createServerSocket(this->interface[i], this->ports[i]);
-        if (this->servers[i] < 0) 
-            return ;
+        if (this->servers[i] < 0)
+            return;
+
         epoll_event ev;
         ev.events = EPOLLIN;
         ev.data.fd = this->servers[i];
@@ -46,7 +50,7 @@ Server::Server(const ConfigParser& config) : port_count(config.getServerCount())
 Server::~Server()
 {
     // Limpar todos os clientes
-    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); ++it)
+    for (std::map<int, Client *>::iterator it = clients.begin(); it != clients.end(); ++it)
     {
         delete it->second;
     }
@@ -56,117 +60,102 @@ Server::~Server()
     delete[] this->interface;
 }
 
-Server::Server(const Server& other) : port_count(other.port_count)
-{
-    this->TIMEOUT_SECONDS = other.TIMEOUT_SECONDS;
-    this->ports = new int[this->port_count];
-    std::memcpy(this->ports, other.ports, sizeof(int) * this->port_count);
-    this->epoll_fd = other.epoll_fd;
-    this->servers = new int[this->port_count];
-    std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
-    this->interface = new std::string[this->port_count];
-    for (int i = 0; i < this->port_count; i++)
-        this->interface[i] = other.interface[i];
-    std::memcpy(this->events, other.events, sizeof(other.events));
-}
-
-Server& Server::operator=(const Server& other)
-{
-    if (this != &other)
-    {
-        delete[] this->ports;
-        delete[] this->servers;
-        this->port_count = other.port_count;
-        this->ports = new int[this->port_count];
-        std::memcpy(this->ports, other.ports, sizeof(int) * this->port_count);
-        this->epoll_fd = other.epoll_fd;
-        this->servers = new int[this->port_count];
-        this->interface = new std::string[this->port_count];
-        this->TIMEOUT_SECONDS = other.TIMEOUT_SECONDS;
-        for (int i = 0; i < this->port_count; i++)
-            this->interface[i] = other.interface[i];
-        std::memcpy(this->servers, other.servers, sizeof(int) * this->port_count);
-        std::memcpy(this->events, other.events, sizeof(other.events));
-    }
-    return *this;
-}
-
 void Server::start()
 {
     std::cout << "Servidor iniciado. Aguardando conexões..." << std::endl;
-    
+
     while (true)
     {
-        // ✅ Verificar timeouts de clientes a cada iteração
         checkTimeout();
 
-        int n = epoll_wait(this->epoll_fd, this->events, 64, -1);
-        if (n < 0) { perror("epoll_wait"); break; }
+        int n = epoll_wait(this->epoll_fd, this->events, 64, 1000);
+        if (n < 0 && errno != EINTR)
+        {
+            perror("epoll_wait");
+            break;
+        }
 
         for (int i = 0; i < n; i++)
         {
             int fd = this->events[i].data.fd;
 
             if (isServerSocket(fd))
-                newConnection(fd);  // ---------- Nova conexão ----------
+            {
+                newConnection(fd);
+                continue;
+            }
+
+            std::map<int, Client*>::iterator it = clients.find(fd);
+            if (it != clients.end())
+            {
+                Client* client = it->second;
+
+                if (events[i].events & (EPOLLERR | EPOLLHUP))
+                {
+                    closeClient(fd);
+                    continue;
+                }
+
+                if (events[i].events & EPOLLIN)
+                    handleClientData(fd);
+
+                // Revalidar iterador após handleClientData (pode ter fechado o cliente)
+                it = clients.find(fd);
+                if (it == clients.end())
+                    continue;
+                client = it->second;
+
+                if (events[i].events & EPOLLOUT)
+                {
+                    if (client->getState() == Client::SENDING_RESPONSE
+                        && client->hasDataToSend())
+                    {
+                        bool finished = client->sendData();
+                        if (finished)
+                        {
+                            if (client->isKeepAlive())
+                                client->reset();
+                            else
+                                closeClient(fd);
+                        }
+                    }
+                }
+            }
             else
-                handleClientData(fd);  // ---------- Dados de cliente ----------
+            {
+                // fd pertence a um pipe CGI
+                std::map<int, Client*>::iterator cit = cgi_fd_map.find(fd);
+                if (cit != cgi_fd_map.end())
+                {
+                    Client* c = cit->second;
+                    if (events[i].events & (EPOLLIN | EPOLLERR | EPOLLHUP))
+                        c->handleCgiStdoutReadable(epoll_fd);
+                    else if (events[i].events & EPOLLOUT)
+                        c->handleCgiStdinWritable(epoll_fd);
+                }
+            }
         }
     }
-}
-
-void Server::stop()
-{
-    for (int i = 0; i < this->port_count; i++)
-        close(this->servers[i]);
-    close(this->epoll_fd);
-}
-
-int Server::createServerSocket(const std::string& interface, int port)
-{
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (server_fd < 0) { perror("socket"); return -1; }
-
-    int opt = 1;
-    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-
-    sockaddr_in addr;
-    std::memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(ipToHex(interface));
-    addr.sin_port = htons(port);
-
-    if (bind(server_fd, (sockaddr*)&addr, sizeof(addr)) < 0) {
-        perror("bind");
-        close(server_fd);
-        return -1;
-    }
-
-    if (listen(server_fd, 10) < 0) {
-        perror("listen");
-        close(server_fd);
-        return -1;
-    }
-
-    std::cout << "Servidor ouvindo na porta " << port 
-              << " http://"<< interface << ":" << port << std::endl;
-    return server_fd;
 }
 
 void Server::newConnection(int fd)
 {
     int client_fd = accept(fd, NULL, NULL);
-    if (client_fd < 0) { perror("accept"); return; }
+    if (client_fd < 0)
+    {
+        perror("accept");
+        return;
+    }
+
+    fcntl(client_fd, F_SETFL, O_NONBLOCK);
 
     std::cout << "[+] Cliente conectado fd=" << client_fd << std::endl;
 
-    // Criar objeto Client
-    Client* client = new Client(client_fd, &this->config);
+    Client *client = new Client(client_fd, &this->config);
     this->clients[client_fd] = client;
 
-    // Adicionar ao epoll
     epoll_event cev;
-    cev.events = EPOLLIN | EPOLLOUT;  // Monitora leitura e escrita
+    cev.events = EPOLLIN | EPOLLOUT;
     cev.data.fd = client_fd;
 
     epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, client_fd, &cev);
@@ -174,63 +163,56 @@ void Server::newConnection(int fd)
 
 void Server::handleClientData(int fd)
 {
-    // Buscar cliente
     std::map<int, Client*>::iterator it = this->clients.find(fd);
     if (it == this->clients.end())
     {
         std::cerr << "[ERRO] Cliente fd=" << fd << " não encontrado" << std::endl;
-        closeClient(fd);
         return;
     }
 
     Client* client = it->second;
-    
-    // ========== LEITURA ==========
-    if (client->getState() == Client::READING_HEADERS || 
+
+    if (client->getState() == Client::READING_HEADERS ||
         client->getState() == Client::READING_BODY)
     {
         char buf[4096];
         int r = read(fd, buf, sizeof(buf));
-        
+
         if (r <= 0)
         {
-            // Cliente desconectou ou erro
             std::cout << "[-] Cliente desconectado fd=" << fd << std::endl;
             closeClient(fd);
             return;
         }
-        
-        // Adicionar dados ao buffer do cliente
+
         client->appendRecvData(buf, r);
-        
-        // Verificar se requisição está completa
+
         if (client->isRequestComplete())
         {
-            // Processar requisição (inclusive erros como 413)
-            client->processRequest(this->config.getServerConfig(0));
+            client->processRequest(this->config.getServerConfig(0), this->epoll_fd);
+
+            // Registar pipes CGI no mapa separado, nunca em clients
+            if (client->isCgiActive())
+            {
+                int out_fd = client->getCgiOutFd();
+                int in_fd  = client->getCgiInFd();
+                if (out_fd >= 0) cgi_fd_map[out_fd] = client;
+                if (in_fd  >= 0) cgi_fd_map[in_fd]  = client;
+            }
         }
     }
-    
-    // ========== ESCRITA ==========
+
     if (client->getState() == Client::SENDING_RESPONSE)
     {
         if (client->hasDataToSend())
         {
             bool finished = client->sendData();
-            
             if (finished)
             {
-                // Resposta enviada completamente
                 if (client->isKeepAlive())
-                {
-                    // Reset para próxima requisição
                     client->reset();
-                }
                 else
-                {
-                    // Fechar conexão
                     closeClient(fd);
-                }
             }
         }
     }
@@ -239,14 +221,33 @@ void Server::handleClientData(int fd)
 void Server::closeClient(int fd)
 {
     std::map<int, Client*>::iterator it = this->clients.find(fd);
-    if (it != this->clients.end())
+    if (it == this->clients.end())
+        return;
+
+    Client* client = it->second;
+
+    // Guardar fds dos pipes ANTES do cleanup os fechar
+    int cgi_out = -1;
+    int cgi_in  = -1;
+    if (client->isCgiActive())
     {
-        delete it->second;
-        this->clients.erase(it);
+        cgi_out = client->getCgiOutFd();
+        cgi_in  = client->getCgiInFd();
     }
-    
+
+    // Cleanup: mata processo, fecha e anula pipes
+    client->cleanupCgiIfActive(this->epoll_fd);
+
+    // Remover pipes do mapa separado
+    if (cgi_out >= 0) cgi_fd_map.erase(cgi_out);
+    if (cgi_in  >= 0) cgi_fd_map.erase(cgi_in);
+
+    delete client;
+    this->clients.erase(it);
+
     epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
     close(fd);
+
     std::cout << "[-] Cliente fd=" << fd << " fechado" << std::endl;
 }
 
@@ -263,29 +264,64 @@ bool Server::isServerSocket(int fd) const
 void Server::checkTimeout()
 {
     time_t now = time(NULL);
-    
+
     // Iterar sobre todos os clientes
-    for (std::map<int, Client*>::iterator it = clients.begin(); it != clients.end(); )
+    for (std::map<int, Client *>::iterator it = clients.begin(); it != clients.end();)
     {
-        Client* client = it->second;
+        Client *client = it->second;
         int client_fd = it->first;
-        
+
         // Verificar se o cliente está inativo por mais tempo que TIMEOUT_SECONDS
         time_t time_inactive = now - client->getLastActivity();
-        
+
         if (time_inactive > TIMEOUT_SECONDS)
         {
-            std::cout << "[TIMEOUT] Cliente " << client_fd << " inativo por " 
-                      << time_inactive << " segundos (limite: " 
+            std::cout << "[TIMEOUT] Cliente " << client_fd << " inativo por "
+                      << time_inactive << " segundos (limite: "
                       << TIMEOUT_SECONDS << ")" << std::endl;
-            
-            // Fechar o cliente
+
+            // Avança o iterador ANTES de fechar o cliente (fechar remove o elemento)
+            ++it;
             closeClient(client_fd);
-            
-            // Iterador seguro: apagar e avançar
-            clients.erase(it++);
         }
         else
             ++it;
     }
+}
+
+int Server::createServerSocket(const std::string &interface, int port)
+{
+    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (server_fd < 0)
+    {
+        perror("socket");
+        return -1;
+    }
+
+    int opt = 1;
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    sockaddr_in addr;
+    std::memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = htonl(ipToHex(interface));
+    addr.sin_port = htons(port);
+
+    if (bind(server_fd, (sockaddr *)&addr, sizeof(addr)) < 0)
+    {
+        perror("bind");
+        close(server_fd);
+        return -1;
+    }
+
+    if (listen(server_fd, 10) < 0)
+    {
+        perror("listen");
+        close(server_fd);
+        return -1;
+    }
+
+    std::cout << "Servidor ouvindo na porta " << port
+              << " http://" << interface << ":" << port << std::endl;
+    return server_fd;
 }

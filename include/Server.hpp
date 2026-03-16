@@ -9,7 +9,6 @@
 /*   Updated: 2026/03/02 12:20:08 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
-
 #ifndef SERVER_HPP
 # define SERVER_HPP
 
@@ -31,27 +30,26 @@
 class Server
 {
     private:
-        int* ports;
-        int epoll_fd;
-        int* servers;
-        int port_count;
-        std::string* interface;
-        epoll_event events[64];
-        ConfigParser config;
-        std::map<int, Client*> clients;  // fd -> Client*
-        int TIMEOUT_SECONDS;
+        int*                     ports;
+        int                      epoll_fd;
+        int*                     servers;
+        int                      port_count;
+        std::string*             interface;
+        epoll_event              events[64];
+        const ConfigParser&      config;
+        std::map<int, Client*>   clients;      // fd cliente -> Client*
+        std::map<int, Client*>   cgi_fd_map;   // fd pipe CGI -> Client*
+        int                      TIMEOUT_SECONDS;
 
     public:
         Server(const ConfigParser& config);
         ~Server();
-        Server(const Server& other);
-        Server& operator=(const Server& other);
-        
+
         void start();
         void stop();
 
     private:
-        int createServerSocket(const std::string& interface, int port);
+        int  createServerSocket(const std::string& interface, int port);
         void newConnection(int fd);
         void handleClientData(int fd);
         void closeClient(int fd);

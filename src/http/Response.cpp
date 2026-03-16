@@ -58,28 +58,6 @@ std::string Response::getResponseHttp()
     return this->response_str;
 }
 
-bool Response::isCgiRequest(const std::string &uri,
-                            const LocationConfig *location)
-{
-    if (!location)
-        return false;
-
-    if (location->cgi_handlers.empty())
-        return false;
-
-    size_t pos = uri.rfind('.');
-
-    if (pos == std::string::npos)
-        return false;
-
-    std::string ext = uri.substr(pos);
-
-    if (location->cgi_handlers.find(ext) != location->cgi_handlers.end())
-        return true;
-
-    return false;
-}
-
 void Response::buildHttpResponse(const HttpRequest &request)
 {
     // 1. Sanitizar URI para prevenir path traversal
@@ -117,22 +95,9 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
     std::string _file_path = file_path;
 
     const LocationConfig *location = findMatchingLocation(request.getUri());
-    if (isCgiRequest(request.getUri(), location))
-    {
-        std::string cgi_output;
-        if (CGIHandler::executeCgi(request, _file_path, *location, cgi_output))
-        {
-            this->response_str = cgi_output;
-            return;
-        }
-        else
-        {
-            StatusCodes::http500InternalServerError(
-                this->response_str,
-                "CGI execution failed");
-            return;
-        }
-    }
+    if (location && !location->cgi_handlers.empty())
+        return StatusCodes::http502BadGateway(this->response_str, "Fail CGI");
+
     if (location && location->redirect_code > 0)
         return handleRedirect(location->redirect_code, location->redirect_url);
     if (isDirectory(_file_path))
@@ -185,24 +150,8 @@ void Response::methodPost(const HttpRequest &request)
 
     // Validar limite específico da location (mais restritivo)
     const LocationConfig *location = findMatchingLocation(request.getUri());
-
-    if (location && isCgiRequest(request.getUri(), location))
-    {
-        std::string scriptPath =
-            location->root + request.getUri().substr(location->path.size());
-
-        std::string cgiResponse;
-
-        if (CGIHandler::executeCgi(request, scriptPath, *location, cgiResponse))
-        {
-            this->response_str = cgiResponse;
-            return;
-        }
-
-        return StatusCodes::http500InternalServerError(
-            this->response_str,
-            "CGI Error");
-    }
+    if (location && !location->cgi_handlers.empty())
+        return StatusCodes::http502BadGateway(this->response_str, "Fail CGI");
 
     if (location && location->client_max_body_size > 0 && body_size > location->client_max_body_size)
     {
