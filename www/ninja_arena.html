@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚔️ Ninja Arena</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" />
+  <style>
+    /* ── Design tokens (same palette as arena.css) ──────── */
+    :root {
+      --neon:       #00FF9C;
+      --purple:     #A855F7;
+      --cyan:       #06B6D4;
+      --red:        #EF4444;
+      --orange:     #F97316;
+      --yellow:     #EAB308;
+      --bg-primary: #0D0F14;
+      --bg-card:    #151a2b;
+      --bg-elevated:#1e2540;
+      --border:     rgba(0,255,156,.12);
+      --text-muted: #6B7280;
+      --font-head:  'Orbitron', monospace;
+      --font-body:  'Inter', sans-serif;
+      --font-mono:  'Fira Code', monospace;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg-primary);
+      color: #E2E8F0;
+      font-family: var(--font-body);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── Navbar ─────────────────────────────────────────── */
+    .navbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: .85rem 2rem;
+      background: rgba(13,15,20,.9);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(10px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-brand {
+      font-family: var(--font-head);
+      font-size: 1.1rem;
+      font-weight: 900;
+      color: var(--neon);
+      text-decoration: none;
+      letter-spacing: 2px;
+    }
+    .navbar-links { display: flex; gap: 1.2rem; align-items: center; }
+    .navbar-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: .85rem;
+      transition: color .2s;
+    }
+    .navbar-links a:hover { color: var(--neon); }
+    .navbar-links a.active { color: var(--neon); font-weight: 600; }
+
+    /* ── Page hero ──────────────────────────────────────── */
+    .hero {
+      text-align: center;
+      padding: 3.5rem 1rem 1.5rem;
+      position: relative;
+    }
+    .hero h1 {
+      font-family: var(--font-head);
+      font-size: clamp(2rem, 6vw, 3.5rem);
+      font-weight: 900;
+      letter-spacing: 4px;
+      background: linear-gradient(135deg, var(--neon) 0%, var(--purple) 60%, var(--cyan) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .hero p {
+      margin-top: .6rem;
+      color: var(--text-muted);
+      font-size: .95rem;
+      max-width: 480px;
+      margin-inline: auto;
+    }
+
+    /* ── Layout ─────────────────────────────────────────── */
+    .arena-wrap {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.5rem 4rem;
+      display: grid;
+      gap: 1.5rem;
+    }
+
+    /* ── Screens ────────────────────────────────────────── */
+    .screen { display: none; }
+    .screen.active { display: contents; }
+
+    /* ────────────────────── SETUP SCREEN ─────────────── */
+    #setup-screen.active { display: block; }
+    .setup-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2.5rem;
+      max-width: 540px;
+      margin: 0 auto 2rem;
+    }
+    .setup-card h2 {
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      color: var(--neon);
+      margin-bottom: 1.8rem;
+      letter-spacing: 2px;
+    }
+    .field { display: flex; flex-direction: column; gap: .4rem; margin-bottom: 1.4rem; }
+    .field label { font-size: .8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; }
+    .field input {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      color: #E2E8F0;
+      padding: .65rem 1rem;
+      border-radius: 8px;
+      font-family: var(--font-body);
+      font-size: .95rem;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .field input:focus { border-color: var(--neon); }
+
+    .class-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: .8rem; }
+    .class-btn {
+      background: var(--bg-elevated);
+      border: 2px solid var(--border);
+      border-radius: 12px;
+      padding: 1rem .5rem;
+      cursor: pointer;
+      transition: border-color .2s, background .2s, transform .1s;
+      text-align: center;
+    }
+    .class-btn:hover  { border-color: var(--neon); transform: translateY(-1px); }
+    .class-btn.picked { border-color: var(--neon); background: rgba(0,255,156,.08); }
+    .class-btn .emoji { font-size: 2.2rem; }
+    .class-btn .cname { font-family: var(--font-head); font-size: .75rem; color: var(--neon); letter-spacing: 1px; margin-top: .4rem; }
+    .class-btn .cdesc { font-size: .7rem; color: var(--text-muted); margin-top: .25rem; }
+    .class-btn .cstats { font-size: .68rem; font-family: var(--font-mono); color: var(--cyan); margin-top: .3rem; }
+
+    .btn-start {
+      width: 100%;
+      padding: .85rem;
+      background: linear-gradient(135deg, var(--neon), var(--cyan));
+      border: none;
+      border-radius: 10px;
+      color: #0D0F14;
+      font-family: var(--font-head);
+      font-weight: 700;
+      font-size: .95rem;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: opacity .2s, transform .1s;
+      margin-top: .5rem;
+    }
+    .btn-start:hover    { opacity: .9; transform: translateY(-1px); }
+    .btn-start:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Scoreboard section ─────────────────────────────── */
+    .scoreboard-wrap {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      max-width: 540px;
+      margin: 0 auto;
+    }
+    .scoreboard-wrap h3 {
+      font-family: var(--font-head);
+      font-size: .85rem;
+      color: var(--yellow);
+      letter-spacing: 2px;
+      margin-bottom: 1rem;
+    }
+    .score-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: .5rem .75rem;
+      border-radius: 8px;
+      font-size: .82rem;
+      font-family: var(--font-mono);
+    }
+    .score-row:nth-child(odd) { background: rgba(255,255,255,.03); }
+    .score-name  { color: var(--neon); }
+    .score-stats { color: var(--text-muted); font-size: .75rem; }
+
+    /* ────────────────────── BATTLE SCREEN ────────────── */
+    #battle-screen.active { display: grid; }
+    #battle-screen {
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: auto 1fr auto;
+      gap: 1rem;
+    }
+
+    .combatant-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: .8rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .combatant-card::before {
+      content: '';
+      position: absolute; inset: 0;
+      border-radius: inherit;
+      opacity: 0;
+      transition: opacity .3s;
+    }
+    .combatant-card.player-side::before { background: radial-gradient(circle at 0% 0%, rgba(0,255,156,.06) 0%, transparent 70%); }
+    .combatant-card.enemy-side::before  { background: radial-gradient(circle at 100% 0%, rgba(239,68,68,.06)  0%, transparent 70%); }
+    .combatant-card.player-side::before,
+    .combatant-card.enemy-side::before  { opacity: 1; }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .card-name {
+      font-family: var(--font-head);
+      font-size: 1rem;
+      letter-spacing: 1px;
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .card-name .emoji { font-size: 1.5rem; }
+    .card-badge {
+      font-size: .65rem;
+      font-family: var(--font-mono);
+      padding: .15rem .5rem;
+      border-radius: 20px;
+      background: rgba(0,255,156,.1);
+      color: var(--neon);
+      border: 1px solid rgba(0,255,156,.25);
+    }
+    .enemy-side .card-badge { background: rgba(239,68,68,.1); color: var(--red); border-color: rgba(239,68,68,.25); }
+
+    /* HP / Energy bars */
+    .bar-label {
+      font-size: .7rem;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: .2rem;
+    }
+    .bar-track {
+      height: 10px;
+      background: rgba(255,255,255,.07);
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 20px;
+      transition: width .6s ease;
+    }
+    .bar-hp   .bar-fill { background: linear-gradient(90deg, #22c55e, var(--neon)); }
+    .bar-en   .bar-fill { background: linear-gradient(90deg, #6366f1, var(--purple)); }
+    .bar-hp   .bar-fill.low   { background: linear-gradient(90deg, var(--red), #f97316); }
+    .bar-hp   .bar-fill.med   { background: linear-gradient(90deg, var(--orange), var(--yellow)); }
+    .bar-enemy .bar-fill      { background: linear-gradient(90deg, var(--red), #f97316); }
+    .bar-enemy .bar-fill.low  { background: linear-gradient(90deg, #7f1d1d, var(--red)); }
+
+    .stats-row {
+      display: flex;
+      gap: .5rem;
+      flex-wrap: wrap;
+    }
+    .stat-chip {
+      font-family: var(--font-mono);
+      font-size: .7rem;
+      padding: .2rem .5rem;
+      border-radius: 6px;
+      background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08);
+      color: var(--text-muted);
+    }
+    .stat-chip span { color: #E2E8F0; font-weight: 600; }
+
+    /* Round / Phase info bar */
+    .battle-info {
+      grid-column: 1 / -1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: .65rem 1.2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .round-tag {
+      font-family: var(--font-head);
+      font-size: .8rem;
+      color: var(--neon);
+      letter-spacing: 2px;
+    }
+    .phase-indicator {
+      font-family: var(--font-mono);
+      font-size: .75rem;
+      padding: .2rem .7rem;
+      border-radius: 20px;
+      background: rgba(0,255,156,.1);
+      color: var(--neon);
+      border: 1px solid rgba(0,255,156,.2);
+    }
+    .phase-indicator.enemy { background: rgba(239,68,68,.1); color: var(--red); border-color: rgba(239,68,68,.2); }
+    .phase-indicator.wait  { background: rgba(234,179,8,.1);  color: var(--yellow); border-color: rgba(234,179,8,.2); }
+
+    /* Combat log */
+    .log-wrap {
+      grid-column: 1 / -1;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 1rem 1.2rem;
+    }
+    .log-header {
+      font-family: var(--font-head);
+      font-size: .7rem;
+      color: var(--text-muted);
+      letter-spacing: 2px;
+      margin-bottom: .6rem;
+    }
+    #combat-log {
+      font-family: var(--font-mono);
+      font-size: .78rem;
+      color: #9CA3AF;
+      line-height: 1.6;
+      max-height: 180px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: .15rem;
+    }
+    #combat-log .entry-player { color: var(--neon); }
+    #combat-log .entry-enemy  { color: var(--red); }
+    #combat-log .entry-system { color: var(--yellow); }
+
+    /* Action buttons */
+    .actions-wrap {
+      grid-column: 1 / -1;
+      display: flex;
+      gap: .75rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .action-btn {
+      padding: .7rem 1.4rem;
+      border-radius: 10px;
+      border: 2px solid transparent;
+      font-family: var(--font-head);
+      font-size: .8rem;
+      letter-spacing: 1px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      gap: .4rem;
+    }
+    .action-btn:disabled { opacity: .35; cursor: not-allowed; transform: none !important; }
+    .action-btn:not(:disabled):hover { transform: translateY(-2px); }
+
+    .btn-attack  { background: rgba(239,68,68,.12); border-color: var(--red);    color: var(--red); }
+    .btn-attack:not(:disabled):hover  { background: rgba(239,68,68,.22); }
+    .btn-special { background: rgba(168,85,247,.12); border-color: var(--purple); color: var(--purple); }
+    .btn-special:not(:disabled):hover { background: rgba(168,85,247,.22); }
+    .btn-defend  { background: rgba(6,182,212,.12);  border-color: var(--cyan);   color: var(--cyan); }
+    .btn-defend:not(:disabled):hover  { background: rgba(6,182,212,.22); }
+    .btn-flee    { background: rgba(107,114,128,.1); border-color: var(--text-muted); color: var(--text-muted); }
+    .btn-flee:not(:disabled):hover    { background: rgba(107,114,128,.2); }
+    .btn-newbattle { background: linear-gradient(135deg, var(--neon), var(--cyan)); border-color: transparent; color: #0D0F14; }
+
+    /* Energy cost badge */
+    .energy-cost {
+      font-size: .65rem;
+      font-family: var(--font-mono);
+      padding: .1rem .35rem;
+      border-radius: 4px;
+      background: rgba(168,85,247,.2);
+      color: var(--purple);
+    }
+
+    /* Damage splash (animation) */
+    .dmg-splash {
+      position: absolute;
+      font-family: var(--font-head);
+      font-size: 1.6rem;
+      font-weight: 900;
+      pointer-events: none;
+      animation: splash .9s ease forwards;
+      z-index: 10;
+    }
+    .dmg-splash.player-hit { color: var(--red);    right: 1.5rem; top: 1.5rem; }
+    .dmg-splash.enemy-hit  { color: var(--neon);   left: 1.5rem;  top: 1.5rem; }
+    @keyframes splash {
+      0%   { opacity: 1;   transform: translateY(0)   scale(1.2); }
+      60%  { opacity: 1;   transform: translateY(-28px) scale(1); }
+      100% { opacity: 0;   transform: translateY(-48px) scale(.6); }
+    }
+
+    /* Glow pulse on active side */
+    @keyframes pulse-green { 0%,100% { box-shadow: 0 0 0 0 rgba(0,255,156,0); } 50% { box-shadow: 0 0 24px 4px rgba(0,255,156,.2); } }
+    @keyframes pulse-red   { 0%,100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); } 50% { box-shadow: 0 0 24px 4px rgba(239,68,68,.2); } }
+    .player-side.active-turn { animation: pulse-green 1.4s infinite; }
+    .enemy-side.active-turn  { animation: pulse-red   1.4s infinite; }
+
+    /* Shake on hit */
+    @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)} 40%{transform:translateX(8px)} 60%{transform:translateX(-5px)} 80%{transform:translateX(5px)} }
+    .shake { animation: shake .4s ease; }
+
+    /* ────────────────── RESULT SCREEN ────────────────── */
+    #result-screen.active { display: flex; }
+    #result-screen {
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      padding: 2rem 0;
+    }
+    .result-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem;
+      text-align: center;
+      max-width: 480px;
+      width: 100%;
+    }
+    .result-emoji { font-size: 4rem; margin-bottom: .8rem; }
+    .result-title {
+      font-family: var(--font-head);
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      margin-bottom: .4rem;
+    }
+    .result-title.victory { color: var(--neon); }
+    .result-title.defeat  { color: var(--red); }
+    .result-sub  { color: var(--text-muted); font-size: .9rem; margin-bottom: 1.5rem; }
+    .reward-list { list-style: none; margin-bottom: 1.5rem; }
+    .reward-list li {
+      font-family: var(--font-mono);
+      font-size: .85rem;
+      padding: .35rem 0;
+      border-bottom: 1px solid rgba(255,255,255,.04);
+      display: flex;
+      justify-content: space-between;
+    }
+    .reward-list li .rval { color: var(--neon); font-weight: 600; }
+    .result-btns { display: flex; gap: .75rem; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Status spinner ────────────────────────────────── */
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid rgba(0,255,156,.2);
+      border-top-color: var(--neon);
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: inline-block;
+      margin-right: .4rem;
+      vertical-align: middle;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Flashing level-up toast ───────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 2rem; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: rgba(0,255,156,.15);
+      border: 1px solid var(--neon);
+      color: var(--neon);
+      font-family: var(--font-head);
+      font-size: .85rem;
+      letter-spacing: 1px;
+      padding: .65rem 1.5rem;
+      border-radius: 30px;
+      opacity: 0;
+      transition: opacity .3s, transform .3s;
+      pointer-events: none;
+      z-index: 200;
+    }
+    #toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    /* ── Responsive ────────────────────────────────────── */
+    @media (max-width: 680px) {
+      #battle-screen { grid-template-columns: 1fr; }
+      .battle-info { flex-direction: column; gap: .4rem; text-align: center; }
+      .navbar { padding: .7rem 1rem; }
+      .navbar-links a { font-size: .75rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a class="navbar-brand" href="index.html">WEBSERV</a>
+  <div class="navbar-links">
+    <a href="index.html">Home</a>
+    <a href="landing.html">Features</a>
+    <a href="arena.html">Arena</a>
+    <a href="ninja_arena.html" class="active">⚔️ Ninja Arena</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <h1>⚔️ NINJA ARENA</h1>
+  <p>Python forja o guerreiro. PHP desperta o inimigo. Apenas um permanece de pé.</p>
+</header>
+
+<main class="arena-wrap">
+
+  <!-- ════════════ ARENA CREATION SCREEN ════════════ -->
+  <div id="arena-creation-screen" class="screen active">
+    <div class="setup-card">
+      <h2>// CRIAR NOVA ARENA</h2>
+      <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 1.5rem; text-align: center;">Inicialize a arena antes de entrar em combate.</p>
+      <button class="btn-start" id="btn-arena-create" onclick="initializeArena()">
+        ⚡ CRIAR ARENA
+      </button>
+    </div>
+  </div>
+
+  <!-- ════════════ SETUP SCREEN ════════════ -->
+  <div id="setup-screen" class="screen">
+    <div class="setup-card">
+      <h2>// CRIAR PERSONAGEM</h2>
+
+      <div class="field">
+        <label>Nome do Ninja</label>
+        <input type="text" id="inp-name" maxlength="20" placeholder="ex: Shinobi_X" autocomplete="off" />
+      </div>
+
+      <div class="field">
+        <label>Escolha a Classe</label>
+        <div class="class-grid">
+          <button class="class-btn picked" data-class="shadow" onclick="pickClass(this,'shadow')">
+            <div class="emoji">🥷</div>
+            <div class="cname">SHADOW</div>
+            <div class="cdesc">Velocidade e furtividade</div>
+            <div class="cstats">HP 120 · ATK 22</div>
+          </button>
+          <button class="class-btn" data-class="blade" onclick="pickClass(this,'blade')">
+            <div class="emoji">⚔️</div>
+            <div class="cname">BLADE</div>
+            <div class="cdesc">Dano máximo, poucos HP</div>
+            <div class="cstats">HP 100 · ATK 28</div>
+          </button>
+          <button class="class-btn" data-class="monk" onclick="pickClass(this,'monk')">
+            <div class="emoji">☯️</div>
+            <div class="cname">MONK</div>
+            <div class="cdesc">Tanque, defesa elevada</div>
+            <div class="cstats">HP 140 · DEF 14</div>
+          </button>
+        </div>
+      </div>
+
+      <button class="btn-start" id="btn-create" onclick="createCharacter()">
+        ▶ ENTRAR NA ARENA
+      </button>
+    </div>
+
+    <div class="scoreboard-wrap" id="scoreboard-wrap">
+      <h3>🏆 PLACAR GERAL</h3>
+      <div id="scoreboard-list"><span style="color:var(--text-muted);font-size:.8rem">Carregando...</span></div>
+    </div>
+  </div>
+
+  <!-- ════════════ BATTLE SCREEN ════════════ -->
+  <div id="battle-screen" class="screen">
+
+    <!-- Round info bar -->
+    <div class="battle-info">
+      <span class="round-tag" id="round-tag">ROUND 1</span>
+      <span class="phase-indicator" id="phase-indicator">SEU TURNO</span>
+      <span style="font-size:.75rem;color:var(--text-muted);font-family:var(--font-mono)" id="level-info">LV 1</span>
+    </div>
+
+    <!-- Player card -->
+    <div class="combatant-card player-side active-turn" id="player-card">
+      <div class="card-header">
+        <div class="card-name">
+          <span id="p-emoji">🥷</span>
+          <span id="p-name">Ninja</span>
+        </div>
+        <span class="card-badge" id="p-class-badge">SHADOW</span>
+      </div>
+
+      <div class="bar-hp">
+        <div class="bar-label"><span>HP</span><span id="p-hp-text">120/120</span></div>
+        <div class="bar-track"><div class="bar-fill" id="p-hp-bar" style="width:100%"></div></div>
+      </div>
+      <div class="bar-en">
+        <div class="bar-label"><span>ENERGIA</span><span id="p-en-text">100/100</span></div>
+        <div class="bar-track"><div class="bar-fill" id="p-en-bar" style="width:100%"></div></div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-chip">ATK <span id="p-atk">22</span></div>
+        <div class="stat-chip">DEF <span id="p-def">8</span></div>
+        <div class="stat-chip">XP <span id="p-xp">0</span></div>
+        <div class="stat-chip">🪙 <span id="p-gold">0</span></div>
+        <div class="stat-chip">W <span id="p-wins">0</span></div>
+      </div>
+      <div class="stat-chip" style="font-size:.7rem;width:fit-content">
+        ✨ <span id="p-sp-name">Shadow Step</span> · <span class="energy-cost" id="p-sp-cost">40</span> EN
+      </div>
+    </div>
+
+    <!-- Enemy card -->
+    <div class="combatant-card enemy-side" id="enemy-card">
+      <div class="card-header">
+        <div class="card-name">
+          <span id="e-emoji">👺</span>
+          <span id="e-name">Ronin</span>
+        </div>
+        <span class="card-badge" id="e-level-badge">WAVE 1</span>
+      </div>
+
+      <div class="bar-enemy">
+        <div class="bar-label"><span>HP INIMIGO</span><span id="e-hp-text">80/80</span></div>
+        <div class="bar-track"><div class="bar-fill bar-enemy" id="e-hp-bar" style="width:100%"></div></div>
+      </div>
+
+      <div class="stats-row" id="e-stats-row">
+        <div class="stat-chip">ATK <span id="e-atk">16</span></div>
+        <div class="stat-chip">DEF <span id="e-def">4</span></div>
+      </div>
+
+      <div style="font-size:.72rem;color:var(--text-muted);font-family:var(--font-mono)" id="e-threat">—</div>
+    </div>
+
+    <!-- Combat log -->
+    <div class="log-wrap">
+      <div class="log-header">// COMBAT LOG</div>
+      <div id="combat-log"></div>
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-wrap" id="action-buttons">
+      <button class="action-btn btn-attack"  id="btn-attack"  onclick="doAction('attack')">⚔️ ATACAR</button>
+      <button class="action-btn btn-special" id="btn-special" onclick="doAction('special')">✨ HABILIDADE <span class="energy-cost" id="btn-sp-cost">40</span></button>
+      <button class="action-btn btn-defend"  id="btn-defend"  onclick="doAction('defend')">🛡️ DEFENDER</button>
+      <button class="action-btn btn-flee"    id="btn-flee"    onclick="doAction('flee')">🏃 FUGIR</button>
+    </div>
+
+  </div>
+
+  <!-- ════════════ RESULT SCREEN ════════════ -->
+  <div id="result-screen" class="screen">
+    <div class="result-card" id="result-card">
+      <div class="result-emoji" id="result-emoji">🏆</div>
+      <div class="result-title victory" id="result-title">VITÓRIA</div>
+      <div class="result-sub"  id="result-sub">Inimigo derrotado!</div>
+      <ul class="reward-list" id="reward-list"></ul>
+      <div class="result-btns">
+        <button class="action-btn btn-newbattle" onclick="nextBattle()">⚔️ PRÓXIMA BATALHA</button>
+        <button class="action-btn btn-flee" onclick="showSetup()">🔄 NOVO PERSONAGEM</button>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+/* ════════════════════════════════════════════════════
+   State
+   ════════════════════════════════════════════════════ */
+const CGI_PY  = '/cgi-bin/arena_action.py';
+const CGI_PHP = '/cgi-bin/arena_enemy.php';
+const COOKIE_NAME = 'NAGSID';
+const CLASSES_META = {
+  shadow: { emoji: '🥷', sp_name: 'Shadow Step', sp_cost: 40 },
+  blade:  { emoji: '⚔️',  sp_name: 'Blade Storm',  sp_cost: 45 },
+  monk:   { emoji: '☯️',  sp_name: 'Iron Body',    sp_cost: 30 },
+};
+
+let selectedClass = 'shadow';
+let isBusy        = false;
+let lastPlayer    = null;
+let lastBattle    = null;
+let lastEnemy     = null;
+
+/* ════════════════════════════════════════════════════
+   Cookie helpers
+   ════════════════════════════════════════════════════ */
+function getSid() {
+  const m = document.cookie.match(/(?:^|;\s*)NAGSID=([^;]+)/);
+  return m ? m[1] : null;
+}
+function setSid(sid) {
+  const maxAge = 24 * 60 * 60; // 24 horas
+  document.cookie = `NAGSID=${encodeURIComponent(sid)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  localStorage.setItem('NAGSID_BACKUP', sid);
+}
+
+/* ════════════════════════════════════════════════════
+   API calls
+   ════════════════════════════════════════════════════ */
+async function callCgi(url, params) {
+  // Se o cookie não existe, tenta usar localStorage
+  if (!getSid() && localStorage.getItem('NAGSID_BACKUP')) {
+    setSid(localStorage.getItem('NAGSID_BACKUP'));
+  }
+  
+  const body = new URLSearchParams(params).toString();
+  const resp = await fetch(url, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body,
+  });
+  const data = await resp.json();
+  if (data.sid) setSid(data.sid);
+  return data;
+}
+
+/* ════════════════════════════════════════════════════
+   Setup screen + Arena Creation
+   ════════════════════════════════════════════════════ */
+function pickClass(btn, cls) {
+  document.querySelectorAll('.class-btn').forEach(b => b.classList.remove('picked'));
+  btn.classList.add('picked');
+  selectedClass = cls;
+}
+
+async function initializeArena() {
+  const btn = document.getElementById('btn-arena-create');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> AGUARDE...';
+
+  // Simulate arena initialization (can add backend call if needed)
+  setTimeout(() => {
+    btn.disabled = false;
+    btn.innerHTML = '⚡ CRIAR ARENA';
+    showCharacterCreation();
+  }, 500);
+}
+
+async function createCharacter() {
+  const name = document.getElementById('inp-name').value.trim() || 'Ninja';
+  document.getElementById('btn-create').disabled = true;
+  document.getElementById('btn-create').innerHTML = '<span class="spinner"></span> AGUARDE...';
+
+  const data = await callCgi(CGI_PY, { action: 'new_game', name, class: selectedClass });
+  if (!data.ok) { showToast('Erro: ' + data.error, true); resetCreateBtn(); return; }
+
+  if (data.sid) setSid(data.sid);
+
+  // Start first battle
+  const b = await callCgi(CGI_PY, { action: 'start_battle' });
+  if (!b.ok) { showToast('Erro: ' + b.error, true); resetCreateBtn(); return; }
+
+  transitionToBattle(b.player, b.battle, b.enemy);
+}
+
+function resetCreateBtn() {
+  const btn = document.getElementById('btn-create');
+  btn.disabled = false;
+  btn.innerHTML = '▶ ENTRAR NA ARENA';
+}
+
+async function loadScoreboard() {
+  try {
+    const data = await callCgi(CGI_PY, { action: 'scoreboard' });
+    const el   = document.getElementById('scoreboard-list');
+    if (!data.ok || !data.scores.length) {
+      el.innerHTML = '<span style="color:var(--text-muted);font-size:.8rem">Sem recordes ainda. Seja o primeiro!</span>';
+      return;
+    }
+    el.innerHTML = data.scores.map((s, i) =>
+      `<div class="score-row">
+        <span><strong style="color:var(--yellow)">#${i+1}</strong>
+          <span class="score-name"> ${esc(s.name)}</span>
+          <span style="color:var(--text-muted)"> (${s.class})</span></span>
+        <span class="score-stats">LV${s.level} · ${s.wins}W · 🪙${s.gold}</span>
+      </div>`
+    ).join('');
+  } catch (e) { /* no-op */ }
+}
+
+/* ════════════════════════════════════════════════════
+   Screen transitions
+   ════════════════════════════════════════════════════ */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function showSetup() {
+  showScreen('arena-creation-screen');
+}
+
+function showCharacterCreation() {
+  showScreen('setup-screen');
+  document.getElementById('btn-create').disabled = false;
+  document.getElementById('btn-create').innerHTML = '▶ ENTRAR NA ARENA';
+  loadScoreboard();
+}
+
+function transitionToBattle(player, battle, enemy) {
+  lastPlayer = player;
+  lastBattle = battle;
+  lastEnemy  = enemy;
+  updateBattleUI(player, battle, enemy);
+  showScreen('battle-screen');
+  setActionsBusy(false);
+}
+
+/* ════════════════════════════════════════════════════
+   Battle UI updates
+   ════════════════════════════════════════════════════ */
+function updateBattleUI(player, battle, enemy) {
+  if (!player || !battle || !enemy) return;
+  const cls = CLASSES_META[player.class] || CLASSES_META.shadow;
+
+  // Player
+  document.getElementById('p-emoji').textContent   = cls.emoji;
+  document.getElementById('p-name').textContent    = player.name;
+  document.getElementById('p-class-badge').textContent = player.class.toUpperCase();
+  document.getElementById('p-atk').textContent     = player.atk;
+  document.getElementById('p-def').textContent     = player.def_;
+  document.getElementById('p-xp').textContent      = player.xp;
+  document.getElementById('p-gold').textContent    = player.gold;
+  document.getElementById('p-wins').textContent    = player.wins;
+  document.getElementById('p-sp-name').textContent = cls.sp_name;
+  document.getElementById('p-sp-cost').textContent = cls.sp_cost;
+  document.getElementById('btn-sp-cost').textContent = cls.sp_cost;
+  document.getElementById('level-info').textContent = `LV ${player.level} · ${player.xp} XP`;
+
+  setHpBar('p-hp-bar', 'p-hp-text', player.hp, player.max_hp, false);
+  setEnergyBar(player.energy, player.max_energy);
+
+  // Enemy
+  document.getElementById('e-emoji').textContent = enemy.emoji;
+  document.getElementById('e-name').textContent  = enemy.name;
+  document.getElementById('e-atk').textContent   = enemy.atk;
+  document.getElementById('e-def').textContent   = enemy.def_;
+  document.getElementById('e-level-badge').textContent = `WAVE ${player.level}`;
+  setHpBar('e-hp-bar', 'e-hp-text', battle.enemy_hp, battle.enemy_max_hp, true);
+
+  // Threat descriptor
+  const hpPct = battle.enemy_hp / battle.enemy_max_hp;
+  document.getElementById('e-threat').textContent =
+    hpPct < 0.25 ? '⚠️ MODO DESESPERO — perigo máximo!' :
+    hpPct < 0.5  ? '🔥 Inimigo enfraquecido — finalize!' :
+    hpPct < 0.75 ? '😤 Inimigo irritado' :
+    '😠 Inimigo em plena forma';
+
+  // Round / Phase
+  document.getElementById('round-tag').textContent = `ROUND ${battle.round}`;
+  const phase   = battle.phase;
+  const phaseEl = document.getElementById('phase-indicator');
+  if (phase === 'player_turn') {
+    phaseEl.textContent = 'SEU TURNO';
+    phaseEl.className   = 'phase-indicator';
+    document.getElementById('player-card').classList.add('active-turn');
+    document.getElementById('enemy-card').classList.remove('active-turn');
+  } else if (phase === 'enemy_turn' || phase === 'resolve') {
+    phaseEl.textContent = 'TURNO INIMIGO';
+    phaseEl.className   = 'phase-indicator enemy';
+    document.getElementById('enemy-card').classList.add('active-turn');
+    document.getElementById('player-card').classList.remove('active-turn');
+  } else {
+    phaseEl.textContent = 'AGUARDANDO';
+    phaseEl.className   = 'phase-indicator wait';
+  }
+
+  // Special button energy check
+  document.getElementById('btn-special').disabled =
+    player.energy < cls.sp_cost || phase !== 'player_turn';
+
+  // Render log
+  renderLog(battle.log);
+}
+
+function setHpBar(barId, textId, hp, max, isEnemy) {
+  const pct = max > 0 ? Math.max(0, (hp / max) * 100) : 0;
+  const bar = document.getElementById(barId);
+  bar.style.width = pct + '%';
+  bar.classList.remove('low', 'med');
+  if (!isEnemy) {
+    if (pct < 25) bar.classList.add('low');
+    else if (pct < 50) bar.classList.add('med');
+  } else {
+    if (pct < 25) bar.classList.add('low');
+  }
+  document.getElementById(textId).textContent = `${hp}/${max}`;
+}
+
+function setEnergyBar(energy, max) {
+  const pct = max > 0 ? Math.max(0, (energy / max) * 100) : 0;
+  document.getElementById('p-en-bar').style.width = pct + '%';
+  document.getElementById('p-en-text').textContent = `${energy}/${max}`;
+}
+
+function renderLog(logJson) {
+  let entries;
+  try { entries = typeof logJson === 'string' ? JSON.parse(logJson) : logJson; }
+  catch { entries = []; }
+  const el = document.getElementById('combat-log');
+  el.innerHTML = entries.map(e => {
+    const cls = e.actor === 'player' ? 'entry-player' :
+                e.actor === 'enemy'  ? 'entry-enemy'  : 'entry-system';
+    return `<div class="${cls}">${esc(e.msg)}</div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function setActionsBusy(busy) {
+  isBusy = busy;
+  ['btn-attack','btn-special','btn-defend','btn-flee'].forEach(id => {
+    document.getElementById(id).disabled = busy;
+  });
+  if (!busy && lastPlayer && lastBattle) {
+    const cls = CLASSES_META[lastPlayer.class] || CLASSES_META.shadow;
+    document.getElementById('btn-special').disabled =
+      lastPlayer.energy < cls.sp_cost || lastBattle.phase !== 'player_turn';
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   Action dispatch
+   ════════════════════════════════════════════════════ */
+async function doAction(action) {
+  if (isBusy) return;
+  setActionsBusy(true);
+
+  const phaseEl = document.getElementById('phase-indicator');
+  phaseEl.textContent = 'PROCESSANDO...';
+  phaseEl.className   = 'phase-indicator wait';
+
+  let data;
+  try {
+    data = await callCgi(CGI_PY, { action });
+  } catch (e) {
+    showToast('Erro de rede. Verifique o servidor.', true);
+    setActionsBusy(false);
+    return;
+  }
+
+  if (!data.ok) {
+    showToast(data.error || 'Erro desconhecido', true);
+    setActionsBusy(false);
+    if (lastPlayer && lastBattle && lastEnemy)
+      updateBattleUI(lastPlayer, lastBattle, lastEnemy);
+    return;
+  }
+
+  // Update UI with Python's response
+  if (data.player) lastPlayer = data.player;
+  if (data.battle) lastBattle = data.battle;
+  if (data.enemy)  lastEnemy  = data.enemy;
+
+  // Show damage splash on enemy card
+  if (data.hit || data.sp_dmg) {
+    showDmgSplash('enemy-card', 'enemy-hit', '-' + (data.hit || data.sp_dmg));
+    shakeEl('enemy-card');
+  }
+
+  // Check outcome
+  if (data.action === 'victory' || data.action === 'defeat' ||
+      (data.battle && (data.battle.status === 'victory' || data.battle.status === 'defeat')) ||
+      data.action === 'flee' && data.fled) {
+    handleBattleEnd(data);
+    return;
+  }
+
+  updateBattleUI(lastPlayer, lastBattle, lastEnemy);
+
+  // If it's now enemy turn, call PHP
+  if (data.next === 'php_enemy_turn') {
+    await doEnemyTurn();
+  } else {
+    setActionsBusy(false);
+  }
+}
+
+async function doEnemyTurn() {
+  let eData;
+  try {
+    eData = await callCgi(CGI_PHP, { action: 'enemy_turn' });
+  } catch (e) {
+    showToast('Erro no turno do inimigo.', true);
+    setActionsBusy(false);
+    return;
+  }
+
+  if (!eData.ok) {
+    showToast(eData.error || 'Erro do inimigo', true);
+    setActionsBusy(false);
+    return;
+  }
+
+  // Damage flash on player card
+  if (eData.dmg_dealt > 0) {
+    showDmgSplash('player-card', 'player-hit', '-' + eData.dmg_dealt);
+    shakeEl('player-card');
+  } else {
+    showDmgSplash('player-card', 'player-hit', '0');
+  }
+
+  // Update state from PHP response
+  if (eData.player) lastPlayer = eData.player;
+  if (eData.battle) lastBattle = eData.battle;
+  if (eData.enemy)  lastEnemy  = eData.enemy;
+
+  updateBattleUI(lastPlayer, lastBattle, lastEnemy);
+
+  // Python resolves the round
+  if (eData.next === 'py_resolve') {
+    let rData;
+    try {
+      rData = await callCgi(CGI_PY, { action: 'resolve_enemy' });
+    } catch (e) {
+      showToast('Erro ao resolver round.', true);
+      setActionsBusy(false);
+      return;
+    }
+
+    if (!rData.ok) {
+      // Could be defeat resolved
+      if (rData.action === 'defeat' || (rData.battle && rData.battle.status === 'defeat')) {
+        handleBattleEnd(rData);
+        return;
+      }
+      showToast(rData.error || 'Erro na resolução', true);
+      setActionsBusy(false);
+      return;
+    }
+
+    if (rData.player)  lastPlayer = rData.player;
+    if (rData.battle)  lastBattle = rData.battle;
+    if (rData.enemy)   lastEnemy  = rData.enemy;
+
+    if (rData.action === 'defeat' || (rData.battle && rData.battle.status === 'defeat')) {
+      handleBattleEnd(rData);
+      return;
+    }
+
+    updateBattleUI(lastPlayer, lastBattle, lastEnemy);
+    setActionsBusy(false);
+  } else {
+    setActionsBusy(false);
+  }
+}
+
+/* ════════════════════════════════════════════════════
+   Battle end
+   ════════════════════════════════════════════════════ */
+function handleBattleEnd(data) {
+  const isVic  = data.action === 'victory'  ||
+                 (data.battle && data.battle.status === 'victory');
+  const isFled = data.action === 'flee' && data.fled;
+
+  if (data.player) lastPlayer = data.player;
+  if (data.battle) lastBattle = data.battle;
+  if (data.enemy)  lastEnemy  = data.enemy;
+
+  const card = document.getElementById('result-card');
+  const title = document.getElementById('result-title');
+  const sub   = document.getElementById('result-sub');
+  const emo   = document.getElementById('result-emoji');
+  const rwds  = document.getElementById('reward-list');
+
+  if (isFled) {
+    emo.textContent   = '🏃';
+    title.textContent = 'FUGIU';
+    title.className   = 'result-title';
+    title.style.color = 'var(--yellow)';
+    sub.textContent   = 'Você escapou... por agora.';
+    rwds.innerHTML    = `<li><span>Ouro perdido</span><span class="rval" style="color:var(--red)">-10 🪙</span></li>`;
+  } else if (isVic) {
+    emo.textContent   = '🏆';
+    title.textContent = 'VITÓRIA!';
+    title.className   = 'result-title victory';
+    title.style.color = '';
+    sub.textContent   = `${lastEnemy ? lastEnemy.emoji + ' ' + lastEnemy.name : 'Inimigo'} foi destruído!`;
+    rwds.innerHTML    = `
+      <li><span>XP ganho</span><span class="rval">+${data.xp_gained || '?'} XP</span></li>
+      <li><span>Ouro ganho</span><span class="rval">+${data.gold_gained || '?'} 🪙</span></li>
+      <li><span>Nível atual</span><span class="rval">LV ${lastPlayer?.level || 1}</span></li>
+      <li><span>Vitórias</span><span class="rval">${lastPlayer?.wins || 0}</span></li>`;
+    if (data.leveled_up) showToast('⬆️ LEVEL UP! Força aumentada!');
+  } else {
+    emo.textContent   = '💀';
+    title.textContent = 'DERROTA';
+    title.className   = 'result-title defeat';
+    title.style.color = '';
+    sub.textContent   = 'Você caiu em batalha. Revive com HP parcial.';
+    rwds.innerHTML    = `
+      <li><span>HP de recuperação</span><span class="rval">${lastPlayer?.hp || '?'} HP</span></li>
+      <li><span>Derrotas</span><span class="rval">${lastPlayer?.losses || 0}</span></li>`;
+  }
+
+  showScreen('result-screen');
+}
+
+async function nextBattle() {
+  showScreen('battle-screen');
+  setActionsBusy(true);
+  document.getElementById('phase-indicator').textContent = 'INICIANDO...';
+
+  const data = await callCgi(CGI_PY, { action: 'start_battle' });
+  if (!data.ok) { showToast(data.error, true); showSetup(); return; }
+
+  transitionToBattle(data.player, data.battle, data.enemy);
+}
+
+/* ════════════════════════════════════════════════════
+   Visual helpers
+   ════════════════════════════════════════════════════ */
+function showDmgSplash(cardId, cls, text) {
+  const card  = document.getElementById(cardId);
+  const el    = document.createElement('div');
+  el.className = 'dmg-splash ' + cls;
+  el.textContent = text;
+  card.appendChild(el);
+  setTimeout(() => el.remove(), 950);
+}
+
+function shakeEl(id) {
+  const el = document.getElementById(id);
+  el.classList.remove('shake');
+  void el.offsetWidth;
+  el.classList.add('shake');
+  setTimeout(() => el.classList.remove('shake'), 450);
+}
+
+let toastTimer;
+function showToast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.style.borderColor  = isErr ? 'var(--red)'  : 'var(--neon)';
+  el.style.color        = isErr ? 'var(--red)'  : 'var(--neon)';
+  el.style.background   = isErr ? 'rgba(239,68,68,.15)' : 'rgba(0,255,156,.15)';
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3200);
+}
+
+function esc(str) {
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+/* ════════════════════════════════════════════════════
+   Init
+   ════════════════════════════════════════════════════ */
+(async function init() {
+  loadScoreboard();
+
+  // Check if there's already a session with an active battle
+  const sid = getSid();
+  if (!sid) return;
+
+  try {
+    const data = await callCgi(CGI_PY, { action: 'state' });
+    if (data.ok && data.player && data.battle && data.battle.status === 'active') {
+      transitionToBattle(data.player, data.battle, data.enemy);
+    }
+  } catch (e) { /* fresh start */ }
+})();
+</script>
+</body>
+</html>

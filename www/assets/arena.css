@@ -1022,6 +1022,10 @@ textarea.form-input {
     .form-row {
         flex-direction: column;
     }
+
+    .session-kpis {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+    }
 }
 
 @media (max-width: 600px) {
@@ -1057,5 +1061,14 @@ textarea.form-input {
     .tab-btn {
         font-size: 10px;
         padding: 10px 14px;
+    }
+
+    .session-btn-grid .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    .session-kpis {
+        grid-template-columns: 1fr;
     }
 }
