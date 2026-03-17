@@ -27,6 +27,12 @@ PASSED_TESTS=0
 FAILED_TESTS=0
 SKIPPED_TESTS=0
 WARNING_MESSAGES=()
+WRK_SUMMARY=""
+WRK_EVIDENCE=""
+SIEGE_SUMMARY=""
+SIEGE_EVIDENCE=""
+SIEGE_CGI_SUMMARY=""
+SIEGE_CGI_EVIDENCE=""
 
 # Diretório temporário para testes
 TEST_DIR="/tmp/webserver_tests"
@@ -102,6 +108,42 @@ wait_for_server() {
     
     print_error "Servidor não respondeu após ${max_attempts}s"
     return 1
+}
+
+wait_for_pids_with_timeout() {
+    local timeout_seconds=$1
+    shift
+    local pids=("$@")
+    local start_time=$(date +%s)
+
+    while true; do
+        local remaining=0
+
+        for pid in "${pids[@]}"; do
+            if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                remaining=1
+                break
+            fi
+        done
+
+        if [ $remaining -eq 0 ]; then
+            return 0
+        fi
+
+        local now=$(date +%s)
+        if [ $((now - start_time)) -ge $timeout_seconds ]; then
+            for pid in "${pids[@]}"; do
+                if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+                    kill "$pid" 2>/dev/null
+                    sleep 0.1
+                    kill -9 "$pid" 2>/dev/null
+                fi
+            done
+            return 1
+        fi
+
+        sleep 0.1
+    done
 }
 
 test_endpoint() {
@@ -496,6 +538,149 @@ if [ -f "$TEST_BIN_FILE" ]; then
     print_info "Corpo de ~100KB: HTTP $http_code"
 fi
 
+# Testes CGI (merged de tests/test_cgi.sh)
+print_header "15. Testes CGI (Smoke)"
+
+print_subheader "GET Python CGI"
+response=$(curl -s -m 10 -w "\n%{http_code}" "$BASE_URL/cgi-bin/hello.py" 2>/dev/null)
+body=$(echo "$response" | head -n-1)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "200" ]; then
+    if echo "$body" | grep -qi "content-type\|done\|method"; then
+        print_success "GET /cgi-bin/hello.py (HTTP 200)"
+    else
+        print_warning "GET /cgi-bin/hello.py respondeu 200 mas conteúdo inesperado"
+    fi
+else
+    print_error "GET /cgi-bin/hello.py - Esperado 200, Obtido: $http_code"
+fi
+
+print_subheader "GET PHP CGI"
+response=$(curl -s -m 10 -w "\n%{http_code}" "$BASE_URL/cgi-bin/hello.php" 2>/dev/null)
+body=$(echo "$response" | head -n-1)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "200" ]; then
+    if echo "$body" | grep -qi "PHP\|Method\|Query"; then
+        print_success "GET /cgi-bin/hello.php (HTTP 200)"
+    else
+        print_warning "GET /cgi-bin/hello.php respondeu 200 mas conteúdo inesperado"
+    fi
+else
+    print_error "GET /cgi-bin/hello.php - Esperado 200, Obtido: $http_code"
+fi
+
+# Testes Non-blocking e carga (merged de tests/test_nonblocking.sh)
+print_header "16. Testes de Non-blocking"
+
+print_subheader "CGI lento nao bloqueia outros"
+curl -s -m 15 "$BASE_URL/cgi-bin/slow.php" > /dev/null 2>&1 &
+SLOW_PID=$!
+sleep 0.2
+
+START=$(date +%s%N)
+FAST_CODE=$(curl -s -m 5 -o /dev/null -w "%{http_code}" "$BASE_URL/cgi-bin/hello.php" 2>/dev/null)
+END=$(date +%s%N)
+ELAPSED=$(( (END - START) / 1000000 ))
+
+if [ "$FAST_CODE" = "200" ] && [ $ELAPSED -lt 1000 ]; then
+    print_success "hello.php respondeu em ${ELAPSED}ms enquanto slow.php corria"
+else
+    print_error "Possivel bloqueio: hello.php HTTP $FAST_CODE em ${ELAPSED}ms (esperado < 1000ms)"
+fi
+
+if ! wait_for_pids_with_timeout 20 "$SLOW_PID"; then
+    print_warning "slow.php excedeu timeout de espera e foi terminado"
+fi
+
+print_subheader "10 pedidos CGI simultaneos"
+CGI_PIDS=""
+for i in $(seq 1 10); do
+    curl -s -m 10 -o /dev/null -w "%{http_code}\n" "$BASE_URL/cgi-bin/hello.php" 2>/dev/null > "$TEST_DIR/cgi_$i.out" &
+    CGI_PIDS="$CGI_PIDS $!"
+done
+
+if ! wait_for_pids_with_timeout 15 $CGI_PIDS; then
+    print_warning "Alguns pedidos CGI simultaneos excederam o timeout e foram terminados"
+fi
+
+ok_count=0
+for i in $(seq 1 10); do
+    code=$(cat "$TEST_DIR/cgi_$i.out" 2>/dev/null | tail -n1)
+    if [ "$code" = "200" ]; then
+        ((ok_count++))
+    fi
+done
+
+if [ $ok_count -eq 10 ]; then
+    print_success "10/10 pedidos CGI simultaneos completaram com HTTP 200"
+else
+    print_warning "$ok_count/10 pedidos CGI simultaneos completaram com HTTP 200"
+fi
+
+print_header "17. Testes de Carga e Clientes Simultaneos"
+
+print_subheader "Carga com wrk"
+if command -v wrk >/dev/null 2>&1; then
+    print_step "Executando: wrk -t4 -c100 -d10s $BASE_URL/index.html"
+    if wrk -t4 -c100 -d10s "$BASE_URL/index.html" > "$TEST_DIR/wrk_static.out" 2>&1; then
+        if grep -q "Requests/sec" "$TEST_DIR/wrk_static.out"; then
+            req_rate=$(grep "Requests/sec" "$TEST_DIR/wrk_static.out" | awk '{print $2}')
+            transfer_rate=$(grep "Transfer/sec" "$TEST_DIR/wrk_static.out" | awk '{print $2}')
+            total_requests=$(grep "requests in" "$TEST_DIR/wrk_static.out" | awk '{print $1}')
+            WRK_SUMMARY="req/s=${req_rate}, transfer=${transfer_rate}, requests=${total_requests}"
+            WRK_EVIDENCE=$(grep -E "requests in|Requests/sec|Transfer/sec" "$TEST_DIR/wrk_static.out" | tr '\n' '; ' | sed 's/; $//')
+            print_success "wrk estatico executado com sucesso (${req_rate} req/s)"
+        else
+            print_warning "wrk terminou mas nao foi possivel extrair Requests/sec"
+        fi
+    else
+        print_warning "wrk executou com falhas (ver $TEST_DIR/wrk_static.out)"
+    fi
+else
+    print_warning "wrk nao esta instalado (comando: wrk -t4 -c100 -d10s $BASE_URL/index.html)"
+fi
+
+print_subheader "Carga com siege"
+if command -v siege >/dev/null 2>&1; then
+    print_step "Executando: siege -c100 -t10S $BASE_URL/index.html"
+    if siege -c100 -t10S "$BASE_URL/index.html" > "$TEST_DIR/siege_static.out" 2>&1; then
+        if grep -q '"transactions"' "$TEST_DIR/siege_static.out"; then
+            transactions=$(grep '"transactions"' "$TEST_DIR/siege_static.out" | sed 's/[^0-9.]//g')
+            availability=$(grep '"availability"' "$TEST_DIR/siege_static.out" | sed 's/[^0-9.]//g')
+            transaction_rate=$(grep '"transaction_rate"' "$TEST_DIR/siege_static.out" | sed 's/[^0-9.]//g')
+            concurrency=$(grep '"concurrency"' "$TEST_DIR/siege_static.out" | sed 's/[^0-9.]//g')
+            SIEGE_SUMMARY="transactions=${transactions}, availability=${availability}%, rate=${transaction_rate}/s, concurrency=${concurrency}"
+            SIEGE_EVIDENCE=$(grep -E '"transactions"|"availability"|"transaction_rate"|"concurrency"' "$TEST_DIR/siege_static.out" | tr '\n' '; ' | sed 's/; $//')
+            print_success "siege estatico executado com sucesso (${transactions} transacoes)"
+        else
+            print_warning "siege terminou mas nao foi possivel extrair estatisticas"
+        fi
+    else
+        print_warning "siege executou com falhas (ver $TEST_DIR/siege_static.out)"
+    fi
+else
+    print_warning "siege nao esta instalado (comando: siege -c100 -t10S $BASE_URL/index.html)"
+fi
+
+print_subheader "Carga concorrente em CGI com siege"
+if command -v siege >/dev/null 2>&1; then
+    print_step "Executando: siege -c30 -t5S $BASE_URL/cgi-bin/hello.php"
+    if siege -c30 -t5S "$BASE_URL/cgi-bin/hello.php" > "$TEST_DIR/siege_cgi.out" 2>&1; then
+        if grep -q '"transactions"' "$TEST_DIR/siege_cgi.out"; then
+            cgi_transactions=$(grep '"transactions"' "$TEST_DIR/siege_cgi.out" | sed 's/[^0-9.]//g')
+            cgi_availability=$(grep '"availability"' "$TEST_DIR/siege_cgi.out" | sed 's/[^0-9.]//g')
+            cgi_rate=$(grep '"transaction_rate"' "$TEST_DIR/siege_cgi.out" | sed 's/[^0-9.]//g')
+            SIEGE_CGI_SUMMARY="transactions=${cgi_transactions}, availability=${cgi_availability}%, rate=${cgi_rate}/s"
+            SIEGE_CGI_EVIDENCE=$(grep -E '"transactions"|"availability"|"transaction_rate"' "$TEST_DIR/siege_cgi.out" | tr '\n' '; ' | sed 's/; $//')
+        fi
+        print_success "siege CGI executado com sucesso"
+    else
+        print_warning "siege CGI executou com falhas (ver $TEST_DIR/siege_cgi.out)"
+    fi
+else
+    print_warning "siege nao esta instalado para teste concorrente de CGI"
+fi
+
 # Resumo Final
 print_header "RESUMO FINAL DOS TESTES"
 
@@ -506,6 +691,23 @@ echo -e "${RED}  ✗ Falharam:${NC}     $FAILED_TESTS"
 echo -e "${YELLOW}  ⚠ Avisos :${NC}     $SKIPPED_TESTS"
 echo -e "${BLUE}  ━ Total   :${NC}     $total_tests"
 echo ""
+
+if [ -n "$WRK_SUMMARY" ] || [ -n "$SIEGE_SUMMARY" ] || [ -n "$SIEGE_CGI_SUMMARY" ]; then
+    echo -e "${CYAN}  Estatisticas de carga:${NC}"
+    if [ -n "$WRK_SUMMARY" ]; then
+        echo -e "${CYAN}   wrk:${NC} $WRK_SUMMARY"
+        echo -e "${BLUE}    evidencia:${NC} $WRK_EVIDENCE"
+    fi
+    if [ -n "$SIEGE_SUMMARY" ]; then
+        echo -e "${CYAN}   siege estatico:${NC} $SIEGE_SUMMARY"
+        echo -e "${BLUE}    evidencia:${NC} $SIEGE_EVIDENCE"
+    fi
+    if [ -n "$SIEGE_CGI_SUMMARY" ]; then
+        echo -e "${CYAN}   siege CGI:${NC} $SIEGE_CGI_SUMMARY"
+        echo -e "${BLUE}    evidencia:${NC} $SIEGE_CGI_EVIDENCE"
+    fi
+    echo ""
+fi
 
 if [ ${#WARNING_MESSAGES[@]} -gt 0 ]; then
     echo -e "${YELLOW}  Detalhes dos avisos:${NC}"

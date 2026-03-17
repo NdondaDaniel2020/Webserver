@@ -6,15 +6,143 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/04 11:25:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/17 10:30:34 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Response.hpp"
 
+#include <algorithm>
+#include <cctype>
+#include <ctime>
+#include <iomanip>
+#include <sys/stat.h>
+
+namespace
+{
+    struct DirectoryEntry
+    {
+        std::string name;
+        bool is_directory;
+        off_t size;
+        time_t mtime;
+    };
+
+    static bool directoryEntryLess(const DirectoryEntry &a, const DirectoryEntry &b)
+    {
+        if (a.name == "..")
+            return true;
+        if (b.name == "..")
+            return false;
+        if (a.is_directory != b.is_directory)
+            return a.is_directory;
+        return a.name < b.name;
+    }
+
+    static std::string htmlEscape(const std::string &value)
+    {
+        std::string escaped;
+
+        for (size_t i = 0; i < value.size(); ++i)
+        {
+            if (value[i] == '&')
+                escaped += "&amp;";
+            else if (value[i] == '<')
+                escaped += "&lt;";
+            else if (value[i] == '>')
+                escaped += "&gt;";
+            else if (value[i] == '"')
+                escaped += "&quot;";
+            else
+                escaped += value[i];
+        }
+        return escaped;
+    }
+
+    static std::string encodeUriSegment(const std::string &name)
+    {
+        std::ostringstream encoded;
+        const char *hex = "0123456789ABCDEF";
+
+        for (size_t i = 0; i < name.size(); ++i)
+        {
+            unsigned char c = static_cast<unsigned char>(name[i]);
+
+            if (std::isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~')
+                encoded << name[i];
+            else
+            {
+                encoded << '%';
+                encoded << hex[c >> 4];
+                encoded << hex[c & 0x0F];
+            }
+        }
+        return encoded.str();
+    }
+
+    static std::string normalizeDirectoryUri(const std::string &uri)
+    {
+        std::string normalized = uri;
+
+        if (normalized.empty() || normalized[0] != '/')
+            normalized = "/" + normalized;
+        if (normalized[normalized.size() - 1] != '/')
+            normalized += '/';
+        return normalized;
+    }
+
+    static std::string parentDirectoryUri(const std::string &uri)
+    {
+        std::string normalized = normalizeDirectoryUri(uri);
+
+        if (normalized == "/")
+            return "/";
+
+        size_t end = normalized.size() - 1;
+        size_t pos = normalized.rfind('/', end - 1);
+
+        if (pos == std::string::npos)
+            return "/";
+        if (pos == 0)
+            return "/";
+        return normalized.substr(0, pos + 1);
+    }
+
+    static std::string formatIndexDate(time_t timestamp)
+    {
+        char buffer[32];
+        std::tm *tm_info = std::localtime(&timestamp);
+
+        if (!tm_info)
+            return "-";
+        if (std::strftime(buffer, sizeof(buffer), "%Y-%b-%d %H:%M", tm_info) == 0)
+            return "-";
+        return buffer;
+    }
+
+    static std::string formatIndexSize(off_t size)
+    {
+        static const char *units[] = {"B", "KiB", "MiB", "GiB", "TiB"};
+        double display = static_cast<double>(size);
+        size_t unit = 0;
+
+        while (display >= 1024.0 && unit < 4)
+        {
+            display /= 1024.0;
+            ++unit;
+        }
+
+        std::ostringstream oss;
+        if (unit == 0)
+            oss << size << ' ' << units[unit];
+        else
+            oss << std::fixed << std::setprecision(1) << display << ' ' << units[unit];
+        return oss.str();
+    }
+}
+
 Response::Response(const HttpRequest &request, const ServerConfig &config) : config(config)
 {
-    // Extensões de arquivo permitidas em post (segurança)
     this->allowed_extensions.push_back(".jpg");
     this->allowed_extensions.push_back(".jpeg");
     this->allowed_extensions.push_back(".png");
@@ -60,10 +188,7 @@ std::string Response::getResponseHttp()
 
 void Response::buildHttpResponse(const HttpRequest &request)
 {
-    // 1. Sanitizar URI para prevenir path traversal
     std::string uri = sanitizePath(request.getUri());
-
-    // Determinar root (location pode sobrescrever)
     std::string root = this->config.root;
     const LocationConfig *location = findMatchingLocation(request.getUri());
 
@@ -72,14 +197,12 @@ void Response::buildHttpResponse(const HttpRequest &request)
 
     std::string file_path = root + removeLocationInUri(uri, location);
 
-    // 2. Validar se método é permitido por location
     if (!validateAllowedMethod(request))
     {
         std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
         return StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
     }
 
-    // 3. Executar método
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
     else if (request.getMethod() == "POST")
@@ -137,10 +260,8 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
 void Response::methodPost(const HttpRequest &request)
 {
-    // 1. Validar client_max_body_size (server e location)
     size_t body_size = request.getBody().size();
 
-    // Validar limite global do servidor
     if (this->config.client_max_body_size > 0 && body_size > this->config.client_max_body_size)
     {
         std::cout << "[413] Body size (" << body_size << ") excede limite do servidor ("
@@ -148,7 +269,6 @@ void Response::methodPost(const HttpRequest &request)
         return StatusCodes::http413PayloadTooLarge(this->response_str);
     }
 
-    // Validar limite específico da location (mais restritivo)
     const LocationConfig *location = findMatchingLocation(request.getUri());
     if (location && !location->cgi_handlers.empty())
         return StatusCodes::http502BadGateway(this->response_str, "Fail CGI");
@@ -160,39 +280,28 @@ void Response::methodPost(const HttpRequest &request)
         return StatusCodes::http413PayloadTooLarge(this->response_str);
     }
 
-    // 2. Obter Content-Type
     std::string content_type = request.getHeader("Content-Type");
     if (content_type.empty())
     {
-        // RFC 7231: 400 Bad Request para header obrigatório ausente
         std::cout << "[400] Content-Type header é obrigatório" << std::endl;
         return StatusCodes::http400BadRequest(this->response_str, "Content-Type header is required");
     }
 
-    // 3. Processar conforme Content-Type
-
-    // 3.1 multipart/form-data - Upload de arquivos
     if (content_type.find("multipart/form-data") != std::string::npos)
         return multipartFormData(request, content_type);
 
-    // 3.2 application/x-www-form-urlencoded - Dados de formulário
     else if (content_type.find("application/x-www-form-urlencoded") != std::string::npos)
     {
-        // Decodificar form data
         std::string decoded_body = urlDecode(request.getBody());
 
-        // RFC 7231: 200 OK para processamento sem criar recurso
         std::ostringstream json_response;
         json_response << "{\"message\":\"Form data recebido\",";
         json_response << "\"size\":" << decoded_body.size() << "}";
 
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-
-    // 3.3 application/json - Dados JSON
     else if (content_type.find("application/json") != std::string::npos)
     {
-        // Processar JSON (validação básica)
         std::string json_body = request.getBody();
 
         std::ostringstream json_response;
@@ -201,8 +310,6 @@ void Response::methodPost(const HttpRequest &request)
 
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-
-    // 3.4 text/plain - Texto simples
     else if (content_type.find("text/plain") != std::string::npos)
     {
         std::ostringstream json_response;
@@ -211,8 +318,6 @@ void Response::methodPost(const HttpRequest &request)
 
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-
-    // Content-Type não suportado
     else
     {
         std::cout << "[415] Content-Type não suportado: " << content_type << std::endl;
@@ -222,21 +327,18 @@ void Response::methodPost(const HttpRequest &request)
 
 void Response::methodDelete(const HttpRequest &request, const std::string &file_path)
 {
-    // 1. Verificar se arquivo existe
     if (!fileExists(file_path))
     {
         std::cout << "[404] Arquivo não encontrado para deletar: " << file_path << std::endl;
         return StatusCodes::http404NotFound(this->response_str, request, "", file_path, this->config);
     }
 
-    // 2. Verificar se é diretório (não permitir deletar diretórios)
     if (isDirectory(file_path))
     {
         std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
-    // 3. Validar symlinks - resolver path real e verificar segurança
     std::string real_path = getRealPath(file_path);
     if (real_path.empty())
     {
@@ -244,7 +346,6 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
-    // Validar que o path real ainda está dentro do root permitido
     std::string root = this->config.root;
     const LocationConfig *location = findMatchingLocation(request.getUri());
     if (location && !location->root.empty())
@@ -256,7 +357,6 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
-    // 4. Verificar permissões de escrita no diretório pai
     std::string parent_dir = getParentDirectory(file_path);
     if (!hasWritePermission(parent_dir))
     {
@@ -264,7 +364,6 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
-    // 5. Verificar se o arquivo é protegido (ex: index.html)
     std::string filename = getFileName(file_path);
     if (isProtectedFile(filename))
     {
@@ -272,20 +371,17 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
         return StatusCodes::http403Forbidden(this->response_str, file_path);
     }
 
-    // Log antes de deletar
     size_t file_size = getFileSize(file_path);
     std::cout << "[DELETE] Arquivo: " << file_path << std::endl;
     std::cout << "[DELETE] Tamanho: " << file_size << " bytes" << std::endl;
     std::cout << "[DELETE] URI: " << request.getUri() << std::endl;
 
-    // 6. Tentar deletar arquivo
     if (remove(file_path.c_str()) != 0)
     {
         std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
         return StatusCodes::http500InternalServerError(this->response_str, "Failed to delete file: " + std::string(strerror(errno)));
     }
 
-    // 6. Sucesso
     std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
     return StatusCodes::http204NoContent(this->response_str);
 }
@@ -306,35 +402,29 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         return StatusCodes::http415UnsupportedMediaType(this->response_str);
     }
 
-    // Determinar diretório de upload. se estiver vazio significa que o body é muito grande
     std::string upload_dir = getUploadDir(request);
     if (upload_dir.empty())
         return StatusCodes::http413PayloadTooLarge(this->response_str);
 
-    // Criar diretório se não existir
     if (!createDirectory(upload_dir))
     {
         std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
         return StatusCodes::http500InternalServerError(this->response_str, "Failed to create upload directory: " + upload_dir);
     }
 
-    // Verificar permissões de escrita
     if (!hasWritePermission(upload_dir))
     {
         std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, upload_dir);
     }
 
-    // Salvar cada arquivo com validação
-    // std::ostringstream saveFiles(files, upload_dir);
     std::ostringstream json_response;
     json_response << "{\"files\":[";
-    std::vector<std::string> saved_files; // Para limpeza em caso de erro
+    std::vector<std::string> saved_files;
     size_t success_count = 0;
 
     for (size_t i = 0; i < files.size(); ++i)
     {
-        // Validar extensão do arquivo
         if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
         {
             std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
@@ -342,7 +432,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
             return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename));
         }
 
-        // Validar tamanho individual do arquivo (max 10MB por arquivo)
         if (files[i].content.size() > 10 * 1024 * 1024)
         {
             std::cout << "[413] Arquivo muito grande: " << files[i].filename
@@ -351,7 +440,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
             return StatusCodes::http413PayloadTooLarge(this->response_str);
         }
 
-        // RFC 2388: Servidor pode renomear arquivo por segurança/conflitos
         std::string unique_filename = generateUniqueFilename(files[i].filename);
         std::string full_path = upload_dir + "/" + unique_filename;
 
@@ -383,15 +471,13 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
 
     json_response << "],\"success\":true,\"count\":" << success_count << "}";
 
-    // RFC 7231: Location header deve conter URI do recurso criado (não caminho filesystem)
     std::string location = "";
     if (!saved_files.empty())
     {
-        // Extrair URI relativo: /tmp/uploads/arquivo.pdf -> /uploads/arquivo.pdf
         std::string first_file = saved_files[0];
         size_t upload_pos = first_file.find("/uploads/");
         if (upload_pos != std::string::npos)
-            location = first_file.substr(upload_pos); // URI relativo ao servidor
+            location = first_file.substr(upload_pos);
         else
             location = request.getUri() + "/" + getFileName(first_file);
     }
@@ -401,7 +487,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
 
 const LocationConfig *Response::findMatchingLocation(const std::string &uri) const
 {
-    // Buscar a location que melhor corresponde ao URI (longest match first)
     const LocationConfig *best_match = NULL;
     size_t best_match_length = 0;
 
@@ -409,10 +494,8 @@ const LocationConfig *Response::findMatchingLocation(const std::string &uri) con
     {
         const std::string &location_path = this->config.locations[i].path;
 
-        // Verificar se URI começa com o path da location
         if (uri.find(location_path) == 0)
         {
-            // Preferir match mais longo (mais específico)
             if (location_path.size() > best_match_length)
             {
                 best_match = &this->config.locations[i];
@@ -426,10 +509,11 @@ const LocationConfig *Response::findMatchingLocation(const std::string &uri) con
 
 bool Response::validateAllowedMethod(const HttpRequest &request)
 {
-    // Buscar location correspondente
     const LocationConfig *location = findMatchingLocation(request.getUri());
 
-    // Se a location tem uma lista de métodos permitidos, verificar se o método da requisição está nela
+    if (!location)
+        return request.getMethod() == "GET";
+
     if (location && !location->allowed_methods.empty())
     {
         std::vector<std::string>::const_iterator it = std::find(
@@ -445,10 +529,8 @@ bool Response::validateAllowedMethod(const HttpRequest &request)
 
 std::string Response::getUploadDir(const HttpRequest &request)
 {
-    // Buscar location correspondente
     const LocationConfig *location = findMatchingLocation(request.getUri());
 
-    // Verificar client_max_body_size específico da location
     if (location && location->client_max_body_size > 0 &&
         request.getBody().size() > location->client_max_body_size)
     {
@@ -458,7 +540,6 @@ std::string Response::getUploadDir(const HttpRequest &request)
         return "";
     }
 
-    // Determinar upload_dir
     std::string upload_dir = this->config.root;
 
     if (location && !location->upload_dir.empty())
@@ -474,35 +555,106 @@ std::string Response::getUploadDir(const HttpRequest &request)
 
 void Response::generateDirectoryListing(const HttpRequest &request, const std::string &dir_path, const std::string &uri)
 {
-    // 1. Abrir diretório
     DIR *dir = opendir(dir_path.c_str());
+    if (!dir)
+    {
+        StatusCodes::http500InternalServerError(this->response_str, "Failed to open directory");
+        return;
+    }
 
-    // 2. Ler todos os arquivos
-    std::vector<std::string> files;
-    struct dirent *entry;
+    std::vector<DirectoryEntry> entries;
+    struct dirent *entry = NULL;
+
     while ((entry = readdir(dir)) != NULL)
     {
-        files.push_back(entry->d_name);
+        std::string name = entry->d_name;
+
+        if (name == ".")
+            continue;
+
+        DirectoryEntry item;
+        item.name = name;
+        item.is_directory = false;
+        item.size = 0;
+        item.mtime = 0;
+
+        if (name == "..")
+        {
+            item.is_directory = true;
+            entries.push_back(item);
+            continue;
+        }
+
+        std::string full_path = dir_path;
+        if (!full_path.empty() && full_path[full_path.size() - 1] != '/')
+            full_path += '/';
+        full_path += name;
+
+        struct stat file_stat;
+        if (stat(full_path.c_str(), &file_stat) == 0)
+        {
+            item.is_directory = S_ISDIR(file_stat.st_mode);
+            item.size = file_stat.st_size;
+            item.mtime = file_stat.st_mtime;
+        }
+
+        entries.push_back(item);
     }
     closedir(dir);
 
-    // 3. Gerar HTML bonito
-    std::ostringstream html;
-    html << "<html><head><title>Index of " << uri << "</title></head>";
-    html << "<body><h1>Index of " << uri << "</h1><hr><ul>";
+    std::sort(entries.begin(), entries.end(), directoryEntryLess);
 
-    for (size_t i = 0; i < files.size(); i++)
+    const std::string current_uri = normalizeDirectoryUri(uri);
+    const std::string parent_uri = parentDirectoryUri(current_uri);
+
+    std::ostringstream html;
+    html << "<!doctype html><html><head><meta charset='UTF-8'>";
+    html << "<meta name='viewport' content='width=device-width'>";
+    html << "<style type='text/css'>";
+    html << "body,html {background:#fff;font-family:\"Bitstream Vera Sans\",\"Lucida Grande\",\"Lucida Sans Unicode\",Lucidux,Verdana,Lucida,sans-serif;}";
+    html << "tr:nth-child(even) {background:#f4f4f4;}";
+    html << "th,td {padding:0.1em 0.5em;}";
+    html << "th {text-align:left;font-weight:bold;background:#eee;border-bottom:1px solid #aaa;}";
+    html << "#list {border:1px solid #aaa;width:100%;}";
+    html << "a {color:#a33;}a:hover {color:#e33;}";
+    html << "</style>";
+    html << "<title>Index of " << htmlEscape(current_uri) << "</title></head><body>";
+    html << "<h1>Index of " << htmlEscape(current_uri) << "</h1>";
+    html << "<table id='list'><thead><tr>";
+    html << "<th style='width:55%'><a href='?C=N&amp;O=A'>File Name</a>&nbsp;<a href='?C=N&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
+    html << "<th style='width:20%'><a href='?C=S&amp;O=A'>File Size</a>&nbsp;<a href='?C=S&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
+    html << "<th style='width:25%'><a href='?C=M&amp;O=A'>Date</a>&nbsp;<a href='?C=M&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
+    html << "</tr></thead><tbody>";
+
+    html << "<tr><td class='link'><a href='" << htmlEscape(parent_uri)
+         << "'>Parent directory/</a></td><td class='size'>-</td><td class='date'>-</td></tr>";
+
+    for (size_t i = 0; i < entries.size(); ++i)
     {
-        if (files[i] != "." && files[i] != "..")
+        if (entries[i].name == "..")
+            continue;
+
+        std::string label = entries[i].name;
+        std::string href = current_uri + encodeUriSegment(entries[i].name);
+        if (entries[i].is_directory)
         {
-            html << "<li><a href='" << uri << "/" << files[i] << "'>";
-            html << files[i] << "</a></li>";
+            label += '/';
+            href += '/';
         }
+
+        html << "<tr><td class='link'><a href='" << htmlEscape(href) << "' title='" << htmlEscape(label) << "'>"
+             << htmlEscape(label) << "</a></td>";
+
+        if (entries[i].is_directory)
+            html << "<td class='size'>-</td>";
+        else
+            html << "<td class='size'>" << formatIndexSize(entries[i].size) << "</td>";
+
+        html << "<td class='date'>" << htmlEscape(formatIndexDate(entries[i].mtime)) << "</td></tr>";
     }
 
-    html << "</ul><hr></body></html>";
+    html << "</tbody></table></body></html>";
 
-    // 4. Retornar 200 OK com HTML
     StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path);
 }
 
@@ -538,7 +690,6 @@ bool Response::isProtectedFile(const std::string &filename)
 
 std::string Response::removeLocationInUri(const std::string &uri, const LocationConfig *location) const
 {
-    // Comportamento alias: remove prefixo do location do URI
     std::string uri_without_location = uri;
     if (location && !location->path.empty())
     {

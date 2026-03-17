@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 09:39:28 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/16 14:45:18 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -196,7 +196,7 @@ std::string getMimeType(const std::string& path)
 {
     size_t dot_pos = path.find_last_of('.');
     if (dot_pos == std::string::npos)
-        return "application/octet-stream";
+        return "text/html"; //"application/octet-stream";
     
     std::string ext = path.substr(dot_pos);
     
