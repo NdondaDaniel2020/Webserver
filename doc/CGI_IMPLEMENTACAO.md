@@ -1,415 +1,539 @@
-# Implementacao de CGI e Integracao com Response
+# Implementacao CGI Atual (Detalhada)
 
-## Objetivo
+## Escopo
 
-Este documento explica como o projeto executa scripts CGI, qual e o papel do namespace `CGIHandler`, como a classe `Response` decide quando usar CGI, e como a resposta final HTTP e montada.
+Este documento descreve, em detalhe, como o CGI funciona no estado atual do projeto.
 
-Arquivos centrais:
+Ponto central: o caminho antigo por `CGIHandler` nao esta no fluxo ativo. Hoje o CGI e executado e orquestrado por `Client`, integrado ao loop `epoll` de `Server`.
 
-- `include/CGIHandler.hpp`
-- `src/cgi/CGIHandler.cpp`
-- `include/EnvBuilder.hpp`
+Arquivos relevantes para entender o ciclo completo:
+
+- `include/Client.hpp`
+- `src/server/Client.cpp`
+- `src/server/Server.cpp`
 - `src/cgi/EnvBuilder.cpp`
-- `include/Response.hpp`
-- `src/http/Response.cpp`
+- `include/EnvBuilder.hpp`
+- `src/config/ConfigHelper.cpp`
+- `src/http/Response.cpp` (para entender o que NAO e CGI)
 
 ---
 
-## Visao Geral
+## 1. Arquitetura E Responsabilidades
 
-O suporte a CGI foi implementado como um fluxo separado da entrega normal de arquivos estaticos.
+Separacao de papeis no design atual:
 
-O caminho geral e este:
+- `Server`: multiplexacao de I/O com `epoll`, aceita conexoes e despacha eventos.
+- `Client`: maquina de estados por conexao HTTP e dono do ciclo CGI (fork/pipes/leitura/parsing da resposta).
+- `EnvBuilder`: transforma `HttpRequest` em variaveis de ambiente para `execve`.
+- `Response`: gera respostas estaticas e de metodos nao-CGI (GET estatico, POST upload/json/form, DELETE).
+
+Visao de alto nivel:
 
 ```text
-HttpRequest
-  -> Response::buildHttpResponse()
-  -> Response::methodGet() ou Response::methodPost()
-  -> Response::isCgiRequest()
-  -> CGIHandler::executeCgi()
-  -> EnvBuilder::build()
-  -> fork() + execve()
-  -> leitura da saida do script
-  -> montagem da resposta HTTP final
+TCP socket
+  -> Server::handleClientData
+  -> Client::appendRecvData / isRequestComplete
+  -> Client::processRequest
+      -> (se location com CGI) Client::startCgi
+      -> (senao) Response(...)
+  -> eventos de pipe CGI via cgi_fd_map
+  -> Client::handleCgiStdinWritable / handleCgiStdoutReadable
+  -> Client::finishCgiAndGenerateResponse
+  -> Client::sendData
 ```
 
-Quando o recurso pedido corresponde a uma extensao configurada em `location.cgi_handlers`, o servidor deixa de tratar esse recurso como arquivo estatico e passa a executa-lo como processo CGI.
-
 ---
 
-## Porque foi usado um namespace
+## 2. Configuracao CGI No Parser
 
-O modulo de CGI nao foi modelado como classe. Em vez disso, ele foi colocado no namespace `CGIHandler`.
+### 2.1 Como a configuracao e lida
 
-Essa decisao faz sentido porque:
+Em `ConfigHelper::parseCommonConfig(..., LocationConfig&)`:
 
-- o modulo nao guarda estado interno entre requisicoes;
-- a API publica e pequena, com uma funcao principal: `executeCgi()`;
-- as funcoes auxiliares (`getExtension`, `stripQuery`, `closePipes`) sao detalhes internos do arquivo `.cpp`;
-- o namespace agrupa responsabilidade sem obrigar construcao de objeto.
+- `cgi_extension` ou `cgi_extensions`
+  - salva a extensao em `location.cgi_handlers[ext] = ""`.
+  - guarda `location.cgi_path = ext` temporariamente.
+- `cgi_path`
+  - associa o `path` ao ultimo valor guardado em `location.cgi_path`.
 
-Na pratica, `CGIHandler` funciona como um modulo utilitario especializado em executar scripts CGI e devolver uma resposta HTTP pronta.
+Isso cria o mapa final `extensao -> interpretador`.
 
----
+### 2.2 Exemplo pratico
 
-## Interface publica do namespace CGIHandler
-
-Em `include/CGIHandler.hpp`, a interface publica e:
-
-```cpp
-namespace CGIHandler {
-    bool executeCgi(const HttpRequest &request,
-                    const std::string &scriptPath,
-                    const LocationConfig &location,
-                    std::string &outResponse);
-}
-```
-
-### Parametros
-
-- `request`: contem metodo, URI, headers, body e demais dados da requisicao.
-- `scriptPath`: caminho do script no filesystem.
-- `location`: configuracao da location atual, incluindo o mapa `cgi_handlers`.
-- `outResponse`: string de saida onde a resposta HTTP completa sera escrita.
-
-### Retorno
-
-- `true`: o CGI foi executado e `outResponse` contem uma resposta HTTP pronta.
-- `false`: houve falha de configuracao ou de execucao.
-
-Isso permite que `Response` apenas delegue a execucao e reaproveite o resultado diretamente em `response_str`.
-
----
-
-## Como Response detecta uma requisicao CGI
-
-O ponto de decisao fica em `Response::isCgiRequest()`.
-
-Regras usadas hoje:
-
-1. precisa existir uma `location` correspondente;
-2. essa `location` precisa ter `cgi_handlers` configurado;
-3. a URI precisa terminar com uma extensao;
-4. a extensao precisa existir no mapa `location->cgi_handlers`.
-
-Exemplo conceitual:
-
-```text
+```conf
 location /cgi-bin {
-    root /var/www/cgi-bin;
-    cgi .py /usr/bin/python3;
-    cgi .php /usr/bin/php-cgi;
+    allowed_methods GET POST;
+    root www/cgi-bin;
+
+    cgi_extension .py;
+    cgi_path /usr/bin/python3;
+
+    cgi_extension .php;
+    cgi_path /usr/bin/php-cgi;
 }
 ```
 
-Se a URI terminar com `.py`, `Response` entende que deve usar o interpretador associado a `.py` em vez de tentar servir o arquivo diretamente.
+Mapa resultante:
+
+- `.py -> /usr/bin/python3`
+- `.php -> /usr/bin/php-cgi`
+
+### 2.3 Observacao de robustez
+
+Como a associacao depende da ordem (extensao antes do path), uma configuracao fora de ordem pode gerar mapeamento incorreto.
 
 ---
 
-## Integracao com GET
+## 3. Maquina De Estados Do Client
 
-No metodo `Response::methodGet()`, o teste de CGI acontece logo no inicio.
+Estados declarados em `Client::State`:
 
-Fluxo atual:
+- `READING_HEADERS`
+- `READING_BODY`
+- `PROCESSING`
+- `CGI_RUNNING`
+- `SENDING_RESPONSE`
+- `DONE`
+- `ERROR_413`
 
-1. encontra a `location` pelo URI;
-2. chama `isCgiRequest(request.getUri(), location)`;
-3. se for CGI, chama `CGIHandler::executeCgi()`;
-4. se der certo, copia a resposta montada para `response_str` e encerra o metodo;
-5. se falhar, devolve `500 Internal Server Error`.
-
-Isso e importante porque o CGI tem prioridade sobre outras regras de GET, como:
-
-- redirect da location;
-- busca de index file;
-- autoindex;
-- leitura direta de arquivo estatico.
-
-Em outras palavras: se o recurso e reconhecido como CGI, ele nao entra no fluxo normal de arquivo estatico.
-
----
-
-## Integracao com POST
-
-Em `Response::methodPost()`, o CGI tambem e tratado antes do restante do processamento do body.
-
-Fluxo atual:
-
-1. valida `client_max_body_size` global;
-2. encontra a `location` correspondente;
-3. se a `location` aceitar CGI para a extensao da URI, monta o `scriptPath`;
-4. chama `CGIHandler::executeCgi()`;
-5. se funcionar, usa a resposta devolvida pelo script;
-6. se falhar, retorna `500 Internal Server Error`.
-
-Se nao for CGI, o POST continua pelo fluxo normal de:
-
-- `multipart/form-data`;
-- `application/x-www-form-urlencoded`;
-- `application/json`;
-- `text/plain`.
-
-Isso mostra que CGI e um caminho alternativo completo para POST, e nao apenas um detalhe de upload.
-
----
-
-## Como o scriptPath e resolvido
-
-Existem dois caminhos levemente diferentes no codigo:
-
-### GET
-
-No fluxo de GET, `buildHttpResponse()` calcula `file_path` com base em:
+Transicoes tipicas com CGI:
 
 ```text
-root + removeLocationInUri(uri, location)
+READING_HEADERS -> READING_BODY -> PROCESSING -> CGI_RUNNING -> SENDING_RESPONSE -> DONE
 ```
 
-Esse valor e passado para `methodGet()`, que o reutiliza ao chamar o CGI.
-
-### POST
-
-No fluxo de POST, o caminho do script e reconstruido com:
+Caso sem body (GET):
 
 ```text
-location->root + request.getUri().substr(location->path.size())
+READING_HEADERS -> PROCESSING -> CGI_RUNNING -> SENDING_RESPONSE -> DONE
 ```
 
-Os dois caminhos perseguem a mesma ideia: transformar a URI em um caminho real dentro da `root` da location.
+Se `Content-Length` exceder limite antes de ler body:
 
-Observacao importante: essa diferenca de montagem merece atencao em manutencao futura, porque duas estrategias diferentes para resolver o mesmo recurso podem gerar comportamento inconsistente em cenarios de alias ou normalizacao de path.
+```text
+READING_HEADERS -> ERROR_413 -> SENDING_RESPONSE -> DONE
+```
 
 ---
 
-## Montagem do ambiente CGI com EnvBuilder
+## 4. Deteccao De Request CGI
 
-Antes de chamar `execve()`, o servidor monta um vetor de variaveis de ambiente com `EnvBuilder::build()`.
+Em `Client::processRequest(...)`:
 
-Variaveis definidas explicitamente hoje:
+1. Extrai body de `recv_buffer` se `content_length > 0`.
+2. Localiza a melhor location por maior prefixo (`findMatchingLocation`).
+3. Se `location` existe e `!location->cgi_handlers.empty()`:
+   - loga inicio CGI,
+   - muda para `CGI_RUNNING`,
+   - chama `startCgi(request, *location, epoll_fd)`.
+
+Importante:
+
+- A decisao inicial e por presence de handlers na location.
+- A validacao fina (extensao realmente suportada) ocorre dentro de `startCgi`.
+
+Consequencia pratica:
+
+- URI em location CGI com extensao nao mapeada gera erro de gateway, nao fallback para estatico.
+
+---
+
+## 5. Inicio Do Processo CGI (`startCgi`)
+
+## 5.1 Resolucao do `script_path`
+
+Formula atual:
+
+```text
+script_path = loc.root + req.getUri().substr(loc.path.size())
+```
+
+Exemplo:
+
+- `loc.path = /cgi-bin`
+- `loc.root = www/cgi-bin`
+- `uri = /cgi-bin/test.py`
+- resultado: `www/cgi-bin/test.py`
+
+## 5.2 Escolha do interpretador
+
+- extensao extraida por `rfind('.')`.
+- busca em `loc.cgi_handlers`.
+
+Se nao encontrado:
+
+- `StatusCodes::http502BadGateway(error_msg, "CGI")`
+- `state = SENDING_RESPONSE`
+- encerra sem fork.
+
+Observacao: o codigo gera `error_msg` local, mas nao atribui `send_buffer` nesse trecho. Dependendo da implementacao de `StatusCodes`, isso pode deixar a resposta de erro incompleta se nao for preenchida em outro ponto.
+
+## 5.3 Criacao de pipes
+
+- `pipe_in`: pai escreve body para stdin do filho.
+- `pipe_out`: filho escreve stdout/stderr para pai.
+
+Se `pipe()` falhar:
+
+- retorna fluxo de erro com `502`.
+
+## 5.4 Flags non-blocking
+
+No pai:
+
+- `fcntl(cgi.pipe_in[1], F_SETFL, O_NONBLOCK)`
+- `fcntl(cgi.pipe_out[0], F_SETFL, O_NONBLOCK)`
+
+## 5.5 Ambiente `envp`
+
+`buildEnvp(req, script_path, loc)`:
+
+- chama `EnvBuilder::build(...)` para obter `vector<string>`.
+- aloca `char** envp`.
+- copia cada string para `char[]` proprio.
+
+Liberacao:
+
+- pai libera logo apos `fork`.
+- filho libera apenas em falha de `execve`.
+
+## 5.6 fork e exec
+
+Filho:
+
+- redireciona `stdin`, `stdout`, `stderr` com `dup2`.
+- fecha descritores nao usados.
+- constroi `argv = [interpreter, script_path, NULL]`.
+- chama `execve(interpreter, argv, envp)`.
+- se falhar, `exit(127)`.
+
+Pai:
+
+- fecha `pipe_in[0]` e `pipe_out[1]`.
+- inicializa estado CGI:
+  - `cgi.pid`
+  - `cgi.body_written = 0`
+  - `cgi.finished = false`
+  - `cgi.start_time = time(NULL)`
+  - `cgi.output = ""`
+- `is_cgi_active = true`.
+
+## 5.7 Registro no epoll
+
+FDs registrados pelo `Client`:
+
+- escrita do body: `pipe_in[1]` com `EPOLLOUT | EPOLLHUP`
+- leitura da saida: `pipe_out[0]` com `EPOLLIN | EPOLLHUP`
+
+Observacao: foi escolhido modo level-triggered (sem `EPOLLET`) para simplificar e evitar perda de evento por drenagem incompleta.
+
+---
+
+## 6. Integracao Com O Loop Do Server
+
+No `Server::start()`:
+
+1. `epoll_wait` devolve eventos.
+2. Se FD for socket de escuta: aceita conexao.
+3. Senao, procura em `clients`.
+4. Se nao estiver em `clients`, tenta em `cgi_fd_map`.
+
+Despacho para CGI:
+
+- `EPOLLIN | EPOLLERR | EPOLLHUP` no FD de saida -> `handleCgiStdoutReadable`.
+- `EPOLLOUT` no FD de entrada -> `handleCgiStdinWritable`.
+
+Quando `processRequest` inicia CGI, `Server::handleClientData` registra os FDs dos pipes em `cgi_fd_map`.
+
+Esse desenho separa claramente:
+
+- mapa `clients`: sockets de rede.
+- mapa `cgi_fd_map`: pipes internos de processo.
+
+---
+
+## 7. Escrita Do Body Para O CGI (`handleCgiStdinWritable`)
+
+Contrato funcional:
+
+- escrever o body sem bloquear o thread principal.
+- suportar escrita parcial.
+- fechar stdin do CGI ao concluir envio.
+
+Passos:
+
+1. Se CGI inativo, retorna.
+2. Se body vazio:
+   - remove FD do epoll,
+   - fecha `pipe_in[1]`,
+   - marca `-1`.
+3. Se body existe:
+   - escreve a partir de `body + cgi.body_written`.
+   - incrementa `cgi.body_written` com bytes realmente escritos.
+4. Se `body_written >= body.size()`:
+   - remove FD do epoll,
+   - fecha `pipe_in[1]`.
+
+Observacao:
+
+- o fluxo nao trata explicitamente erro de `write < 0` nesse metodo; uma falha permanente pode exigir tratamento adicional para evitar CGI preso.
+
+---
+
+## 8. Leitura Da Saida CGI (`handleCgiStdoutReadable`)
+
+Contrato funcional:
+
+- drenar stdout/stderr do CGI de forma incremental.
+- detectar fim de stream.
+- finalizar resposta quando nao houver mais dados.
+
+Passos:
+
+1. Loop de `read` em buffer de 8192 bytes enquanto `r > 0`.
+2. Cada chunk e anexado em `cgi.output`.
+3. Se `r == 0` (EOF):
+   - remove FD do epoll,
+   - fecha `pipe_out[0]`,
+   - chama `finishCgiAndGenerateResponse`.
+4. Se `EAGAIN`/`EWOULDBLOCK`:
+   - usa `waitpid(pid, &status, WNOHANG)`.
+   - se processo terminou, drena pipe novamente e finaliza.
+5. Se outro erro de leitura:
+   - loga erro (`strerror(errno)`).
+
+Observacao de design:
+
+- `stderr` e redirecionado para o mesmo pipe de `stdout`; isso melhora visibilidade de erro, mas pode poluir a resposta HTTP caso o script escreva logs em stderr junto com headers/body.
+
+---
+
+## 9. Finalizacao E Montagem Da Resposta HTTP
+
+`finishCgiAndGenerateResponse(...)` converte `cgi.output` bruto em resposta HTTP enviada ao cliente.
+
+### 9.1 Encerramento do processo
+
+- se `cgi.pid > 0`, chama `waitpid(..., WNOHANG)` e zera `cgi.pid`.
+- `is_cgi_active = false`.
+
+### 9.2 Split de headers e body
+
+Busca separador:
+
+- primeiro `\r\n\r\n`
+- fallback `\n\n`
+
+Se encontrado:
+
+- parte antes = `cgi_headers`
+- parte depois = `cgi_body`
+
+Se nao encontrado:
+
+- `cgi_headers = ""`
+- `cgi_body = output inteiro`
+
+### 9.3 Status e headers extras
+
+- status default: `200 OK`.
+- parse linha por linha de `cgi_headers`.
+- se linha com `Status: `, sobrescreve status.
+- demais linhas (normalizadas sem `\r`) vao para `extra_headers`.
+
+### 9.4 Montagem final
+
+Formato produzido:
+
+```text
+HTTP/1.1 <status_line>
+<extra_headers>
+Content-Length: <len(cgi_body)>
+Connection: <keep-alive|close>
+
+<cgi_body>
+```
+
+Depois:
+
+- `send_buffer = resposta`
+- `send_offset = 0`
+- `state = SENDING_RESPONSE`
+
+---
+
+## 10. Interacao Com Keep-Alive
+
+`Client` preserva semantica de keep-alive apos CGI:
+
+- header `Connection` na resposta final usa `keep_alive` do cliente.
+- quando envio termina (`sendData`), `Server` decide:
+  - `client->reset()` se keep-alive,
+  - `closeClient(fd)` se nao.
+
+Isso permite multiplas requisicoes na mesma conexao mesmo quando uma delas usa CGI.
+
+---
+
+## 11. Limpeza E Encerramento Forcado
+
+`cleanupCgiIfActive(epoll_fd)` e chamado quando cliente e fechado.
+
+Acoes:
+
+1. Se `cgi.pid > 0`, envia `SIGKILL` e chama `waitpid(..., WNOHANG)`.
+2. Remove/fecha `pipe_in[1]` do epoll.
+3. Remove/fecha `pipe_out[0]` do epoll.
+4. `is_cgi_active = false`.
+
+No `Server::closeClient(...)`:
+
+- guarda FDs CGI antes de cleanup,
+- faz cleanup,
+- remove esses FDs de `cgi_fd_map`.
+
+Isso evita dangling references no mapa de pipes.
+
+---
+
+## 12. Variaveis De Ambiente CGI (Detalhe)
+
+`EnvBuilder::build(...)` monta:
 
 - `REDIRECT_STATUS=200`
-- `REQUEST_METHOD`
-- `QUERY_STRING`
-- `SERVER_PROTOCOL`
+- `REQUEST_METHOD=<GET|POST|...>`
+- `QUERY_STRING=<request.getQuery()>`
+- `SERVER_PROTOCOL=<HTTP/x.y>`
 - `GATEWAY_INTERFACE=CGI/1.1`
 - `SERVER_SOFTWARE=webserv/1.0`
-- `SCRIPT_FILENAME`
-- `SCRIPT_NAME`
-- `REQUEST_URI`
-- `CONTENT_TYPE` quando existir
-- `CONTENT_LENGTH` quando existir
+- `SCRIPT_FILENAME=<script_path>`
+- `SCRIPT_NAME=<request.getPath()>`
+- `REQUEST_URI=<uri original>`
+- `CONTENT_TYPE` / `CONTENT_LENGTH` quando presentes
+- headers HTTP convertidos para `HTTP_*`
 
-Depois disso, todos os headers HTTP recebidos sao convertidos para o formato CGI:
+Regra de conversao de header:
+
+- nome -> uppercase
+- `-` -> `_`
+- prefixo `HTTP_`
+
+Exemplo:
 
 ```text
 User-Agent: curl/8.5.0
 -> HTTP_USER_AGENT=curl/8.5.0
 ```
 
-Regras aplicadas:
+Limite atual:
 
-- o nome do header e convertido para maiusculo;
-- `-` vira `_`;
-- `Content-Type` e `Content-Length` nao entram como `HTTP_*` porque ja sao adicionados separadamente.
-
-Esse ambiente e entregue ao processo CGI como `envp` em `execve()`.
+- `HttpRequest::query` e `HttpRequest::path` nao sao preenchidos no parser atual, entao `QUERY_STRING` e `SCRIPT_NAME` podem ficar vazios mesmo com URI contendo query.
 
 ---
 
-## Passo a passo dentro de CGIHandler::executeCgi()
+## 13. Relacao Com `Response` (Por Que Existe 502 Ali)
 
-### 1. Limpeza do caminho
+`Response::methodGet` e `Response::methodPost` possuem guarda:
 
-O metodo remove a query string do caminho com `stripQuery()`.
+- se location encontrada tem `cgi_handlers`, retornam `502 Bad Gateway` com mensagem de falha CGI.
 
-Exemplo:
+Intencao desse comportamento:
 
-```text
-/www/cgi-bin/hello.py?name=ana
--> /www/cgi-bin/hello.py
-```
+- evitar que o caminho estatico processe resources de location CGI.
+- manter CGI no pipeline dedicado de `Client`.
 
-Isso garante que a extensao e o caminho do script sejam resolvidos corretamente.
+Risco:
 
-### 2. Escolha do interpretador
-
-`getExtension()` pega a extensao do arquivo, e o modulo procura essa extensao em `location.cgi_handlers`.
-
-Se nao existir mapeamento para a extensao, a funcao retorna `false`.
-
-Exemplo:
-
-```text
-.py  -> /usr/bin/python3
-.php -> /usr/bin/php-cgi
-```
-
-### 3. Conversao do ambiente para `char **`
-
-`EnvBuilder::build()` devolve `std::vector<std::string>`.
-
-Em seguida, o codigo cria um vetor `std::vector<char *>` apontando para os buffers internos dessas strings, e adiciona `NULL` no final para cumprir a interface de `execve()`.
-
-### 4. Montagem do argv
-
-O processo filho recebe:
-
-```text
-argv[0] = interpretador
-argv[1] = scriptPath
-argv[2] = NULL
-```
-
-Ou seja, o servidor executa o interpretador e passa o script como primeiro argumento.
-
-### 5. Criacao de pipes
-
-Sao criados dois pipes:
-
-- `inpipe`: servidor escreve o body da requisicao e o CGI le do `stdin`;
-- `outpipe`: CGI escreve em `stdout` e `stderr`, e o servidor le esse conteudo.
-
-### 6. fork()
-
-Depois do `fork()`:
-
-- o filho prepara `stdin`, `stdout` e `stderr` com `dup2()`;
-- o pai escreve o body e le a saida do CGI.
-
-### 7. Processo filho
-
-No filho:
-
-- `STDIN_FILENO` recebe `inpipe[0]`;
-- `STDOUT_FILENO` recebe `outpipe[1]`;
-- `STDERR_FILENO` tambem recebe `outpipe[1]`;
-- todos os descritores redundantes sao fechados;
-- `execve()` substitui o processo pelo interpretador.
-
-Se `execve()` falhar, o filho termina com codigo `127`.
-
-### 8. Processo pai
-
-No pai:
-
-- fecha a ponta de leitura de `inpipe`;
-- fecha a ponta de escrita de `outpipe`;
-- se o metodo for `POST`, escreve o body no `stdin` do CGI;
-- fecha `inpipe[1]` para sinalizar fim de entrada;
-- le tudo de `outpipe[0]` para `cgiOutput`;
-- espera o filho com `waitpid()`.
-
-Se o processo filho terminar com codigo `127`, o servidor considera a execucao um erro e retorna `false`.
+- se por algum bug o request CGI cair em `Response`, o usuario recebe erro gateway em vez de fallback para arquivo estatico.
 
 ---
 
-## Como a saida do CGI vira resposta HTTP
+## 14. Matriz De Falhas E Efeito Observavel
 
-Depois de capturar toda a saida do script, `CGIHandler::executeCgi()` tenta separar headers e body.
+Falhas principais no caminho CGI:
 
-Separadores aceitos:
+1. Extensao nao mapeada
+   - ponto: `startCgi` antes de `pipe`
+   - efeito: `502`.
 
-- `\r\n\r\n`
-- `\n\n`
+2. Erro de `pipe()`
+   - ponto: `startCgi`
+   - efeito: `502`.
 
-Se houver cabecalhos, o codigo procura uma linha especial:
+3. Erro de `fork()`
+   - ponto: `startCgi`
+   - efeito: `502`.
 
-```text
-Status: 404 Not Found
-```
+4. `execve` falha no filho
+   - ponto: filho termina com `127`
+   - efeito: processo encerra sem gerar output valido; resposta depende da logica de leitura/finalizacao e pode virar body vazio com `200` se nao houver tratamento adicional.
 
-Quando essa linha existe:
+5. Script escreve output sem headers CGI
+   - ponto: parse em `finishCgiAndGenerateResponse`
+   - efeito: server assume `200 OK` e trata todo output como body.
 
-- o valor apos `Status:` vira a linha de status HTTP;
-- os outros cabecalhos sao reaproveitados na resposta final.
-
-Se nao houver `Status:`, o status padrao e:
-
-```text
-200 OK
-```
-
-Depois, o servidor monta a resposta final assim:
-
-```text
-HTTP/1.1 <status>
-<headers vindos do CGI>
-Content-Length: <tamanho do body>
-Connection: close
-
-<body>
-```
-
-Isso significa que o CGI nao entrega a resposta diretamente ao socket. Quem sempre envia a resposta final ao cliente continua sendo o servidor.
+6. Script lento ou travado
+   - ponto: ausencia de timeout dedicado de CGI
+   - efeito: conexao pode ficar em `CGI_RUNNING` ate timeout geral de inatividade do cliente ou cleanup por fechamento.
 
 ---
 
-## Relacao entre Response e CGIHandler
+## 15. Pontos De Melhoria Prioritarios
 
-As responsabilidades estao separadas desta forma:
+1. Preencher `query/path` em `HttpRequest::parseRequestLine`.
+   - ganho: `QUERY_STRING` e `SCRIPT_NAME` corretos para CGI.
 
-### Response
+2. Adicionar timeout de CGI por processo.
+   - usar `cgi.start_time` + threshold e matar com `SIGKILL`/`SIGTERM`.
 
-- decide qual location corresponde a URI;
-- valida metodo permitido;
-- decide se a requisicao e CGI ou nao;
-- escolhe entre fluxo de arquivo estatico, upload, delete, redirect ou CGI;
-- armazena a resposta final em `response_str`.
+3. Tratar retorno de `write` em `handleCgiStdinWritable` com erro.
+   - evitar stuck quando pipe de entrada falha.
 
-### CGIHandler
+4. Tratar status de saida do filho (`waitpid status`).
+   - mapear falha real para `502/500` consistente.
 
-- resolve extensao e interpretador;
-- prepara ambiente e argumentos;
-- cria pipes;
-- faz `fork()` e `execve()`;
-- injeta o body no `stdin` do script quando necessario;
-- recolhe a saida do processo;
-- transforma a saida do CGI em uma resposta HTTP pronta.
+5. Separar stderr de stdout (opcional).
+   - melhora robustez do parsing HTTP.
 
-### EnvBuilder
-
-- traduz `HttpRequest` para variaveis de ambiente no formato esperado por scripts CGI.
-
-Essa divisao deixa a classe `Response` como orquestradora de alto nivel, e concentra a mecanica de processo no modulo CGI.
+6. Consolidar caminho CGI para nao depender de fallback em `Response`.
+   - reduzir ambiguidade de arquitetura.
 
 ---
 
-## Comportamento de erro atual
+## 16. Checklist De Debug Operacional
 
-As principais falhas tratadas hoje sao:
+Quando CGI nao responde como esperado:
 
-- extensao sem interpretador configurado: `executeCgi()` retorna `false`;
-- erro em `pipe()` ou `fork()`: `executeCgi()` retorna `false`;
-- erro em `execve()`: o filho sai com `127`, e o pai converte isso em falha;
-- falha de CGI no fluxo de GET: `Response` responde `500 Internal Server Error` com mensagem `CGI execution failed`;
-- falha de CGI no fluxo de POST: `Response` responde `500 Internal Server Error` com mensagem `CGI Error`.
+1. Confirmar mapping em `config/*.conf`:
+   - `cgi_extension` com ponto (`.py`, `.php`)
+   - `cgi_path` valido no host.
 
-Ponto importante: `stderr` do CGI e redirecionado para o mesmo pipe de `stdout`. Isso ajuda no debug, mas tambem significa que mensagens de erro do script podem acabar misturadas ao conteudo de resposta se o script nao seguir o formato esperado.
+2. Confirmar resolucao de caminho:
+   - `loc.root + uri sem prefixo da location`.
 
----
+3. Verificar permissao de script e interpretador.
 
-## Limitacoes da implementacao atual
+4. Validar se script imprime headers CGI corretos:
+   - minimo recomendado: `Content-Type: ...` + linha em branco.
 
-O modulo esta funcional, mas ainda tem limites claros:
+5. Observar logs do `Client`:
+   - `Iniciando CGI`
+   - `CGI stdin writable`
+   - `CGI stdout readable`
+   - `CGI stdout EOF`
 
-1. o CGI e tratado de forma bloqueante;
-2. nao existe timeout para script travado ou muito lento;
-3. a resposta final sempre usa `Connection: close`;
-4. GET e POST resolvem `scriptPath` por caminhos diferentes;
-5. nao ha tratamento especifico para codigos de saida diferentes de `127`;
-6. nao ha parsing avancado de headers CGI repetidos ou malformados;
-7. `stderr` e `stdout` compartilham o mesmo fluxo.
-
-Esses pontos nao invalidam a implementacao, mas devem ser conhecidos por quem for evoluir o modulo.
+6. Confirmar fim de processo:
+   - checar zumbi/processo preso se conexao fechou sem cleanup.
 
 ---
 
-## Resumo tecnico
+## 17. Resumo Executivo
 
-- `Response` decide se a requisicao entra no fluxo CGI.
-- `CGIHandler` executa o script e monta a resposta HTTP.
-- `EnvBuilder` converte a requisicao para variaveis de ambiente CGI.
-- o namespace foi usado porque o modulo nao precisa de estado nem de instancias.
-- a resposta devolvida pelo CGI e reaproveitada por `Response` como string HTTP completa.
+A implementacao atual de CGI e event-driven e encaixada no mesmo loop `epoll` do servidor:
 
-Se o objetivo for evoluir esse modulo, o proximo passo natural e unificar a resolucao de `scriptPath`, adicionar timeout de execucao e separar melhor o tratamento de `stdout` e `stderr`.
+- `Client` inicia e controla o processo CGI com pipes non-blocking.
+- `Server` despacha FDs de pipe em `cgi_fd_map`.
+- `EnvBuilder` fornece ambiente para `execve`.
+- resposta HTTP final e montada pelo proprio `Client` a partir da saida do script.
+
+O desenho esta funcional para GET/POST CGI sem bloquear I/O global, mas ainda tem gaps importantes de robustez (timeout dedicado, parse de query/path, tratamento de erros de subprocesso e escrita parcial com falha).
