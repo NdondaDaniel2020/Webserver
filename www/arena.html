@@ -31,6 +31,7 @@
             <li><a href="/landing.html#team">Equipa</a></li>
             <li><a href="/landing.html#stats">Estatísticas</a></li>
             <li><a href="/arena.html" class="active">⚡ Testar Servidor</a></li>
+            <li><a href="ninja_arena.html" class="active">⚔️ Ninja Arena</a></li>
         </ul>
         <div class="nav-hamburger" id="hamburger" onclick="document.getElementById('navLinks').classList.toggle('open')">
             <span></span><span></span><span></span>
@@ -307,6 +308,59 @@
 
 <div class="divider"></div>
 
+<!-- ===== FORMULARIO PYTHON + PHP ===== -->
+<div class="section" id="form-demo">
+    <div class="section-label">// Integração Python ↔ PHP + SQLite</div>
+    <div class="section-title">📝 Formulário com <span class="highlight">Database</span></div>
+
+    <div class="card">
+        <div class="card-header">
+            <span class="method-badge badge-get">FORMULÁRIO</span>
+            <h3>Salva dados com Python → Lê com PHP</h3>
+        </div>
+        <p class="card-description">
+            Preencha o formulário abaixo. Python salva em SQLite. PHP lista os dados.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+            <!-- Form para salvar -->
+            <div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--dark-gray); margin-bottom: 10px; text-transform: uppercase;">Salvar com Python</div>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <input type="text" id="form-name" placeholder="Nome..." style="padding: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 6px; color: white; font-family: var(--font-body);" />
+                    <input type="email" id="form-email" placeholder="Email..." style="padding: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 6px; color: white; font-family: var(--font-body);" />
+                    <textarea id="form-message" placeholder="Mensagem..." style="padding: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 6px; color: white; font-family: var(--font-body); resize: vertical; min-height: 100px;"></textarea>
+                    <button class="btn btn-neon" onclick="saveToDB()">💾 Salvar</button>
+                </div>
+            </div>
+
+            <!-- Lista -->
+            <div>
+                <div style="font-family: var(--font-mono); font-size: 11px; color: var(--dark-gray); margin-bottom: 10px; text-transform: uppercase;">Listar com PHP</div>
+                <div id="form-list" style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; max-height: 380px; overflow-y: auto; font-family: var(--font-mono); font-size: 12px;">
+                    <span style="color: var(--dark-gray);">Nenhum dado ainda. Salve algo!</span>
+                </div>
+                <button class="btn btn-outline" onclick="loadFromDB()" style="margin-top: 10px; width: 100%;">🔄 Atualizar</button>
+            </div>
+        </div>
+
+        <div class="response-area" id="form-response" style="display: none;">
+            <div class="response-header">
+                <div class="response-status">
+                    <span class="status-dot" id="form-dot"></span>
+                    <span class="status-code" id="form-status"></span>
+                </div>
+                <span class="response-time" id="form-time"></span>
+            </div>
+            <div class="response-body">
+                <pre id="form-json"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="divider"></div>
+
 <!-- ===== SERVER STATS ===== -->
 <div class="section" id="stats">
     <div class="section-label">// Informações do Servidor</div>
@@ -398,6 +452,20 @@
                     <td>/errors/500.html</td>
                     <td><span class="route-method get">GET</span></td>
                     <td>Página de erro 500</td>
+                </tr>
+                <tr>
+                    <td>/cgi-bin/form_save.py</td>
+                    <td>
+                        <span class="route-method post">POST</span>
+                    </td>
+                    <td>Salva formulário na base SQLite (Python CGI)</td>
+                </tr>
+                <tr>
+                    <td>/cgi-bin/form_list.php</td>
+                    <td>
+                        <span class="route-method post">POST</span>
+                    </td>
+                    <td>Lista dados da base SQLite (PHP CGI)</td>
                 </tr>
             </tbody>
         </table>
@@ -722,6 +790,152 @@ async function sendRaw() {
     } catch (err) {
         const elapsed = Math.round(performance.now() - start);
         displayResponse('raw', 0, 'Network Error', new Headers(), err.message, elapsed);
+    }
+}
+
+/* ──────────────────────────────────────────────
+   FORMULÁRIO + DATABASE (Python save + PHP list)
+   ────────────────────────────────────────────── */
+async function saveToDB() {
+    const name = document.getElementById('form-name').value.trim();
+    const email = document.getElementById('form-email').value.trim();
+    const message = document.getElementById('form-message').value.trim();
+
+    if (!name || !email) {
+        alert('Nome e Email são obrigatórios');
+        return;
+    }
+
+    const start = performance.now();
+    try {
+        const params = new URLSearchParams({
+            action: 'save',
+            name: name,
+            email: email,
+            message: message
+        });
+
+        const resp = await fetch('/cgi-bin/form_save.py', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: params
+        });
+
+        const elapsed = Math.round(performance.now() - start);
+        const data = await resp.json();
+
+        // Show response
+        document.getElementById('form-response').style.display = 'block';
+        document.getElementById('form-status').textContent = resp.status + ' ' + resp.statusText;
+        document.getElementById('form-time').textContent = elapsed + 'ms';
+        document.getElementById('form-json').textContent = JSON.stringify(data, null, 2);
+
+        const dot = document.getElementById('form-dot');
+        dot.className = 'status-dot ' + (resp.ok ? 'success' : 'error');
+
+        if (data.ok) {
+            // Limpar form
+            document.getElementById('form-name').value = '';
+            document.getElementById('form-email').value = '';
+            document.getElementById('form-message').value = '';
+            // Atualizar lista
+            setTimeout(() => loadFromDB(), 500);
+        }
+    } catch (err) {
+        const elapsed = Math.round(performance.now() - start);
+        document.getElementById('form-response').style.display = 'block';
+        document.getElementById('form-status').textContent = 'Error';
+        document.getElementById('form-time').textContent = elapsed + 'ms';
+        document.getElementById('form-json').textContent = err.message;
+        document.getElementById('form-dot').className = 'status-dot error';
+    }
+}
+
+async function loadFromDB() {
+    const start = performance.now();
+    try {
+        const resp = await fetch('/cgi-bin/form_list.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=list'
+        });
+        const elapsed = Math.round(performance.now() - start);
+        const data = await resp.json();
+
+        // Show response
+        document.getElementById('form-response').style.display = 'block';
+        document.getElementById('form-status').textContent = resp.status + ' ' + resp.statusText;
+        document.getElementById('form-time').textContent = elapsed + 'ms';
+        document.getElementById('form-json').textContent = JSON.stringify(data, null, 2);
+
+        const dot = document.getElementById('form-dot');
+        dot.className = 'status-dot ' + (resp.ok ? 'success' : 'error');
+
+        // Display entries
+        const listEl = document.getElementById('form-list');
+        if (data.ok && data.entries && data.entries.length > 0) {
+            listEl.innerHTML = data.entries.map(e => 
+                '<div style="margin-bottom:10px;padding:8px;background:rgba(255,255,255,0.05);border-radius:4px;">' +
+                '<div style="color:var(--neon);" >' + htmlEscape(e.name) + ' &lt;' + htmlEscape(e.email) + '&gt;</div>' +
+                (e.message ? '<div style="color:var(--text-muted);font-size:11px;margin-top:4px;">' + htmlEscape(e.message) + '</div>' : '') +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">' +
+                    '<div style="color:var(--dark-gray);font-size:10px;">' + htmlEscape(e.created_at || '') + '</div>' +
+                    '<button class="btn btn-red" style="padding:4px 8px;font-size:10px;min-height:auto;" onclick="deleteFromDB(' + Number(e.id || 0) + ')">Apagar</button>' +
+                '</div>' +
+                '</div>'
+            ).join('');
+        } else {
+            listEl.innerHTML = '<span style="color:var(--dark-gray);">Sem dados.</span>';
+        }
+    } catch (err) {
+        const elapsed = Math.round(performance.now() - start);
+        document.getElementById('form-response').style.display = 'block';
+        document.getElementById('form-status').textContent = 'Error';
+        document.getElementById('form-time').textContent = elapsed + 'ms';
+        document.getElementById('form-json').textContent = err.message;
+        document.getElementById('form-dot').className = 'status-dot error';
+    }
+}
+
+function htmlEscape(str) {
+    return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+async function deleteFromDB(id) {
+    const safeId = Number(id);
+    if (!safeId) return;
+    if (!confirm('Remover este registro?')) return;
+
+    const start = performance.now();
+    try {
+        const resp = await fetch('/cgi-bin/form_list.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'action=delete&id=' + encodeURIComponent(String(safeId))
+        });
+        const elapsed = Math.round(performance.now() - start);
+        const data = await resp.json();
+
+        document.getElementById('form-response').style.display = 'block';
+        document.getElementById('form-status').textContent = resp.status + ' ' + resp.statusText;
+        document.getElementById('form-time').textContent = elapsed + 'ms';
+        document.getElementById('form-json').textContent = JSON.stringify(data, null, 2);
+        document.getElementById('form-dot').className = 'status-dot ' + (resp.ok && data.ok ? 'success' : 'error');
+
+        if (resp.ok && data.ok) {
+            await loadFromDB();
+        }
+    } catch (err) {
+        const elapsed = Math.round(performance.now() - start);
+        document.getElementById('form-response').style.display = 'block';
+        document.getElementById('form-status').textContent = 'Error';
+        document.getElementById('form-time').textContent = elapsed + 'ms';
+        document.getElementById('form-json').textContent = err.message;
+        document.getElementById('form-dot').className = 'status-dot error';
     }
 }
 
