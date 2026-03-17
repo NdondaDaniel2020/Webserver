@@ -1,0 +1,6 @@
+
+comands:
+  curl -I -X GET http://127.0.0.1:8080/uploads
+  curl -X POST -F "file=@/path/to/file" http://127.0.0.1:8080/upload
+  curl -X PUT -d "name=John&age=30" http://127.0.0.1:8080/update
+  curl -X DELETE http://127.0.0.1:8080/delete/123
