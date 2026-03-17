@@ -45,6 +45,9 @@ tags
 *.pdf
 *.o
 *.txt
+*.db
+*.sql
+*.log
 
 obj
 obj/*
@@ -52,6 +55,7 @@ cgi_tester
 tester
 ubuntu_cgi_tester
 ubuntu_tester
+__pycache__
 
 # Webserver executable
 webserv
