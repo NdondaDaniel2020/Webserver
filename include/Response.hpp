@@ -22,7 +22,6 @@
 # include "ConfigParser.hpp"
 # include "HttpRequest.hpp"
 # include "StatusCodes.hpp"
-# include "CGIHandler.hpp"
 
 class Response
 {
