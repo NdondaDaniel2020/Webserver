@@ -12,17 +12,25 @@ HttpRequest::~HttpRequest()
 {
 }
 
-HttpRequest::HttpRequest(const HttpRequest& other)
+HttpRequest::HttpRequest(const HttpRequest &other)
+    : query(other.query),
+      path(other.path),
+      method(other.method),
+      uri(other.uri),
+      version(other.version),
+      headers(other.headers),
+      body(other.body)
 {
-    *this = other;
 }
 
-HttpRequest& HttpRequest::operator=(const HttpRequest& other)
+HttpRequest &HttpRequest::operator=(const HttpRequest &other)
 {
     if (this != &other)
     {
         this->method = other.method;
         this->uri = other.uri;
+        this->path = other.path;
+        this->query = other.query;
         this->version = other.version;
         this->headers = other.headers;
         this->body = other.body;
@@ -30,7 +38,7 @@ HttpRequest& HttpRequest::operator=(const HttpRequest& other)
     return *this;
 }
 
-HttpRequest HttpRequest::parse(const std::string& raw_request)
+HttpRequest HttpRequest::parse(const std::string &raw_request)
 {
     HttpRequest req;
     std::istringstream stream(raw_request);
@@ -54,19 +62,31 @@ HttpRequest HttpRequest::parse(const std::string& raw_request)
     return req;
 }
 
-void HttpRequest::parseRequestLine(const std::string& line)
+void HttpRequest::parseRequestLine(const std::string &line)
 {
     std::istringstream iss(line);
     iss >> this->method >> this->uri >> this->version;
 
+    size_t pos = this->uri.find('?');
+    if (pos != std::string::npos)
+    {
+        this->path = this->uri.substr(0, pos);
+        this->query = this->uri.substr(pos + 1);
+    }
+    else
+    {
+        this->path = this->uri;
+        this->query = "";
+    }
+
     // Default to /index.html if root path
     if (this->uri == "/")
         this->uri = "/index.html";
-
     std::cout << "[REQUEST] " << this->method << " " << this->uri << " " << this->version << std::endl;
+    
 }
 
-void HttpRequest::parseHeaders(std::istringstream& stream)
+void HttpRequest::parseHeaders(std::istringstream &stream)
 {
     std::string line;
 
@@ -86,17 +106,17 @@ void HttpRequest::parseHeaders(std::istringstream& stream)
         {
             std::string key = line.substr(0, colon_pos);
             std::string value = line.substr(colon_pos + 1);
-            
+
             // Trim whitespace
             key = StringUtils::trim(key);
             value = StringUtils::trim(value);
-            
+
             this->headers[key] = value;
         }
     }
 }
 
-void HttpRequest::parseBody(std::istringstream& stream)
+void HttpRequest::parseBody(std::istringstream &stream)
 {
     std::string line;
     std::ostringstream body_stream;
@@ -114,54 +134,54 @@ void HttpRequest::parseBody(std::istringstream& stream)
 }
 
 // Getters
-const std::string& HttpRequest::getMethod() const
+const std::string &HttpRequest::getMethod() const
 {
     return this->method;
 }
 
- const std::string& HttpRequest::getQuery() const
- {
+const std::string &HttpRequest::getQuery() const
+{
     return this->query;
- }
+}
 
- const std::string& HttpRequest::getPath() const
- {
+const std::string &HttpRequest::getPath() const
+{
     return this->path;
- }
+}
 
-const std::string& HttpRequest::getUri() const
+const std::string &HttpRequest::getUri() const
 {
     return this->uri;
 }
 
-const std::string& HttpRequest::getVersion() const
+const std::string &HttpRequest::getVersion() const
 {
     return this->version;
 }
 
-const std::map<std::string, std::string>& HttpRequest::getHeaders() const
+const std::map<std::string, std::string> &HttpRequest::getHeaders() const
 {
     return this->headers;
 }
 
-const std::string& HttpRequest::getBody() const
+const std::string &HttpRequest::getBody() const
 {
     return this->body;
 }
 
 // Setters
-void HttpRequest::setBody(const std::string& body)
+void HttpRequest::setBody(const std::string &body)
 {
     this->body = body;
 }
 
 // Header utilities
-bool HttpRequest::hasHeader(const std::string& key) const
+bool HttpRequest::hasHeader(const std::string &key) const
 {
     return this->headers.find(key) != this->headers.end();
 }
 
-std::string HttpRequest::getHeader(const std::string& key) const
+std::string HttpRequest::getHeader(const std::string &key) const
 {
     std::map<std::string, std::string>::const_iterator it = this->headers.find(key);
     if (it != this->headers.end())

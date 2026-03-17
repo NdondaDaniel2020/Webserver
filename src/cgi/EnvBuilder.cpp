@@ -33,6 +33,9 @@ std::vector<std::string> build(const HttpRequest& request,
     (void)location;
     std::vector<std::string> env;
 
+     std::cerr << "[ENV] query='" << request.getQuery() << "'\n";
+    std::cerr << "[ENV] path='"  << request.getPath()  << "'\n";
+
     // standard CGI variables
     env.push_back("REDIRECT_STATUS=200");
     env.push_back("REQUEST_METHOD=" + request.getMethod());
@@ -43,7 +46,8 @@ std::vector<std::string> build(const HttpRequest& request,
     env.push_back("SCRIPT_FILENAME=" + scriptPath);
     env.push_back("SCRIPT_NAME=" + request.getPath());
     env.push_back("REQUEST_URI=" + request.getUri());
-
+    env.push_back("PATH_INFO=" + request.getPath());
+    env.push_back("PATH_TRANSLATED=" + scriptPath);
     if (request.hasHeader("Content-Type"))
         env.push_back("CONTENT_TYPE=" + request.getHeader("Content-Type"));
     if (request.hasHeader("Content-Length"))

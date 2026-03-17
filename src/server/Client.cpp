@@ -12,12 +12,12 @@
 
 #include "Client.hpp"
 #include "StatusCodes.hpp"
-#include "EnvBuilder.hpp"  // para gerar envp correto para CGI
+#include "EnvBuilder.hpp" // para gerar envp correto para CGI
 
-Client::Client(int fd, const ConfigParser* config)
+Client::Client(int fd, const ConfigParser *config)
     : fd(fd),
       state(READING_HEADERS),
-      last_activity(0),                  // ← corrigido
+      last_activity(0), // ← corrigido
       recv_buffer(),
       send_buffer(),
       send_offset(0),
@@ -27,7 +27,7 @@ Client::Client(int fd, const ConfigParser* config)
       content_length(0),
       headers_end_pos(0),
       config(config),
-      cgi(),                             // default constructor
+      cgi(), // default constructor
       is_cgi_active(false)
 {
     updateLastActivity();
@@ -42,14 +42,14 @@ Client::~Client()
 Client::Client(const Client &other)
     : fd(other.fd),
       state(other.state),
-      last_activity(other.last_activity),         // ← agora na posição correta
+      last_activity(other.last_activity), // ← agora na posição correta
       recv_buffer(other.recv_buffer),
       send_buffer(other.send_buffer),
       send_offset(other.send_offset),
       request(other.request),
-      response(NULL),                             // cuidado com deep copy abaixo
+      response(NULL), // cuidado com deep copy abaixo
       keep_alive(other.keep_alive),
-      content_length(other.content_length),       // ← agora depois de keep_alive
+      content_length(other.content_length), // ← agora depois de keep_alive
       headers_end_pos(other.headers_end_pos),
       config(other.config),
       cgi(other.cgi),
@@ -434,20 +434,23 @@ static void freeEnvp(char **envp)
 void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epoll_fd)
 {
     std::string error_msg = "Fail CGI";
-    std::string script_path = loc.root + req.getUri().substr(loc.path.size());
-    size_t dot = script_path.rfind('.');
-    std::string ext = (dot != std::string::npos) ? script_path.substr(dot) : "";
-
+    std::string script_path = loc.root + req.getPath().substr(loc.path.size());
+    size_t pos = script_path.find('.');
+    std::string ext;
+    if (pos != std::string::npos)
+        ext = script_path.substr(pos);
+    else
+       ext = "" ;
     std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
     if (it == loc.cgi_handlers.end())
     {
-        // não é CGI válido → erro
         StatusCodes::http502BadGateway(error_msg, "CGI");
-        state = SENDING_RESPONSE;
-        return;
+            send_buffer = error_msg;
+            send_offset = 0;
+            state = SENDING_RESPONSE;
+            return ;
     }
     std::string interpreter = it->second;
-
     if (pipe(cgi.pipe_in) < 0 || pipe(cgi.pipe_out) < 0)
     {
         StatusCodes::http502BadGateway(error_msg, "CGI");
@@ -515,7 +518,6 @@ void Client::handleCgiStdinWritable(int epoll_fd)
 {
     if (!is_cgi_active)
         return;
-
     std::cout << "[CLIENT " << fd << "] CGI stdin writable" << std::endl;
 
     const std::string &body = request.getBody();
@@ -605,29 +607,43 @@ void Client::finishCgiAndGenerateResponse(int epoll_fd)
 
     is_cgi_active = false;
 
-    // Parseia output do CGI
+    // Separar headers CGI do body
     size_t pos = cgi.output.find("\r\n\r\n");
+    size_t header_end_len = 4;
     if (pos == std::string::npos)
+    {
         pos = cgi.output.find("\n\n");
-    std::string cgi_headers = (pos != std::string::npos) ? cgi.output.substr(0, pos) : "";
-    std::string cgi_body = (pos != std::string::npos) ? cgi.output.substr(pos + (cgi.output[pos] == '\r' ? 4 : 2)) : cgi.output;
+        header_end_len = 2;
+    }
 
-    std::string status_line = "200 OK";
+    std::string cgi_headers = (pos != std::string::npos)
+        ? cgi.output.substr(0, pos) : "";
+    std::string cgi_body = (pos != std::string::npos)
+        ? cgi.output.substr(pos + header_end_len) : cgi.output;
+
+    std::string status_line  = "200 OK";
     std::string extra_headers;
 
     std::istringstream iss(cgi_headers);
     std::string line;
     while (std::getline(iss, line))
     {
+        // Remove \r se presente
+        if (!line.empty() && line[line.size() - 1] == '\r')
+            line.erase(line.size() - 1);
+
+        if (line.empty())
+            continue;
+
         if (line.find("Status: ") == 0)
         {
             status_line = line.substr(8);
+            // Remove \r do status se presente
+            if (!status_line.empty() && status_line[status_line.size()-1] == '\r')
+                status_line.erase(status_line.size() - 1);
         }
-        else if (!line.empty() && line[line.size() - 1] == '\r')
-        {
-            line.erase(line.size() - 1);
+        else
             extra_headers += line + "\r\n";
-        }
     }
 
     std::ostringstream oss;
@@ -640,5 +656,5 @@ void Client::finishCgiAndGenerateResponse(int epoll_fd)
 
     send_buffer = oss.str();
     send_offset = 0;
-    state = SENDING_RESPONSE;
+    state       = SENDING_RESPONSE;
 }
