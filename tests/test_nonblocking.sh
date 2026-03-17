@@ -27,3 +27,11 @@ for i in $(seq 1 10); do
     curl -s http://127.0.0.1:8080/cgi-bin/hello.php > /dev/null &
 done
 wait && echo "OK — todos completaram"
+
+echo "=== Teste 4: carga com siege (equivalente ao wrk) ==="
+if command -v siege >/dev/null 2>&1; then
+    siege -c100 -t20S http://127.0.0.1:8080/index.html
+else
+    echo "SKIP — siege não está instalado"
+    echo "Comando equivalente: siege -c100 -t20S http://127.0.0.1:8080/index.html"
+fi
