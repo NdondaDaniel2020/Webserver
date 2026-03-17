@@ -511,6 +511,9 @@ bool Response::validateAllowedMethod(const HttpRequest &request)
 {
     const LocationConfig *location = findMatchingLocation(request.getUri());
 
+    if (!location)
+        return request.getMethod() == "GET";
+
     if (location && !location->allowed_methods.empty())
     {
         std::vector<std::string>::const_iterator it = std::find(
