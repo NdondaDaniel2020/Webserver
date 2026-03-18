@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 08:48:35 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 13:09:48 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -293,7 +293,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 
         // Criar resposta 413 diretamente
         std::string response_str;
-        StatusCodes::http413PayloadTooLarge(response_str);
+        StatusCodes::http413PayloadTooLarge(response_str, server_config);
 
         send_buffer = response_str;
         send_offset = 0;
@@ -337,7 +337,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
         if (!method_allowed)
         {
             std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
-            StatusCodes::http405MethodNotAllowed(this->send_buffer, request.getUri());
+            StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
             this->send_offset = 0;
             this->state = SENDING_RESPONSE;
             return;
@@ -345,7 +345,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 
         std::cout << "[CLIENT " << fd << "] Iniciando CGI para " << request.getUri() << std::endl;
         state = CGI_RUNNING;
-        startCgi(request, *location, epoll_fd);
+        startCgi(request, *location, server_config, epoll_fd);
         return;
     }
 
@@ -449,7 +449,8 @@ static void freeEnvp(char **envp)
     delete[] envp;
 }
 
-void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epoll_fd)
+void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
+                      const ServerConfig &server_config, int epoll_fd)
 {
     std::string error_msg = "Fail CGI";
     std::string script_path = loc.root + req.getPath().substr(loc.path.size());
@@ -462,7 +463,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epo
     std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
     if (it == loc.cgi_handlers.end())
     {
-        StatusCodes::http502BadGateway(error_msg, "CGI handler not found for extension");
+        StatusCodes::http502BadGateway(error_msg, req, "CGI handler not found for extension", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
@@ -471,7 +472,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epo
     std::string interpreter = it->second;
     if (pipe(cgi.pipe_in) < 0 || pipe(cgi.pipe_out) < 0)
     {
-        StatusCodes::http502BadGateway(error_msg, "Failed to create pipes");
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to create pipes", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
@@ -486,7 +487,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epo
     if (pid < 0)
     {
         freeEnvp(envp);
-        StatusCodes::http502BadGateway(error_msg, "Failed to fork process");
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to fork process", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
