@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/02/28 12:05:45 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 08:48:35 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -261,7 +261,6 @@ void Client::parseHeaders()
 
 bool Client::checkBodyComplete()
 {
-    // Body começa após os headers
     size_t body_received = recv_buffer.size() - headers_end_pos;
     return body_received >= content_length;
 }
@@ -288,7 +287,6 @@ static const LocationConfig *findMatchingLocation(const ServerConfig &config, co
 
 void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 {
-    // ✅ Tratar erro 413 detectado ANTES de receber o body
     if (state == ERROR_413)
     {
         std::cout << "[CLIENT " << fd << "] Gerando resposta 413 (Content-Length excedeu limite)" << std::endl;
@@ -300,7 +298,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
         send_buffer = response_str;
         send_offset = 0;
         state = SENDING_RESPONSE;
-        keep_alive = false; // Forçar fechamento da conexão
+        keep_alive = false;
 
         return;
     }
@@ -308,7 +306,6 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
     if (state != PROCESSING)
         return;
 
-    // Se tem body, extrair do recv_buffer e adicionar ao request
     if (content_length > 0 && headers_end_pos > 0)
     {
         size_t body_size = recv_buffer.size() - headers_end_pos;
@@ -320,17 +317,38 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
         }
     }
 
-    // Se é CGI, iniciar processamento não-bloqueante
     const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
     if (location && !location->cgi_handlers.empty())
     {
+        bool method_allowed = true;
+        if (!location->allowed_methods.empty())
+        {
+            method_allowed = false;
+            for (size_t i = 0; i < location->allowed_methods.size(); ++i)
+            {
+                if (location->allowed_methods[i] == request.getMethod())
+                {
+                    method_allowed = true;
+                    break;
+                }
+            }
+        }
+        
+        if (!method_allowed)
+        {
+            std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
+            StatusCodes::http405MethodNotAllowed(this->send_buffer, request.getUri());
+            this->send_offset = 0;
+            this->state = SENDING_RESPONSE;
+            return;
+        }
+
         std::cout << "[CLIENT " << fd << "] Iniciando CGI para " << request.getUri() << std::endl;
         state = CGI_RUNNING;
         startCgi(request, *location, epoll_fd);
         return;
     }
 
-    // Criar resposta estática/normal
     if (response)
         delete response;
 
@@ -444,16 +462,18 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epo
     std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
     if (it == loc.cgi_handlers.end())
     {
-        StatusCodes::http502BadGateway(error_msg, "CGI");
-            send_buffer = error_msg;
-            send_offset = 0;
-            state = SENDING_RESPONSE;
-            return ;
+        StatusCodes::http502BadGateway(error_msg, "CGI handler not found for extension");
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
     }
     std::string interpreter = it->second;
     if (pipe(cgi.pipe_in) < 0 || pipe(cgi.pipe_out) < 0)
     {
-        StatusCodes::http502BadGateway(error_msg, "CGI");
+        StatusCodes::http502BadGateway(error_msg, "Failed to create pipes");
+        send_buffer = error_msg;
+        send_offset = 0;
         state = SENDING_RESPONSE;
         return;
     }
@@ -466,7 +486,9 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc, int epo
     if (pid < 0)
     {
         freeEnvp(envp);
-        StatusCodes::http502BadGateway(error_msg, "CGI");
+        StatusCodes::http502BadGateway(error_msg, "Failed to fork process");
+        send_buffer = error_msg;
+        send_offset = 0;
         state = SENDING_RESPONSE;
         return;
     }
