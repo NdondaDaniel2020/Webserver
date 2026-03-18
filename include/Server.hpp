@@ -6,9 +6,10 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/02 12:20:08 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 14:26:24 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
+
 #ifndef SERVER_HPP
 # define SERVER_HPP
 

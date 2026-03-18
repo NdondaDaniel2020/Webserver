@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 08:45:59 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 14:53:23 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -118,6 +118,8 @@ void Server::start()
                             else
                                 closeClient(fd);
                         }
+                        else
+                            closeClient(fd);
                     }
                 }
             }
@@ -214,6 +216,8 @@ void Server::handleClientData(int fd)
                 else
                     closeClient(fd);
             }
+            else
+                closeClient(fd);
         }
     }
 }

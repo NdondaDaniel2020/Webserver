@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 13:09:48 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 14:48:53 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -375,6 +375,12 @@ bool Client::sendData()
 
     ssize_t sent = write(fd, send_buffer.c_str() + send_offset, to_send);
 
+    if (sent == 0)
+    {
+        std::cout << "[CLIENT " << fd << "] Conexão fechada pelo cliente durante envio" << std::endl;
+        return false;
+    }
+
     if (sent < 0)
     {
         std::cerr << "[CLIENT " << fd << "] Erro ao enviar dados" << std::endl;
@@ -568,6 +574,20 @@ void Client::handleCgiStdinWritable(int epoll_fd)
             cgi.pipe_in[1] = -1;
         }
     }
+    else if (w == 0)
+    {
+        // w == 0 pode significar que o pipe está cheio (raro)
+        std::cout << "[CLIENT " << fd << "] CGI stdin write retornou 0" << std::endl;
+        // Epoll sinalizará novamente quando houver espaço
+    }
+    else  // w < 0
+    {
+        // Erro em write: pipe quebrado, processo morreu, etc
+        std::cerr << "[CLIENT " << fd << "] CGI stdin write error: " << strerror(errno) << std::endl;
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+        close(cgi.pipe_in[1]);
+        cgi.pipe_in[1] = -1;
+    }
 }
 
 void Client::handleCgiStdoutReadable(int epoll_fd)
@@ -583,6 +603,16 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
     {
         std::cout << "[CLIENT " << fd << "] CGI read " << r << " bytes" << std::endl;
         cgi.output.append(buf, r);
+    }
+    
+    if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
+    {
+        std::cerr << "[CLIENT " << fd << "] CGI read error: " << strerror(errno) << std::endl;
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+        close(cgi.pipe_out[0]);
+        cgi.pipe_out[0] = -1;
+        finishCgiAndGenerateResponse(epoll_fd);
+        return;
     }
 
     if (r == 0)
