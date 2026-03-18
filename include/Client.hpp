@@ -117,7 +117,8 @@ public:
     void                setState(State s);
 
     // CGI non-blocking
-    void                startCgi(const HttpRequest& req, const LocationConfig& loc, int epoll_fd);
+    void                startCgi(const HttpRequest& req, const LocationConfig& loc,
+                                 const ServerConfig& server_config, int epoll_fd);
     void                handleCgiStdoutReadable(int epoll_fd);
     void                handleCgiStdinWritable(int epoll_fd);
     void                finishCgiAndGenerateResponse(int epoll_fd);

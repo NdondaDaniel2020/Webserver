@@ -92,13 +92,31 @@ namespace ConfigValidator
     {
         if (code.size() != 3)
             return false;
-        for (size_t i = 0; i < code.size(); i++)
+
+        // Primeiro dígito deve ser numérico
+        if (!isdigit(code[0]))
+            return false;
+
+        // Segundo e terceiro caracteres podem ser dígitos ou 'x'/'X'
+        for (size_t i = 1; i < code.size(); i++)
         {
-            if (!isdigit(code[i]))
+            if (!isdigit(code[i]) && code[i] != 'x' && code[i] != 'X')
                 return false;
         }
-        int int_code = atoi(code.c_str());
-        return (int_code >= 100 && int_code <= 599);
+
+        // Validar range do primeiro dígito (1-5 para códigos HTTP)
+        int first_digit = code[0] - '0';
+        if (first_digit < 1 || first_digit > 5)
+            return false;
+
+        // Se for um código específico (sem 'x'), validar o range completo
+        if (isdigit(code[1]) && isdigit(code[2]))
+        {
+            int int_code = atoi(code.c_str());
+            return (int_code >= 100 && int_code <= 599);
+        }
+
+        return true;
     }
     bool validateAutoIndex(std::string value)
     {

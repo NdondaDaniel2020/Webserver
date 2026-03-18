@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/17 15:43:13 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 13:07:06 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -200,7 +200,7 @@ void Response::buildHttpResponse(const HttpRequest &request)
     if (!validateAllowedMethod(request))
     {
         std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
-        return StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
+        return StatusCodes::http405MethodNotAllowed(this->response_str, request, file_path, this->config);
     }
 
     if (request.getMethod() == "GET")
@@ -210,7 +210,7 @@ void Response::buildHttpResponse(const HttpRequest &request)
     else if (request.getMethod() == "DELETE")
         methodDelete(request, file_path);
     else
-        StatusCodes::http405MethodNotAllowed(this->response_str, file_path);
+        StatusCodes::http405MethodNotAllowed(this->response_str, request, file_path, this->config);
 }
 
 void Response::methodGet(const HttpRequest &request, const std::string &file_path)
@@ -219,7 +219,7 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
     const LocationConfig *location = findMatchingLocation(request.getUri());
     if (location && !location->cgi_handlers.empty())
-        return StatusCodes::http502BadGateway(this->response_str, "Fail CGI");
+        return StatusCodes::http502BadGateway(this->response_str, request, "Fail CGI", this->config);
 
     if (location && location->redirect_code > 0)
         return handleRedirect(location->redirect_code, location->redirect_url);
@@ -236,7 +236,7 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
             if (location && location->autoindex)
                 return generateDirectoryListing(request, file_path, request.getUri());
             else
-                return StatusCodes::http403Forbidden(this->response_str, _file_path);
+                return StatusCodes::http403Forbidden(this->response_str, request, _file_path, this->config);
         }
     }
     if (!fileExists(_file_path))
@@ -244,12 +244,11 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
         return StatusCodes::http404NotFound(
             this->response_str,
             request,
-            "",
             _file_path,
             this->config);
     }
     if (!isReadable(_file_path))
-        return StatusCodes::http403Forbidden(this->response_str, _file_path);
+        return StatusCodes::http403Forbidden(this->response_str, request, _file_path, this->config);
     std::string content = readFile(_file_path);
     StatusCodes::http200FileFound(
         this->response_str,
@@ -266,25 +265,25 @@ void Response::methodPost(const HttpRequest &request)
     {
         std::cout << "[413] Body size (" << body_size << ") excede limite do servidor ("
                   << this->config.client_max_body_size << ")" << std::endl;
-        return StatusCodes::http413PayloadTooLarge(this->response_str);
+        return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
     }
 
     const LocationConfig *location = findMatchingLocation(request.getUri());
     if (location && !location->cgi_handlers.empty())
-        return StatusCodes::http502BadGateway(this->response_str, "Fail CGI");
+        return StatusCodes::http502BadGateway(this->response_str, request, "Fail CGI", this->config);
 
     if (location && location->client_max_body_size > 0 && body_size > location->client_max_body_size)
     {
         std::cout << "[413] Body size (" << body_size << ") excede limite da location ("
                   << location->client_max_body_size << ")" << std::endl;
-        return StatusCodes::http413PayloadTooLarge(this->response_str);
+        return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
     }
 
     std::string content_type = request.getHeader("Content-Type");
     if (content_type.empty())
     {
         std::cout << "[400] Content-Type header é obrigatório" << std::endl;
-        return StatusCodes::http400BadRequest(this->response_str, "Content-Type header is required");
+        return StatusCodes::http400BadRequest(this->response_str, "Content-Type header is required", this->config);
     }
 
     if (content_type.find("multipart/form-data") != std::string::npos)
@@ -321,7 +320,7 @@ void Response::methodPost(const HttpRequest &request)
     else
     {
         std::cout << "[415] Content-Type não suportado: " << content_type << std::endl;
-        return StatusCodes::http415UnsupportedMediaType(this->response_str);
+        return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
     }
 }
 
@@ -330,20 +329,20 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     if (!fileExists(file_path))
     {
         std::cout << "[404] Arquivo não encontrado para deletar: " << file_path << std::endl;
-        return StatusCodes::http404NotFound(this->response_str, request, "", file_path, this->config);
+        return StatusCodes::http404NotFound(this->response_str, request, file_path, this->config);
     }
 
     if (isDirectory(file_path))
     {
         std::cout << "[403] Não é permitido deletar diretórios: " << file_path << std::endl;
-        return StatusCodes::http403Forbidden(this->response_str, file_path);
+        return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
     }
 
     std::string real_path = getRealPath(file_path);
     if (real_path.empty())
     {
         std::cout << "[403] Não foi possível resolver path real: " << file_path << std::endl;
-        return StatusCodes::http403Forbidden(this->response_str, file_path);
+        return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
     }
 
     std::string root = this->config.root;
@@ -354,21 +353,21 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     if (!isPathSafe(real_path, root))
     {
         std::cout << "[403] Symlink aponta para fora do root permitido: " << file_path << " -> " << real_path << std::endl;
-        return StatusCodes::http403Forbidden(this->response_str, file_path);
+        return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
     }
 
     std::string parent_dir = getParentDirectory(file_path);
     if (!hasWritePermission(parent_dir))
     {
         std::cout << "[403] Sem permissão para deletar: " << file_path << std::endl;
-        return StatusCodes::http403Forbidden(this->response_str, file_path);
+        return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
     }
 
     std::string filename = getFileName(file_path);
     if (isProtectedFile(filename))
     {
         std::cout << "[403] Arquivo protegido, não pode ser deletado: " << file_path << std::endl;
-        return StatusCodes::http403Forbidden(this->response_str, file_path);
+        return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
     }
 
     size_t file_size = getFileSize(file_path);
@@ -379,7 +378,7 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     if (remove(file_path.c_str()) != 0)
     {
         std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
-        return StatusCodes::http500InternalServerError(this->response_str, "Failed to delete file: " + std::string(strerror(errno)));
+        return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to delete file: " + std::string(strerror(errno)), this->config);
     }
 
     std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
@@ -392,30 +391,30 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
     if (boundary.empty())
     {
         std::cout << "[400] Boundary não encontrado no Content-Type" << std::endl;
-        return StatusCodes::http415UnsupportedMediaType(this->response_str);
+        return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
     }
 
     std::vector<MultipartFile> files;
     if (!parseMultipartData(request.getBody(), boundary, files))
     {
         std::cout << "[400] Erro ao parsear multipart data" << std::endl;
-        return StatusCodes::http415UnsupportedMediaType(this->response_str);
+        return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
     }
 
     std::string upload_dir = getUploadDir(request);
     if (upload_dir.empty())
-        return StatusCodes::http413PayloadTooLarge(this->response_str);
+        return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
 
     if (!createDirectory(upload_dir))
     {
         std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
-        return StatusCodes::http500InternalServerError(this->response_str, "Failed to create upload directory: " + upload_dir);
+        return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to create upload directory: " + upload_dir, this->config);
     }
 
     if (!hasWritePermission(upload_dir))
     {
         std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
-        return StatusCodes::http403Forbidden(this->response_str, upload_dir);
+        return StatusCodes::http403Forbidden(this->response_str, request, upload_dir, this->config);
     }
 
     std::ostringstream json_response;
@@ -429,7 +428,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         {
             std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
             cleanupFiles(saved_files); // Limpar arquivos já salvos
-            return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename));
+            return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename), this->config);
         }
 
         if (files[i].content.size() > 10 * 1024 * 1024)
@@ -437,7 +436,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
             std::cout << "[413] Arquivo muito grande: " << files[i].filename
                       << " (" << files[i].content.size() << " bytes)" << std::endl;
             cleanupFiles(saved_files);
-            return StatusCodes::http413PayloadTooLarge(this->response_str);
+            return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
         }
 
         std::string unique_filename = generateUniqueFilename(files[i].filename);
@@ -465,7 +464,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         {
             std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
             cleanupFiles(saved_files); // Limpar todos em caso de erro
-            return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + files[i].filename);
+            return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + files[i].filename, this->config);
         }
     }
 
@@ -558,7 +557,7 @@ void Response::generateDirectoryListing(const HttpRequest &request, const std::s
     DIR *dir = opendir(dir_path.c_str());
     if (!dir)
     {
-        StatusCodes::http500InternalServerError(this->response_str, "Failed to open directory");
+        StatusCodes::http500InternalServerError(this->response_str, request, "Failed to open directory", this->config);
         return;
     }
 

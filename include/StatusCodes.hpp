@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 08:38:46 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/18 12:57:25 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -37,28 +37,36 @@ class StatusCodes
         static void http304NotModified(std::string& response_str);
 
         // Erros do Cliente (4xx)
-        static void http400BadRequest(std::string& response_str, const std::string& message);
-        static void http401Unauthorized(std::string& response_str, const std::string& message);
-        static void http403Forbidden(std::string& response_str, const std::string& file_path);
-        static void http404NotFound(std::string& response_str, const HttpRequest& request, 
-                                    const std::string& content, const std::string& file_path, 
-                                    const ServerConfig& config);
-        static void http405MethodNotAllowed(std::string& response_str, const std::string& file_path);
-        static void http408RequestTimeout(std::string& response_str);
-        static void http409Conflict(std::string& response_str, const std::string& message);
-        static void http411LengthRequired(std::string& response_str);
-        static void http413PayloadTooLarge(std::string& response_str);
-        static void http414UriTooLong(std::string& response_str);
-        static void http415UnsupportedMediaType(std::string& response_str);
-        static void http429TooManyRequests(std::string& response_str);
+        static void http400BadRequest(std::string& response_str, const std::string& message,
+                                      const ServerConfig& config);
+        static void http401Unauthorized(std::string& response_str, const HttpRequest& request, 
+                                    const std::string& message, const ServerConfig& config);
+        static void http403Forbidden(std::string& response_str, const HttpRequest& request,
+                                    const std::string& file_path, const ServerConfig& config);
+        static void http404NotFound(std::string& response_str, const HttpRequest& request,
+                                     const std::string& file_path, const ServerConfig& config);
+        static void http405MethodNotAllowed(std::string& response_str, const HttpRequest& request,
+                                    const std::string& file_path, const ServerConfig& config);
+        static void http408RequestTimeout(std::string& response_str, const ServerConfig& config);
+        static void http409Conflict(std::string& response_str, const HttpRequest& request,
+                                  const std::string& message, const ServerConfig& config);
+        static void http411LengthRequired(std::string& response_str, const ServerConfig& config);
+        static void http413PayloadTooLarge(std::string& response_str, const ServerConfig& config);
+        static void http414UriTooLong(std::string& response_str, const ServerConfig& config);
+        static void http415UnsupportedMediaType(std::string& response_str, const HttpRequest& request,
+                                                const ServerConfig& config);
+        static void http429TooManyRequests(std::string& response_str, const HttpRequest& request, const ServerConfig& config);
 
         // Erros do Servidor (5xx)
-        static void http500InternalServerError(std::string& response_str, const std::string& message);
-        static void http501NotImplemented(std::string& response_str, const std::string& message);
-        static void http502BadGateway(std::string& response_str, const std::string& message);
-        static void http503ServiceUnavailable(std::string& response_str);
-        static void http504GatewayTimeout(std::string& response_str);
-        static void http505VersionNotSupported(std::string& response_str);
+        static void http500InternalServerError(std::string& response_str, const HttpRequest& request, const std::string& message,
+                                             const ServerConfig& config);
+        static void http501NotImplemented(std::string& response_str, const HttpRequest& request, const std::string& message,
+                                          const ServerConfig& config);
+        static void http502BadGateway(std::string& response_str, const HttpRequest& request, const std::string& message,
+                                      const ServerConfig& config);
+        static void http503ServiceUnavailable(std::string& response_str, const HttpRequest& request, const ServerConfig& config);
+        static void http504GatewayTimeout(std::string& response_str, const HttpRequest& request, const ServerConfig& config);
+        static void http505VersionNotSupported(std::string& response_str, const ServerConfig& config);
 };
 
 #endif
