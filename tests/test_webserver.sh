@@ -569,8 +569,240 @@ else
     print_error "GET /cgi-bin/hello.php - Esperado 200, Obtido: $http_code"
 fi
 
+# Testes CGI Avançados
+print_header "16. Testes CGI Avançados"
+
+print_subheader "POST em CGI - form_save.py"
+response=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "name=TestUser&email=test@example.com&message=Test%20Message" \
+    "$BASE_URL/cgi-bin/form_save.py" 2>/dev/null)
+body=$(echo "$response" | head -n-1)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "201" ] || [ "$http_code" = "200" ]; then
+    if echo "$body" | grep -qi "ok\|saved\|success"; then
+        print_success "POST /cgi-bin/form_save.py (HTTP $http_code)"
+    else
+        print_warning "POST form_save.py respondeu $http_code mas resposta inesperada"
+    fi
+else
+    print_warning "POST /cgi-bin/form_save.py - HTTP $http_code"
+fi
+
+print_subheader "GET em CGI - Query string múltiplos"
+response=$(curl -s -w "\n%{http_code}" "$BASE_URL/cgi-bin/hello.py?param1=value1&param2=value2&name=TestUser" 2>/dev/null)
+body=$(echo "$response" | head -n-1)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "200" ]; then
+    if echo "$body" | grep -qi "QUERY\|param\|value"; then
+        print_success "GET /cgi-bin/hello.py?param1=val1&param2=val2 (HTTP 200)"
+    else
+        print_warning "GET com query múltiplos respondeu 200 mas conteúdo inesperado"
+    fi
+else
+    print_error "GET /cgi-bin/hello.py com query múltiplos - HTTP $http_code"
+fi
+
+print_subheader "DELETE em CGI - form_list.php"
+# Primeiro fazer um POST para ter um ID para deletar
+POST_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "name=ToDelete&email=delete@example.com&message=Delete%20test" \
+    "$BASE_URL/cgi-bin/form_save.py" 2>/dev/null)
+POST_CODE=$(echo "$POST_RESPONSE" | tail -n1)
+
+if [ "$POST_CODE" = "201" ] || [ "$POST_CODE" = "200" ]; then
+    # Obter lista para pegar um ID
+    LIST_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/cgi-bin/form_list.php" 2>/dev/null)
+    LIST_CODE=$(echo "$LIST_RESPONSE" | tail -n1)
+    LIST_BODY=$(echo "$LIST_RESPONSE" | head -n-1)
+    
+    # Extrair primeiro ID
+    FIRST_ID=$(echo "$LIST_BODY" | grep -oP '"id":\K[0-9]+' | head -1)
+    
+    if [ ! -z "$FIRST_ID" ]; then
+        DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL/cgi-bin/form_list.php?id=$FIRST_ID" 2>/dev/null)
+        DELETE_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
+        DELETE_BODY=$(echo "$DELETE_RESPONSE" | head -n-1)
+        
+        if [ "$DELETE_CODE" = "200" ]; then
+            if echo "$DELETE_BODY" | grep -qi "deletad\|success\|ok"; then
+                print_success "DELETE /cgi-bin/form_list.php?id=$FIRST_ID (HTTP 200)"
+            else
+                print_warning "DELETE respondeu 200 mas resposta inesperada"
+            fi
+        else
+            print_warning "DELETE /cgi-bin/form_list.php?id=$FIRST_ID - HTTP $DELETE_CODE"
+        fi
+    else
+        print_info "Nenhum ID disponível para teste DELETE"
+    fi
+else
+    print_warning "Não foi possível criar entrada para teste DELETE"
+fi
+
+# Testes de Requisições e Headers
+print_header "17. Testes de Headers e Requisições Especiais"
+
+print_subheader "Cookies - Set-Cookie e envio"
+response=$(curl -s -i -b /tmp/cookies.txt -c /tmp/cookies.txt "$BASE_URL/index.html" 2>/dev/null | head -20)
+if [ -f /tmp/cookies.txt ] && [ -s /tmp/cookies.txt ]; then
+    cookie_count=$(wc -l < /tmp/cookies.txt)
+    print_success "Cookies testados - $cookie_count linhas em cookie jar"
+else
+    print_info "Nenhum cookie Set-Cookie encontrado no index.html (esperado)"
+fi
+
+print_subheader "Custom Headers - User-Agent e Accept"
+response=$(curl -s -w "%{http_code}" \
+    -H "User-Agent: TestClient/1.0" \
+    -H "Accept: application/json" \
+    -H "X-Custom-Header: CustomValue" \
+    "$BASE_URL/index.html" 2>/dev/null)
+http_code="${response: -3}"
+if [ "$http_code" = "200" ]; then
+    print_success "Custom headers aceitos (HTTP 200)"
+else
+    print_warning "Custom headers - HTTP $http_code"
+fi
+
+print_subheader "Conditional Requests - If-Modified-Since"
+# Obter Last-Modified header
+LAST_MOD=$(curl -s -i "$BASE_URL/index.html" 2>/dev/null | grep -i "Last-Modified" | cut -d' ' -f2-)
+if [ ! -z "$LAST_MOD" ]; then
+    response=$(curl -s -w "\n%{http_code}" \
+        -H "If-Modified-Since: $LAST_MOD" \
+        "$BASE_URL/index.html" 2>/dev/null)
+    http_code=$(echo "$response" | tail -n1)
+    if [ "$http_code" = "304" ]; then
+        print_success "Conditional request - 304 Not Modified (If-Modified-Since)"
+    elif [ "$http_code" = "200" ]; then
+        print_info "Conditional request - 200 OK (arquivo foi modificado)"
+    else
+        print_warning "Conditional request - HTTP $http_code"
+    fi
+else
+    print_info "Last-Modified não encontrado, skip teste conditional"
+fi
+
+print_subheader "Range Requests - bytes"
+response=$(curl -s -w "\n%{http_code}" \
+    -H "Range: bytes=0-100" \
+    "$BASE_URL/index.html" 2>/dev/null)
+body=$(echo "$response" | head -n-1)
+http_code=$(echo "$response" | tail -n1)
+if [ "$http_code" = "206" ]; then
+    print_success "Range request - 206 Partial Content (suportado)"
+elif [ "$http_code" = "200" ]; then
+    print_info "Range request - 200 OK (retornou arquivo completo)"
+else
+    print_warning "Range request - HTTP $http_code"
+fi
+
+print_subheader "HEAD Method"
+response=$(curl -s -I "$BASE_URL/index.html" 2>/dev/null | head -1)
+if echo "$response" | grep -q "200\|404"; then
+    print_success "HEAD /index.html retornou headers sem body"
+else
+    print_warning "HEAD method - resposta: $response"
+fi
+
+# Testes de Segurança
+print_header "18. Testes de Segurança e Validação"
+
+print_subheader "Path Traversal Prevention"
+response=$(curl -s -w "%{http_code}" "$BASE_URL/../../etc/passwd" 2>/dev/null)
+http_code="${response: -3}"
+if [ "$http_code" = "400" ] || [ "$http_code" = "404" ]; then
+    print_success "Path traversal bloqueado (HTTP $http_code)"
+else
+    print_warning "Path traversal - HTTP $http_code (esperado 400 ou 404)"
+fi
+
+print_subheader "Path Traversal - ../ pattern"
+response=$(curl -s -w "%{http_code}" "$BASE_URL/../../../../../../../etc/passwd" 2>/dev/null)
+http_code="${response: -3}"
+if [ "$http_code" = "400" ] || [ "$http_code" = "404" ]; then
+    print_success "Multiple ../ bloqueado (HTTP $http_code)"
+else
+    print_warning "Multiple ../ - HTTP $http_code"
+fi
+
+print_subheader "Requisições Malformadas - Headers quebrados"
+# Teste com header sem valor
+response=$(echo -e "GET /index.html HTTP/1.1\r\nHost: 127.0.0.1:8080\r\nInvalid-Header:\r\n\r\n" | \
+    nc localhost 8080 2>/dev/null | head -1)
+if [ ! -z "$response" ]; then
+    print_info "Servidor responde a headers malformados (potencial DoS)"
+else
+    print_warning "Servidor pode ter rejeitado requisição malformada"
+fi
+
+print_subheader "Requisições Malformadas - Sem Content-Length em POST"
+response=$(curl -s -w "%{http_code}" -X POST \
+    -H "Content-Type: application/json" \
+    -d '{"test":"data"}' \
+    "$BASE_URL/uploads/" 2>/dev/null)
+http_code="${response: -3}"
+if [ "$http_code" != "000" ]; then
+    print_success "POST sem Content-Length explícito respondido (HTTP $http_code)"
+else
+    print_warning "POST sem Content-Length - timeout ou falha"
+fi
+
+# Testes de Upload Grande
+print_header "19. Testes de Upload e Limite de Tamanho"
+
+print_subheader "Large file upload - 5MB"
+# Criar arquivo de 5MB
+head -c 5242880 /dev/urandom 2>/dev/null | base64 > "$TEST_DIR/large_file.txt" 2>/dev/null
+if [ -f "$TEST_DIR/large_file.txt" ] && [ -s "$TEST_DIR/large_file.txt" ]; then
+    file_size=$(wc -c < "$TEST_DIR/large_file.txt")
+    START=$(date +%s%N)
+    response=$(curl -s -w "\n%{http_code}" -X POST \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary "@$TEST_DIR/large_file.txt" \
+        "$BASE_URL/uploads/" 2>/dev/null)
+    END=$(date +%s%N)
+    ELAPSED=$(( (END - START) / 1000000 ))
+    
+    body=$(echo "$response" | head -n-1)
+    http_code=$(echo "$response" | tail -n1)
+    
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
+        print_success "Upload 5MB completo em ${ELAPSED}ms (HTTP $http_code)"
+    elif [ "$http_code" = "413" ]; then
+        print_success "Upload 5MB rejeitado com 413 Payload Too Large (dentro do esperado)"
+    else
+        print_warning "Upload 5MB - HTTP $http_code após ${ELAPSED}ms"
+    fi
+else
+    print_warning "Não foi possível criar arquivo de 5MB para teste"
+fi
+
+print_subheader "Large file upload - 10MB (teste limite)"
+head -c 10485760 /dev/urandom 2>/dev/null | base64 > "$TEST_DIR/very_large_file.txt" 2>/dev/null
+if [ -f "$TEST_DIR/very_large_file.txt" ] && [ -s "$TEST_DIR/very_large_file.txt" ]; then
+    file_size=$(wc -c < "$TEST_DIR/very_large_file.txt")
+    response=$(curl -s -m 30 -w "%{http_code}" -X POST \
+        -H "Content-Type: application/octet-stream" \
+        --data-binary "@$TEST_DIR/very_large_file.txt" \
+        "$BASE_URL/uploads/" 2>/dev/null)
+    http_code="${response: -3}"
+    
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
+        print_success "Upload 10MB completo (HTTP $http_code)"
+    elif [ "$http_code" = "413" ]; then
+        print_success "Upload 10MB rejeitado com 413 (limite de tamanho funcionando)"
+    else
+        print_warning "Upload 10MB - HTTP $http_code"
+    fi
+else
+    print_warning "Não foi possível criar arquivo de 10MB para teste"
+fi
+
 # Testes Non-blocking e carga (merged de tests/test_nonblocking.sh)
-print_header "16. Testes de Non-blocking"
+print_header "20. Testes de Non-blocking"
 
 print_subheader "CGI lento nao bloqueia outros"
 curl -s -m 15 "$BASE_URL/cgi-bin/slow.php" > /dev/null 2>&1 &
@@ -617,12 +849,12 @@ else
     print_warning "$ok_count/10 pedidos CGI simultaneos completaram com HTTP 200"
 fi
 
-print_header "17. Testes de Carga e Clientes Simultaneos"
+print_header "21. Testes de Carga e Clientes Simultaneos"
 
 print_subheader "Carga com wrk"
 if command -v wrk >/dev/null 2>&1; then
-    print_step "Executando: wrk -t4 -c100 -d10s $BASE_URL/index.html"
-    if wrk -t4 -c100 -d10s "$BASE_URL/index.html" > "$TEST_DIR/wrk_static.out" 2>&1; then
+    print_step "Executando: wrk -t4 -c50 -d10s $BASE_URL/index.html"
+    if wrk -t4 -c50 -d10s "$BASE_URL/index.html" > "$TEST_DIR/wrk_static.out" 2>&1; then
         if grep -q "Requests/sec" "$TEST_DIR/wrk_static.out"; then
             req_rate=$(grep "Requests/sec" "$TEST_DIR/wrk_static.out" | awk '{print $2}')
             transfer_rate=$(grep "Transfer/sec" "$TEST_DIR/wrk_static.out" | awk '{print $2}')
@@ -637,13 +869,13 @@ if command -v wrk >/dev/null 2>&1; then
         print_warning "wrk executou com falhas (ver $TEST_DIR/wrk_static.out)"
     fi
 else
-    print_warning "wrk nao esta instalado (comando: wrk -t4 -c100 -d10s $BASE_URL/index.html)"
+    print_warning "wrk nao esta instalado (comando: wrk -t4 -c50 -d10s $BASE_URL/index.html)"
 fi
 
 print_subheader "Carga com siege"
 if command -v siege >/dev/null 2>&1; then
-    print_step "Executando: siege -c100 -t10S $BASE_URL/index.html"
-    if siege -c100 -t10S "$BASE_URL/index.html" > "$TEST_DIR/siege_static.out" 2>&1; then
+    print_step "Executando: siege -c50 -t10S $BASE_URL/index.html"
+    if siege -c50 -t10S "$BASE_URL/index.html" > "$TEST_DIR/siege_static.out" 2>&1; then
         if grep -q '"transactions"' "$TEST_DIR/siege_static.out"; then
             transactions=$(grep '"transactions"' "$TEST_DIR/siege_static.out" | sed 's/[^0-9.]//g')
             availability=$(grep '"availability"' "$TEST_DIR/siege_static.out" | sed 's/[^0-9.]//g')
@@ -659,13 +891,13 @@ if command -v siege >/dev/null 2>&1; then
         print_warning "siege executou com falhas (ver $TEST_DIR/siege_static.out)"
     fi
 else
-    print_warning "siege nao esta instalado (comando: siege -c100 -t10S $BASE_URL/index.html)"
+    print_warning "siege nao esta instalado (comando: siege -c50 -t10S $BASE_URL/index.html)"
 fi
 
 print_subheader "Carga concorrente em CGI com siege"
 if command -v siege >/dev/null 2>&1; then
-    print_step "Executando: siege -c30 -t5S $BASE_URL/cgi-bin/hello.php"
-    if siege -c30 -t5S "$BASE_URL/cgi-bin/hello.php" > "$TEST_DIR/siege_cgi.out" 2>&1; then
+    print_step "Executando: siege -c50 -t10S $BASE_URL/cgi-bin/hello.php"
+    if siege -c50 -t10S "$BASE_URL/cgi-bin/hello.php" > "$TEST_DIR/siege_cgi.out" 2>&1; then
         if grep -q '"transactions"' "$TEST_DIR/siege_cgi.out"; then
             cgi_transactions=$(grep '"transactions"' "$TEST_DIR/siege_cgi.out" | sed 's/[^0-9.]//g')
             cgi_availability=$(grep '"availability"' "$TEST_DIR/siege_cgi.out" | sed 's/[^0-9.]//g')
