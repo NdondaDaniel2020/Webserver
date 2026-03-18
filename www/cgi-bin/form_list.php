@@ -1,7 +1,9 @@
 <?php
 /**
- * form_list.php — Lista dados salvos em SQLite
- * GET /cgi-bin/form_list.php
+ * form_list.php — Lista/deleta dados salvos em SQLite
+ * GET /cgi-bin/form_list.php (lista todos)
+ * DELETE /cgi-bin/form_list.php?id=1 (deleta por ID)
+ * POST /cgi-bin/form_list.php?id=1 com method=post também funciona como fallback
  */
 
 $db_path = "/tmp/form_data.db";
@@ -26,49 +28,36 @@ header('Content-Type: application/json');
 
 try {
     $db = init_db();
-
-    $params = [];
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-    if (!empty($_GET)) {
-        $params = array_merge($params, $_GET);
-    }
-    if (!empty($_POST)) {
-        $params = array_merge($params, $_POST);
-    }
-    if ($method === 'POST') {
-        $cl = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
-        if ($cl > 0) {
-            $stdin = fopen('php://stdin', 'r');
-            $raw = fread($stdin, $cl);
-            fclose($stdin);
-            $body_params = [];
-            parse_str($raw, $body_params);
-            if (!empty($body_params)) {
-                $params = array_merge($params, $body_params);
+
+    if ($method === 'DELETE' || (isset($_GET['_method']) && $_GET['_method'] === 'DELETE')) {
+        // Deletar por ID (via query string ou request body)
+        $id = (int)($_GET['id'] ?? 0);
+        if ($id <= 0) {
+            // Tenta ler do body
+            $cl = (int)($_SERVER['CONTENT_LENGTH'] ?? 0);
+            if ($cl > 0) {
+                $stdin = fopen('php://stdin', 'r');
+                $raw = fread($stdin, $cl);
+                fclose($stdin);
+                $body_params = [];
+                parse_str($raw, $body_params);
+                $id = (int)($body_params['id'] ?? 0);
             }
         }
-    } else if (!empty($_SERVER['QUERY_STRING'])) {
-        $qs_params = [];
-        parse_str($_SERVER['QUERY_STRING'], $qs_params);
-        if (!empty($qs_params)) {
-            $params = array_merge($params, $qs_params);
-        }
-    }
 
-    $action = $params['action'] ?? 'list';
-
-    if ($action === 'delete') {
-        $id = (int)($params['id'] ?? 0);
         if ($id > 0) {
             $stmt = $db->prepare("DELETE FROM entries WHERE id = ?");
             $stmt->bindValue(1, $id, SQLITE3_INTEGER);
             $stmt->execute();
-            $result = ["ok" => true, "message" => "Entrada deletada"];
+            $result = ["ok" => true, "message" => "Entrada deletada com sucesso"];
+            http_response_code(200);
         } else {
             $result = ["ok" => false, "error" => "ID inválido"];
+            http_response_code(400);
         }
-    } else {
-        // list
+    } else if ($method === 'GET') {
+        // GET: listar todas as entradas
         $stmt = $db->prepare(
             "SELECT id, name, email, message, created_at FROM entries ORDER BY created_at DESC LIMIT 50"
         );
@@ -78,6 +67,10 @@ try {
             $entries[] = $row;
         }
         $result = ["ok" => true, "entries" => $entries];
+        http_response_code(200);
+    } else {
+        $result = ["ok" => false, "error" => "Use GET para listar ou DELETE para remover"];
+        http_response_code(405);
     }
 
     echo json_encode($result, JSON_UNESCAPED_UNICODE);
@@ -85,3 +78,4 @@ try {
     http_response_code(500);
     echo json_encode(["ok" => false, "error" => $e->getMessage()], JSON_UNESCAPED_UNICODE);
 }
+

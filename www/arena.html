@@ -809,7 +809,6 @@ async function saveToDB() {
     const start = performance.now();
     try {
         const params = new URLSearchParams({
-            action: 'save',
             name: name,
             email: email,
             message: message
@@ -855,9 +854,7 @@ async function loadFromDB() {
     const start = performance.now();
     try {
         const resp = await fetch('/cgi-bin/form_list.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=list'
+            method: 'GET'
         });
         const elapsed = Math.round(performance.now() - start);
         const data = await resp.json();
@@ -912,10 +909,8 @@ async function deleteFromDB(id) {
 
     const start = performance.now();
     try {
-        const resp = await fetch('/cgi-bin/form_list.php', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'action=delete&id=' + encodeURIComponent(String(safeId))
+        const resp = await fetch('/cgi-bin/form_list.php?id=' + encodeURIComponent(String(safeId)), {
+            method: 'DELETE'
         });
         const elapsed = Math.round(performance.now() - start);
         const data = await resp.json();

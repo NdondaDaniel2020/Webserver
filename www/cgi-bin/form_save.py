@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 form_save.py — Salva dados de formulário em SQLite
-POST /cgi-bin/form_save.py?name=...&email=...&message=...
+POST /cgi-bin/form_save.py (name e email obrigatórios no body)
 """
 
 import os
@@ -28,31 +28,33 @@ def init_db():
     conn.close()
 
 def main():
-    # Parse query string ou POST body
-    qs_str = os.environ.get("QUERY_STRING", "")
     method = os.environ.get("REQUEST_METHOD", "GET").upper()
-    params = parse_qs(qs_str, keep_blank_values=True)
     
-    if method == "POST":
+    init_db()
+    
+    # Apenas POST é aceito
+    if method != "POST":
+        result = {"ok": False, "error": "Use POST para salvar dados"}
+        status = "405 Method Not Allowed"
+    else:
+        # Parse POST body
         try:
             cl = int(os.environ.get("CONTENT_LENGTH", "0"))
         except ValueError:
             cl = 0
+        
+        params = {}
         if cl > 0:
             body_params = parse_qs(sys.stdin.read(cl), keep_blank_values=True)
             params.update(body_params)
-    
-    init_db()
-    
-    action = params.get("action", ["list"])[0]
-    
-    if action == "save":
+        
         name = params.get("name", [""])[0].strip()
         email = params.get("email", [""])[0].strip()
         message = params.get("message", [""])[0].strip()
         
         if not name or not email:
-            result = {"ok": False, "error": "Name e Email são obrigatórios"}
+            result = {"ok": False, "error": "name e email são obrigatórios"}
+            status = "400 Bad Request"
         else:
             try:
                 conn = sqlite3.connect(DB_PATH)
@@ -63,24 +65,13 @@ def main():
                 conn.commit()
                 conn.close()
                 result = {"ok": True, "message": "Dados salvos com sucesso"}
+                status = "201 Created"
             except Exception as e:
                 result = {"ok": False, "error": str(e)}
-    else:  # list
-        try:
-            conn = sqlite3.connect(DB_PATH)
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute(
-                "SELECT id, name, email, message, created_at FROM entries ORDER BY created_at DESC LIMIT 50"
-            ).fetchall()
-            conn.close()
-            result = {
-                "ok": True,
-                "entries": [dict(row) for row in rows]
-            }
-        except Exception as e:
-            result = {"ok": False, "error": str(e)}
+                status = "500 Internal Server Error"
     
-    # Output
+    # Output HTTP headers and JSON
+    sys.stdout.write(f"Status: {status}\r\n")
     sys.stdout.write("Content-Type: application/json\r\n\r\n")
     sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
