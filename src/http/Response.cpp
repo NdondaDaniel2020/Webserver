@@ -108,37 +108,6 @@ namespace
         return normalized.substr(0, pos + 1);
     }
 
-    static std::string formatIndexDate(time_t timestamp)
-    {
-        char buffer[32];
-        std::tm *tm_info = std::localtime(&timestamp);
-
-        if (!tm_info)
-            return "-";
-        if (std::strftime(buffer, sizeof(buffer), "%Y-%b-%d %H:%M", tm_info) == 0)
-            return "-";
-        return buffer;
-    }
-
-    static std::string formatIndexSize(off_t size)
-    {
-        static const char *units[] = {"B", "KiB", "MiB", "GiB", "TiB"};
-        double display = static_cast<double>(size);
-        size_t unit = 0;
-
-        while (display >= 1024.0 && unit < 4)
-        {
-            display /= 1024.0;
-            ++unit;
-        }
-
-        std::ostringstream oss;
-        if (unit == 0)
-            oss << size << ' ' << units[unit];
-        else
-            oss << std::fixed << std::setprecision(1) << display << ' ' << units[unit];
-        return oss.str();
-    }
 }
 
 Response::Response(const HttpRequest &request, const ServerConfig &config) : config(config)
@@ -607,52 +576,94 @@ void Response::generateDirectoryListing(const HttpRequest &request, const std::s
     const std::string parent_uri = parentDirectoryUri(current_uri);
 
     std::ostringstream html;
-    html << "<!doctype html><html><head><meta charset='UTF-8'>";
-    html << "<meta name='viewport' content='width=device-width'>";
-    html << "<style type='text/css'>";
-    html << "body,html {background:#fff;font-family:\"Bitstream Vera Sans\",\"Lucida Grande\",\"Lucida Sans Unicode\",Lucidux,Verdana,Lucida,sans-serif;}";
-    html << "tr:nth-child(even) {background:#f4f4f4;}";
-    html << "th,td {padding:0.1em 0.5em;}";
-    html << "th {text-align:left;font-weight:bold;background:#eee;border-bottom:1px solid #aaa;}";
-    html << "#list {border:1px solid #aaa;width:100%;}";
-    html << "a {color:#a33;}a:hover {color:#e33;}";
-    html << "</style>";
-    html << "<title>Index of " << htmlEscape(current_uri) << "</title></head><body>";
-    html << "<h1>Index of " << htmlEscape(current_uri) << "</h1>";
-    html << "<table id='list'><thead><tr>";
-    html << "<th style='width:55%'><a href='?C=N&amp;O=A'>File Name</a>&nbsp;<a href='?C=N&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
-    html << "<th style='width:20%'><a href='?C=S&amp;O=A'>File Size</a>&nbsp;<a href='?C=S&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
-    html << "<th style='width:25%'><a href='?C=M&amp;O=A'>Date</a>&nbsp;<a href='?C=M&amp;O=D'>&nbsp;&#8595;&nbsp;</a></th>";
-    html << "</tr></thead><tbody>";
+    html << "<!DOCTYPE html>\n<html lang=\"pt\">\n<head>\n";
+    html << "    <meta charset=\"UTF-8\">\n";
+    html << "    <title>Index of " << htmlEscape(current_uri) << " | Web Ninjas</title>\n";
+    html << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
+    html << "    <link href=\"https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n";
+    html << "    <link href=\"/assets/directory-listing.css\" rel=\"stylesheet\">\n";
+    html << "</head>\n<body>\n";
+    html << "    <div class=\"background-lines\"></div>\n";
+    html << "    <main>\n";
+    html << "        <div class=\"header\">\n";
+    html << "            <h1>📁 " << htmlEscape(current_uri) << "</h1>\n";
+    html << "            <p>Directory Contents</p>\n";
+    html << "        </div>\n";
+    html << "        <div class=\"breadcrumb\">\n";
+    html << "            <a href=\"/\">~/</a>\n";
 
-    html << "<tr><td class='link'><a href='" << htmlEscape(parent_uri)
-         << "'>Parent directory/</a></td><td class='size'>-</td><td class='date'>-</td></tr>";
+    // Gerar breadcrumb
+    {
+        std::string path = current_uri;
+        std::string acc = "";
+        if (current_uri != "/") {
+            size_t pos = 0;
+            while ((pos = path.find('/', pos + 1)) != std::string::npos) {
+                acc = path.substr(0, pos);
+                html << "<a href=\"" << htmlEscape(acc) << "\">" << htmlEscape(acc.substr(acc.rfind('/') + 1)) << "/</a> ";
+            }
+        }
+    }
 
+    html << "        </div>\n";
+    html << "        <div class=\"files-container\">\n";
+
+    // Adicionar link para parent directory
+    if (current_uri != "/")
+    {
+        html << "            <a href=\"" << htmlEscape(parent_uri) << "\" class=\"file-card parent-dir\">\n";
+        html << "                <div class=\"file-icon\">⬆️</div>\n";
+        html << "                <span class=\"file-name\">..</span>\n";
+        html << "                <span class=\"file-type\">Parent Directory</span>\n";
+        html << "            </a>\n";
+    }
+
+    // Adicionar arquivos e diretórios
+    bool has_files = false;
     for (size_t i = 0; i < entries.size(); ++i)
     {
         if (entries[i].name == "..")
             continue;
-
-        std::string label = entries[i].name;
-        std::string href = current_uri + encodeUriSegment(entries[i].name);
-        if (entries[i].is_directory)
-        {
-            label += '/';
-            href += '/';
-        }
-
-        html << "<tr><td class='link'><a href='" << htmlEscape(href) << "' title='" << htmlEscape(label) << "'>"
-             << htmlEscape(label) << "</a></td>";
-
-        if (entries[i].is_directory)
-            html << "<td class='size'>-</td>";
-        else
-            html << "<td class='size'>" << formatIndexSize(entries[i].size) << "</td>";
-
-        html << "<td class='date'>" << htmlEscape(formatIndexDate(entries[i].mtime)) << "</td></tr>";
+        has_files = true;
+        break;
     }
 
-    html << "</tbody></table></body></html>";
+    if (!has_files)
+    {
+        html << "        </div>\n";
+        html << "        <div class=\"empty-state\">\n";
+        html << "            <div class=\"empty-state-icon\">📭</div>\n";
+        html << "            <h2>No files found</h2>\n";
+        html << "            <p>This directory is empty</p>\n";
+        html << "        </div>\n";
+    }
+    else
+    {
+        for (size_t i = 0; i < entries.size(); ++i)
+        {
+            if (entries[i].name == "..")
+                continue;
+
+            std::string icon = entries[i].is_directory ? "📂" : "📄";
+            std::string file_type = entries[i].is_directory ? "Directory" : "File";
+            std::string href = current_uri + encodeUriSegment(entries[i].name);
+            if (entries[i].is_directory)
+                href += '/';
+
+            html << "            <a href=\"" << htmlEscape(href) << "\" class=\"file-card\">\n";
+            html << "                <div class=\"file-icon\">" << icon << "</div>\n";
+            html << "                <span class=\"file-name\">" << htmlEscape(entries[i].name) << "</span>\n";
+            html << "                <span class=\"file-type\">" << file_type << "</span>\n";
+            html << "            </a>\n";
+        }
+        html << "        </div>\n";
+    }
+
+    html << "    </main>\n";
+    html << "    <footer>\n";
+    html << "        <p>🥷 <strong>Web Ninjas</strong> — HTTP Server @ 42 Project</p>\n";
+    html << "    </footer>\n";
+    html << "</body>\n</html>\n";
 
     StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path);
 }
