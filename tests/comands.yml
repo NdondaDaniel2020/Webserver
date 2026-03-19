@@ -9,6 +9,7 @@ comands:
   siege -c50 -r100 http://127.0.0.1:8080/index.html
 
   curl -X POST -H "Content-Type: plain/text" --data "abc"
+
 cgi:
   curl -s -X POST http://127.0.0.1:8080/cgi-bin/form_save.py \
   -H "Content-Type: application/x-www-form-urlencoded" \
@@ -18,3 +19,11 @@ cgi:
 
   curl -s -X DELETE "http://127.0.0.1:8080/cgi-bin/form_list.php?id=1"
 
+cgi_cook:
+  # Como Usar (Ninja Arena)
+  # 1. Criar nova sessão:
+      curl -v -X POST -d "action=new_game&name=MeuNinja&class=shadow" \
+      http://127.0.0.1:8080/cgi-bin/arena_action.py
+  # 2. Usar cookie em requisições subsequentes:
+      curl -b "NAGSID=e5c74d64038d5035c02e63640f571e9e" \
+      http://127.0.0.1:8080/cgi-bin/arena_action.py?action=state

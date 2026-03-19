@@ -206,8 +206,229 @@
     #battle-screen.active { display: grid; }
     #battle-screen {
       grid-template-columns: 1fr 1fr;
-      grid-template-rows: auto 1fr auto;
+      grid-template-rows: auto auto 1fr auto;
       gap: 1rem;
+    }
+
+    /* ── Visual Battle Arena ─────────────────────────── */
+    .battle-arena {
+      grid-column: 1 / -1;
+      background:
+        linear-gradient(135deg, rgba(168,85,247,0.03) 0%, transparent 50%, rgba(239,68,68,0.03) 100%),
+        linear-gradient(180deg, var(--bg-card) 0%, var(--bg-elevated) 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 2rem;
+      height: 280px;
+      position: relative;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: inset 0 -1px 40px rgba(0,255,156,0.05);
+    }
+    .battle-arena::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg, transparent, transparent 10px, rgba(0,255,156,.02) 10px, rgba(0,255,156,.02) 11px),
+        repeating-linear-gradient(90deg, transparent, transparent 10px, rgba(0,255,156,.02) 10px, rgba(0,255,156,.02) 11px);
+      opacity: 0.3;
+    }
+    .battle-arena::after {
+      content: '⚡';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 6rem;
+      opacity: 0.05;
+      pointer-events: none;
+    }
+
+    .fighter-sprite {
+      width: 200px;
+      height: 200px;
+      position: relative;
+      z-index: 2;
+      filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3));
+      transition: transform 0.3s ease, filter 0.3s ease;
+      animation: idleBreathing 3s ease-in-out infinite;
+    }
+    .fighter-sprite.player {
+      margin-left: 2rem;
+    }
+    .fighter-sprite.enemy {
+      margin-right: 2rem;
+      transform: scaleX(-1);
+    }
+    .fighter-sprite:hover {
+      transform: scale(1.05);
+      animation-play-state: paused;
+    }
+    .fighter-sprite.enemy:hover {
+      transform: scaleX(-1) scale(1.05);
+      animation-play-state: paused;
+    }
+
+    /* Idle breathing animation */
+    @keyframes idleBreathing {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-5px) scale(1.02); }
+    }
+    @keyframes idleBreathingEnemy {
+      0%, 100% { transform: scaleX(-1) translateY(0) scale(1); }
+      50% { transform: scaleX(-1) translateY(-5px) scale(1.02); }
+    }
+    .fighter-sprite.enemy {
+      animation: idleBreathingEnemy 3s ease-in-out infinite;
+    }
+
+    /* Attack lunge animation */
+    .fighter-sprite.attacking {
+      animation: attackLunge 0.6s ease-out forwards !important;
+    }
+    .fighter-sprite.enemy.attacking {
+      animation: attackLungeEnemy 0.6s ease-out forwards !important;
+    }
+    @keyframes attackLunge {
+      0% { transform: translateX(0); }
+      40% { transform: translateX(50px) scale(1.1); }
+      100% { transform: translateX(0); }
+    }
+    @keyframes attackLungeEnemy {
+      0% { transform: scaleX(-1) translateX(0); }
+      40% { transform: scaleX(-1) translateX(-50px) scale(1.1); }
+      100% { transform: scaleX(-1) translateX(0); }
+    }
+
+    /* Defending state */
+    .fighter-sprite.defending {
+      filter: drop-shadow(0 0 20px rgba(6,182,212,0.8));
+      animation: defendPulse 1s ease-in-out infinite;
+    }
+    @keyframes defendPulse {
+      0%, 100% { filter: drop-shadow(0 0 20px rgba(6,182,212,0.8)); }
+      50% { filter: drop-shadow(0 0 30px rgba(6,182,212,1)); }
+    }
+
+    /* Critical hit glow */
+    .fighter-sprite.critical-glow {
+      filter: drop-shadow(0 0 30px rgba(255,215,0,1));
+      animation: criticalFlash 0.4s ease-out;
+    }
+    @keyframes criticalFlash {
+      0%, 100% { filter: drop-shadow(0 10px 20px rgba(0,0,0,0.3)); }
+      50% { filter: drop-shadow(0 0 40px rgba(255,215,0,1)); }
+    }
+
+    /* ── Attack Effects ──────────────────────────────── */
+    .attack-effect {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 5rem;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 10;
+      filter: drop-shadow(0 0 10px currentColor);
+      animation: attackFlash 0.6s ease-out;
+    }
+    @keyframes attackFlash {
+      0% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.5) rotate(-20deg);
+      }
+      50% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1.3) rotate(10deg);
+      }
+      100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.8) rotate(20deg);
+      }
+    }
+
+    /* Critical hit indicator */
+    .critical-text {
+      position: absolute;
+      top: 30%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-family: var(--font-head);
+      font-size: 3rem;
+      font-weight: 900;
+      color: #FFD700;
+      text-shadow: 0 0 20px #FFD700, 0 0 40px #FF8C00;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 15;
+      animation: criticalPop 1s ease-out forwards;
+      letter-spacing: 4px;
+    }
+    @keyframes criticalPop {
+      0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(-10deg); }
+      30% { opacity: 1; transform: translate(-50%, -50%) scale(1.3) rotate(5deg); }
+      60% { opacity: 1; transform: translate(-50%, -100%) scale(1) rotate(0deg); }
+      100% { opacity: 0; transform: translate(-50%, -150%) scale(0.8) rotate(0deg); }
+    }
+
+    /* Combo counter */
+    .combo-counter {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(239,68,68,0.2));
+      border: 2px solid var(--purple);
+      border-radius: 12px;
+      padding: 0.8rem 1.2rem;
+      font-family: var(--font-head);
+      font-size: 1.2rem;
+      color: var(--purple);
+      text-shadow: 0 0 10px var(--purple);
+      opacity: 0;
+      transform: scale(0.5);
+      transition: all 0.3s ease;
+      z-index: 20;
+    }
+    .combo-counter.show {
+      opacity: 1;
+      transform: scale(1);
+    }
+    .combo-counter .combo-num {
+      font-size: 2rem;
+      font-weight: 900;
+      color: #FFD700;
+      display: block;
+      text-align: center;
+    }
+    .combo-counter .combo-label {
+      font-size: 0.7rem;
+      letter-spacing: 2px;
+      opacity: 0.8;
+    }
+
+    .hit-shake {
+      animation: shake 0.3s ease-in-out;
+    }
+    @keyframes shake {
+      0%, 100% { transform: translateX(0) scaleX(-1); }
+      20% { transform: translateX(-12px) scaleX(-1) rotate(3deg); }
+      40% { transform: translateX(12px) scaleX(-1) rotate(-3deg); }
+      60% { transform: translateX(-8px) scaleX(-1) rotate(2deg); }
+      80% { transform: translateX(8px) scaleX(-1) rotate(-2deg); }
+    }
+    .hit-shake.player {
+      animation: shakePlayer 0.3s ease-in-out;
+    }
+    @keyframes shakePlayer {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-12px) rotate(-3deg); }
+      40% { transform: translateX(12px) rotate(3deg); }
+      60% { transform: translateX(-8px) rotate(-2deg); }
+      80% { transform: translateX(8px) rotate(2deg); }
     }
 
     .combatant-card {
@@ -350,16 +571,44 @@
       font-family: var(--font-mono);
       font-size: .78rem;
       color: #9CA3AF;
-      line-height: 1.6;
+      line-height: 1.8;
       max-height: 180px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: .15rem;
+      gap: .25rem;
     }
-    #combat-log .entry-player { color: var(--neon); }
-    #combat-log .entry-enemy  { color: var(--red); }
-    #combat-log .entry-system { color: var(--yellow); }
+    #combat-log .entry-player {
+      color: var(--neon);
+      padding: 0.3rem 0.6rem;
+      border-left: 3px solid var(--neon);
+      background: rgba(0,255,156,0.05);
+      border-radius: 4px;
+    }
+    #combat-log .entry-enemy {
+      color: var(--red);
+      padding: 0.3rem 0.6rem;
+      border-left: 3px solid var(--red);
+      background: rgba(239,68,68,0.05);
+      border-radius: 4px;
+    }
+    #combat-log .entry-system {
+      color: var(--yellow);
+      padding: 0.3rem 0.6rem;
+      border-left: 3px solid var(--yellow);
+      background: rgba(234,179,8,0.05);
+      border-radius: 4px;
+      font-style: italic;
+    }
+    #combat-log .entry-critical {
+      color: #FFD700;
+      padding: 0.3rem 0.6rem;
+      border-left: 3px solid #FFD700;
+      background: rgba(255,215,0,0.1);
+      border-radius: 4px;
+      font-weight: 700;
+      text-shadow: 0 0 5px #FFD700;
+    }
 
     /* Action buttons */
     .actions-wrap {
@@ -604,6 +853,22 @@
       <span style="font-size:.75rem;color:var(--text-muted);font-family:var(--font-mono)" id="level-info">LV 1</span>
     </div>
 
+    <!-- Visual Battle Arena -->
+    <div class="battle-arena">
+      <div class="fighter-sprite player" id="player-sprite">
+        <!-- Player sprite will be injected here -->
+      </div>
+      <div class="attack-effect" id="attack-effect"></div>
+      <div class="critical-text" id="critical-text" style="display:none;">CRITICAL!</div>
+      <div class="combo-counter" id="combo-counter">
+        <div class="combo-num" id="combo-num">0</div>
+        <div class="combo-label">COMBO</div>
+      </div>
+      <div class="fighter-sprite enemy" id="enemy-sprite">
+        <!-- Enemy sprite will be injected here -->
+      </div>
+    </div>
+
     <!-- Player card -->
     <div class="combatant-card player-side active-turn" id="player-card">
       <div class="card-header">
@@ -710,6 +975,8 @@ let isBusy        = false;
 let lastPlayer    = null;
 let lastBattle    = null;
 let lastEnemy     = null;
+let comboCount    = 0;
+let comboTimer    = null;
 
 /* ════════════════════════════════════════════════════
    Cookie helpers
@@ -832,9 +1099,266 @@ function transitionToBattle(player, battle, enemy) {
   lastPlayer = player;
   lastBattle = battle;
   lastEnemy  = enemy;
+  resetCombo(); // Reset combo counter
+  setDefendingState(true, false); // Clear defending states
+  setDefendingState(false, false);
   updateBattleUI(player, battle, enemy);
   showScreen('battle-screen');
   setActionsBusy(false);
+}
+
+/* ════════════════════════════════════════════════════
+   Sprite Generation
+   ════════════════════════════════════════════════════ */
+function getNinjaSprite(className) {
+  const sprites = {
+    shadow: `
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Shadow Ninja - Purple theme -->
+        <g id="shadow-ninja">
+          <!-- Body --><ellipse cx="100" cy="180" rx="30" ry="8" fill="rgba(0,0,0,0.3)"/>
+          <rect x="85" y="100" width="30" height="50" rx="5" fill="#2D1B4E"/>
+          <rect x="80" y="140" width="15" height="35" rx="3" fill="#2D1B4E"/>
+          <rect x="105" y="140" width="15" height="35" rx="3" fill="#2D1B4E"/>
+          <!-- Arms -->
+          <rect x="70" y="105" width="12" height="40" rx="3" fill="#2D1B4E" transform="rotate(-25 76 105)"/>
+          <rect x="118" y="105" width="12" height="40" rx="3" fill="#2D1B4E" transform="rotate(25 124 105)"/>
+          <!-- Head -->
+          <circle cx="100" cy="80" r="22" fill="#3D2B5E"/>
+          <rect x="80" y="75" width="40" height="8" fill="#1a1a2e" rx="2"/>
+          <!-- Eyes -->
+          <circle cx="92" cy="78" r="3" fill="#A855F7"/>
+          <circle cx="108" cy="78" r="3" fill="#A855F7"/>
+          <!-- Katana -->
+          <rect x="55" y="120" width="4" height="45" fill="#4A5568" transform="rotate(-45 57 120)"/>
+          <rect x="53" y="115" width="8" height="8" fill="#8B4513" rx="2"/>
+          <line x1="55" y1="165" x2="58" y2="162" stroke="#E0E0E0" stroke-width="2"/>
+        </g>
+      </svg>`,
+
+    blade: `
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Blade Ninja - Cyan theme -->
+        <g id="blade-ninja">
+          <ellipse cx="100" cy="180" rx="30" ry="8" fill="rgba(0,0,0,0.3)"/>
+          <rect x="85" y="100" width="30" height="50" rx="5" fill="#0D3D56"/>
+          <rect x="80" y="140" width="15" height="35" rx="3" fill="#0D3D56"/>
+          <rect x="105" y="140" width="15" height="35" rx="3" fill="#0D3D56"/>
+          <!-- Arms with dual swords -->
+          <rect x="65" y="105" width="12" height="40" rx="3" fill="#0D3D56" transform="rotate(-35 71 105)"/>
+          <rect x="123" y="105" width="12" height="40" rx="3" fill="#0D3D56" transform="rotate(35 129 105)"/>
+          <!-- Head -->
+          <circle cx="100" cy="80" r="22" fill="#1A5266"/>
+          <rect x="80" y="75" width="40" height="8" fill="#0A2533" rx="2"/>
+          <circle cx="92" cy="78" r="3" fill="#06B6D4"/>
+          <circle cx="108" cy="78" r="3" fill="#06B6D4"/>
+          <!-- Dual Katanas -->
+          <rect x="50" y="100" width="3" height="50" fill="#C0C0C0" transform="rotate(-50 52 100)"/>
+          <rect x="147" y="100" width="3" height="50" fill="#C0C0C0" transform="rotate(50 149 100)"/>
+          <path d="M 52 95 L 56 95 L 55 105 L 53 105 Z" fill="#06B6D4"/>
+          <path d="M 147 95 L 151 95 L 150 105 L 148 105 Z" fill="#06B6D4"/>
+        </g>
+      </svg>`,
+
+    monk: `
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <!-- Monk Ninja - Orange theme -->
+        <g id="monk-ninja">
+          <ellipse cx="100" cy="180" rx="30" ry="8" fill="rgba(0,0,0,0.3)"/>
+          <rect x="85" y="100" width="30" height="50" rx="5" fill="#8B4513"/>
+          <rect x="80" y="140" width="15" height="35" rx="3" fill="#8B4513"/>
+          <rect x="105" y="140" width="15" height="35" rx="3" fill="#8B4513"/>
+          <!-- Arms in martial arts pose -->
+          <rect x="70" y="90" width="12" height="45" rx="3" fill="#8B4513" transform="rotate(-15 76 90)"/>
+          <rect x="118" y="90" width="12" height="45" rx="3" fill="#8B4513" transform="rotate(15 124 90)"/>
+          <!-- Head with headband -->
+          <circle cx="100" cy="80" r="22" fill="#A0522D"/>
+          <rect x="78" y="70" width="44"height="6" fill="#F97316" rx="2"/>
+          <circle cx="92" cy="78" r="3" fill="#FF6B35"/>
+          <circle cx="108" cy="78" r="3" fill="#FF6B35"/>
+          <!-- Energy glow -->
+          <circle cx="100" cy="115" r="8" fill="#F97316" opacity="0.3"/>
+        </g>
+      </svg>`
+  };
+
+  return sprites[className] || sprites.shadow;
+}
+
+function getEnemySprite(enemyName) {
+  const lowername = (enemyName || '').toLowerCase();
+
+  // Different enemy designs based on name
+  if (lowername.includes('ronin') || lowername.includes('samurai')) {
+    return `
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <g id="ronin">
+          <ellipse cx="100" cy="180" rx="30" ry="8" fill="rgba(0,0,0,0.3)"/>
+          <rect x="85" y="100" width="30" height="50" rx="5" fill="#8B0000"/>
+          <rect x="80" y="140" width="15" height="35" rx="3" fill="#8B0000"/>
+          <rect x="105" y="140" width="15" height="35" rx="3" fill="#8B0000"/>
+          <!-- Armor plates -->
+          <rect x="83" y="105" width="34" height="8" fill="#B8860B"/>
+          <rect x="83" y="120" width="34" height="8" fill="#B8860B"/>
+          <!-- Arms -->
+          <rect x="70" y="105" width="12" height="45" rx="3" fill="#8B0000"/>
+          <rect x="118" y="105" width="12" height="45" rx="3" fill="#8B0000"/>
+          <!-- Head -->
+          <circle cx="100" cy="80" r="22" fill="#A52A2A"/>
+          <rect x="78" y="65" width="44" height="12" fill="#B8860B" rx="2"/>
+          <circle cx="92" cy="82" r="3" fill="#EF4444"/>
+          <circle cx="108" cy="82" r="3" fill="#EF4444"/>
+          <!-- Large Katana -->
+          <rect x="125" y="90" width="5" height="65" fill="#696969" transform="rotate(35 127 90)"/>
+          <rect x="123" y="85" width="9" height="10" fill="#DAA520" rx="2"/>
+        </g>
+      </svg>`;
+  }
+
+  if (lowername.includes('oni') || lowername.includes('demon')) {
+    return `
+      <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+        <g id="oni">
+          <ellipse cx="100" cy="185" rx="35" ry="10" fill="rgba(0,0,0,0.4)"/>
+          <!-- Large body -->
+          <rect x="80" y="100" width="40" height="60" rx="8" fill="#4A0E0E"/>
+          <rect x="75" y="145" width="20" height="40" rx="4" fill="#4A0E0E"/>
+          <rect x="105" y="145" width="20" height="40" rx="4" fill="#4A0E0E"/>
+          <!-- Muscular arms -->
+          <rect x="60" y="100" width="18" height="50" rx="4" fill="#5A1E1E"/>
+          <rect x="122" y="100" width="18" height="50" rx="4" fill="#5A1E1E"/>
+          <!-- Large head -->
+          <circle cx="100" cy="75" r="28" fill="#6A1E1E"/>
+          <!-- Horns -->
+          <path d="M 75 60 Q 70 45 72 50 Q 74 55 77 58" fill="#2C1810" stroke="#2C1810" stroke-width="3"/>
+          <path d="M 125 60 Q 130 45 128 50 Q 126 55 123 58" fill="#2C1810" stroke="#2C1810" stroke-width="3"/>
+          <!-- Fierce eyes -->
+          <circle cx="90" cy="75" r="4" fill="#FF0000"/>
+          <circle cx="110" cy="75" r="4" fill="#FF0000"/>
+          <!-- Club weapon -->
+          <rect x="135" y="100" width="12" height="55" rx="6" fill="#654321" transform="rotate(25 141 100)"/>
+          <circle cx="143" cy="145" r="8" fill="#654321"/>
+        </g>
+      </svg>`;
+  }
+
+  // Default enemy
+  return `
+    <svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+      <g id="enemy-thug">
+        <ellipse cx="100" cy="180" rx="30" ry="8" fill="rgba(0,0,0,0.3)"/>
+        <rect x="85" y="105" width="30" height="45" rx="5" fill="#3D3D3D"/>
+        <rect x="80" y="140" width="15" height="35" rx="3" fill="#3D3D3D"/>
+        <rect x="105" y="140" width="15" height="35" rx="3" fill="#3D3D3D"/>
+        <rect x="72" y="110" width="12" height="38" rx="3" fill="#3D3D3D" transform="rotate(-20 78 110)"/>
+        <rect x="116" y="110" width="12" height="38" rx="3" fill="#3D3D3D" transform="rotate(20 122 110)"/>
+        <circle cx="100" cy="85" r="20" fill="#4D4D4D"/>
+        <rect x="82" y="80" width="36" height="6" fill="#2D2D2D" rx="2"/>
+        <circle cx="93" cy="85" r="2" fill="#EF4444"/>
+        <circle cx="107" cy="85" r="2" fill="#EF4444"/>
+      </g>
+    </svg>`;
+}
+
+function showAttackEffect(attackType) {
+  const effect = document.getElementById('attack-effect');
+  const effects = {
+    attack: '⚔️',
+    special: '✨',
+    defend: '🛡️',
+    critical: '💥'
+  };
+
+  effect.textContent = effects[attackType] || '💢';
+  effect.style.animation = 'none';
+  setTimeout(() => {
+    effect.style.animation = 'attackFlash 0.6s ease-out';
+  }, 10);
+}
+
+function shakeEnemy() {
+  const enemySprite = document.getElementById('enemy-sprite');
+  enemySprite.classList.add('hit-shake');
+  setTimeout(() => enemySprite.classList.remove('hit-shake'), 300);
+}
+
+function shakePlayer() {
+  const playerSprite = document.getElementById('player-sprite');
+  playerSprite.classList.add('hit-shake', 'player');
+  setTimeout(() => {
+    playerSprite.classList.remove('hit-shake', 'player');
+  }, 300);
+}
+
+/* ════════════════════════════════════════════════════
+   Enhanced Battle Animations
+   ════════════════════════════════════════════════════ */
+function playAttackAnimation(isPlayer) {
+  const sprite = document.getElementById(isPlayer ? 'player-sprite' : 'enemy-sprite');
+  sprite.classList.add('attacking');
+  setTimeout(() => sprite.classList.remove('attacking'), 600);
+}
+
+function showCritical() {
+  const critText = document.getElementById('critical-text');
+  critText.style.display = 'block';
+  critText.style.animation = 'none';
+  setTimeout(() => {
+    critText.style.animation = 'criticalPop 1s ease-out forwards';
+  }, 10);
+  setTimeout(() => {
+    critText.style.display = 'none';
+  }, 1000);
+
+  // Add glow to enemy
+  const enemySprite = document.getElementById('enemy-sprite');
+  enemySprite.classList.add('critical-glow');
+  setTimeout(() => enemySprite.classList.remove('critical-glow'), 400);
+}
+
+function updateCombo(hit) {
+  if (hit) {
+    comboCount++;
+    const comboEl = document.getElementById('combo-counter');
+    const comboNumEl = document.getElementById('combo-num');
+
+    if (comboCount >= 2) {
+      comboEl.classList.add('show');
+      comboNumEl.textContent = comboCount;
+
+      // Clear previous timer
+      clearTimeout(comboTimer);
+
+      // Reset combo after 3 seconds of no hits
+      comboTimer = setTimeout(() => {
+        resetCombo();
+      }, 3000);
+    }
+  } else {
+    resetCombo();
+  }
+}
+
+function resetCombo() {
+  comboCount = 0;
+  const comboEl = document.getElementById('combo-counter');
+  comboEl.classList.remove('show');
+  setTimeout(() => {
+    document.getElementById('combo-num').textContent = '0';
+  }, 300);
+}
+
+function setDefendingState(isPlayer, active) {
+  const sprite = document.getElementById(isPlayer ? 'player-sprite' : 'enemy-sprite');
+  if (active) {
+    sprite.classList.add('defending');
+  } else {
+    sprite.classList.remove('defending');
+  }
+}
+
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 /* ════════════════════════════════════════════════════
@@ -843,6 +1367,10 @@ function transitionToBattle(player, battle, enemy) {
 function updateBattleUI(player, battle, enemy) {
   if (!player || !battle || !enemy) return;
   const cls = CLASSES_META[player.class] || CLASSES_META.shadow;
+
+  // Update sprites
+  document.getElementById('player-sprite').innerHTML = getNinjaSprite(player.class);
+  document.getElementById('enemy-sprite').innerHTML = getEnemySprite(enemy.name);
 
   // Player
   document.getElementById('p-emoji').textContent   = cls.emoji;
@@ -930,9 +1458,26 @@ function renderLog(logJson) {
   catch { entries = []; }
   const el = document.getElementById('combat-log');
   el.innerHTML = entries.map(e => {
-    const cls = e.actor === 'player' ? 'entry-player' :
-                e.actor === 'enemy'  ? 'entry-enemy'  : 'entry-system';
-    return `<div class="${cls}">${esc(e.msg)}</div>`;
+    // Detect critical hits in message
+    const isCritical = (e.msg || '').toLowerCase().includes('crítico') ||
+                       (e.msg || '').toLowerCase().includes('critical');
+
+    let cls = e.actor === 'player' ? 'entry-player' :
+              e.actor === 'enemy'  ? 'entry-enemy'  : 'entry-system';
+
+    if (isCritical) {
+      cls = 'entry-critical';
+    }
+
+    // Add icons based on action
+    let icon = '';
+    if (e.msg.includes('ataca')) icon = '⚔️ ';
+    if (e.msg.includes('habilidade') || e.msg.includes('especial')) icon = '✨ ';
+    if (e.msg.includes('defende') || e.msg.includes('bloqueia')) icon = '🛡️ ';
+    if (isCritical) icon = '💥 ';
+    if (e.msg.includes('fugiu') || e.msg.includes('escapou')) icon = '🏃 ';
+
+    return `<div class="${cls}">${icon}${esc(e.msg)}</div>`;
   }).join('');
   el.scrollTop = el.scrollHeight;
 }
@@ -960,6 +1505,17 @@ async function doAction(action) {
   phaseEl.textContent = 'PROCESSANDO...';
   phaseEl.className   = 'phase-indicator wait';
 
+  // Player attack animation
+  if (action === 'attack' || action === 'special') {
+    playAttackAnimation(true);
+    await sleep(300); // Wait for attack to land
+  }
+
+  // Set defending state
+  if (action === 'defend') {
+    setDefendingState(true, true);
+  }
+
   let data;
   try {
     data = await callCgi(CGI_PY, { action });
@@ -984,8 +1540,27 @@ async function doAction(action) {
 
   // Show damage splash on enemy card
   if (data.hit || data.sp_dmg) {
-    showDmgSplash('enemy-card', 'enemy-hit', '-' + (data.hit || data.sp_dmg));
+    const dmg = data.hit || data.sp_dmg;
+    const isCritical = data.critical || false;
+
+    showDmgSplash('enemy-card', 'enemy-hit', '-' + dmg);
     shakeEl('enemy-card');
+    shakeEnemy();
+    showAttackEffect(data.sp_dmg ? 'special' : 'attack');
+
+    // Critical hit
+    if (isCritical) {
+      await sleep(200);
+      showCritical();
+      updateCombo(true);
+    } else if (data.hit) {
+      updateCombo(true);
+    }
+
+    await sleep(400); // Delay after hit for impact feel
+  } else if (action === 'attack') {
+    // Missed attack
+    updateCombo(false);
   }
 
   // Check outcome
@@ -998,6 +1573,8 @@ async function doAction(action) {
 
   updateBattleUI(lastPlayer, lastBattle, lastEnemy);
 
+  await sleep(300); // Delay before enemy turn
+
   // If it's now enemy turn, call PHP
   if (data.next === 'php_enemy_turn') {
     await doEnemyTurn();
@@ -1007,6 +1584,12 @@ async function doAction(action) {
 }
 
 async function doEnemyTurn() {
+  await sleep(500); // Dramatic pause before enemy attacks
+
+  // Enemy attack animation
+  playAttackAnimation(false);
+  await sleep(300);
+
   let eData;
   try {
     eData = await callCgi(CGI_PHP, { action: 'enemy_turn' });
@@ -1026,8 +1609,12 @@ async function doEnemyTurn() {
   if (eData.dmg_dealt > 0) {
     showDmgSplash('player-card', 'player-hit', '-' + eData.dmg_dealt);
     shakeEl('player-card');
+    shakePlayer();
+    showAttackEffect('attack');
+    await sleep(400); // Impact delay
   } else {
     showDmgSplash('player-card', 'player-hit', '0');
+    await sleep(200);
   }
 
   // Update state from PHP response
@@ -1036,6 +1623,8 @@ async function doEnemyTurn() {
   if (eData.enemy)  lastEnemy  = eData.enemy;
 
   updateBattleUI(lastPlayer, lastBattle, lastEnemy);
+
+  await sleep(300); // Delay before resolve
 
   // Python resolves the round
   if (eData.next === 'py_resolve') {
