@@ -154,6 +154,11 @@ time_t Client::getLastActivity() const
     return last_activity;
 }
 
+time_t    Client::getCgiStartTime() const
+{
+    return cgi.start_time;
+}
+
 bool Client::hasDataToSend() const
 {
     return !send_buffer.empty() && send_offset < send_buffer.size();
