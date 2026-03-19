@@ -97,12 +97,13 @@ public:
     bool                isKeepAlive() const;
     bool                isDone() const;
     time_t              getLastActivity() const;
+    time_t              getCgiStartTime() const;
     bool                hasDataToSend() const;
     bool                isCgiActive() const { return is_cgi_active; }
     void                cleanupCgiIfActive(int epoll_fd);
 
     // FDs do CGI (para epoll no Server)
-
+    void sendTimeoutResponse();
     // Recepção de dados
     void                appendRecvData(const char* data, size_t len);
     bool                isRequestComplete();

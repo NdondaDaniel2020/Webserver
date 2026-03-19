@@ -17,7 +17,6 @@ Server::Server(const ConfigParser &config)
       config(config),
       TIMEOUT_SECONDS(120)
 {
-    // ---------- Portas ----------
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
     for (int i = 0; i < this->port_count; i++)
@@ -26,23 +25,31 @@ Server::Server(const ConfigParser &config)
         this->interface[i] = config.getServerConfig(i).interface;
     }
 
-    // ---------- Criar epoll ----------
     this->epoll_fd = epoll_create(1);
     if (this->epoll_fd < 0)
+    {
         perror("epoll_create");
+        return;
+    }
 
-    // ---------- Criar sockets servidores ----------
     this->servers = new int[this->port_count];
     for (int i = 0; i < this->port_count; i++)
     {
         this->servers[i] = createServerSocket(this->interface[i], this->ports[i]);
         if (this->servers[i] < 0)
+        {
+            std::cerr << "[ERRO] Falha ao criar socket para porta "
+                      << this->ports[i]
+                      << " — abortando" << std::endl;
+            // Fecha os sockets já criados
+            for (int j = 0; j < i; j++)
+                close(this->servers[j]);
             return;
+        }
 
         epoll_event ev;
-        ev.events = EPOLLIN;
+        ev.events  = EPOLLIN;
         ev.data.fd = this->servers[i];
-
         epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, this->servers[i], &ev);
     }
 }
@@ -273,32 +280,83 @@ bool Server::isServerSocket(int fd) const
     return false;
 }
 
+void Client::sendTimeoutResponse()
+{
+    std::string body =
+        "<html><body><h1>504 Gateway Timeout</h1>"
+        "<p>O processo CGI demorou demasiado tempo.</p></body></html>";
+
+    std::ostringstream oss;
+    oss << "HTTP/1.1 504 Gateway Timeout\r\n"
+        << "Content-Type: text/html\r\n"
+        << "Content-Length: " << body.size() << "\r\n"
+        << "Connection: close\r\n"
+        << "\r\n"
+        << body;
+
+    send_buffer = oss.str();
+    send_offset = 0;
+    keep_alive  = false;
+    state       = SENDING_RESPONSE;
+
+    // Envia directamente — não espera pelo epoll
+    write(fd, send_buffer.c_str(), send_buffer.size());
+}
+
 void Server::checkTimeout()
 {
     time_t now = time(NULL);
+    std::vector<int> to_close;
+    std::vector<int> cgi_timeout;
 
-    // Iterar sobre todos os clientes
-    for (std::map<int, Client *>::iterator it = clients.begin(); it != clients.end();)
+    for (std::map<int, Client*>::iterator it = clients.begin();
+         it != clients.end(); ++it)
     {
-        Client *client = it->second;
-        int client_fd = it->first;
+        int     client_fd = it->first;
+        Client* client    = it->second;
 
-        // Verificar se o cliente está inativo por mais tempo que TIMEOUT_SECONDS
-        time_t time_inactive = now - client->getLastActivity();
-
-        if (time_inactive > TIMEOUT_SECONDS)
+        if (client->isCgiActive())
         {
-            std::cout << "[TIMEOUT] Cliente " << client_fd << " inativo por "
-                      << time_inactive << " segundos (limite: "
-                      << TIMEOUT_SECONDS << ")" << std::endl;
-
-            // Avança o iterador ANTES de fechar o cliente (fechar remove o elemento)
-            ++it;
-            closeClient(client_fd);
+            if (now - client->getCgiStartTime() > 10)
+            {
+                std::cout << "[TIMEOUT] CGI fd=" << client_fd
+                          << " excedeu 10s" << std::endl;
+                cgi_timeout.push_back(client_fd);
+                continue;
+            }
         }
-        else
-            ++it;
+
+        if (now - client->getLastActivity() > TIMEOUT_SECONDS)
+        {
+            std::cout << "[TIMEOUT] Cliente fd=" << client_fd
+                      << " inactivo por "
+                      << (now - client->getLastActivity())
+                      << "s" << std::endl;
+            to_close.push_back(client_fd);
+        }
     }
+
+    // CGI timeout — envia 504 antes de fechar
+    for (size_t i = 0; i < cgi_timeout.size(); i++)
+    {
+        std::map<int, Client*>::iterator it = clients.find(cgi_timeout[i]);
+        if (it == clients.end()) continue;
+        Client* client = it->second;
+
+        // Mata o CGI
+        client->cleanupCgiIfActive(this->epoll_fd);
+
+        // Remove pipes do mapa
+        if (client->getCgiOutFd() >= 0) cgi_fd_map.erase(client->getCgiOutFd());
+        if (client->getCgiInFd()  >= 0) cgi_fd_map.erase(client->getCgiInFd());
+
+        // Envia 504 e fecha
+        client->sendTimeoutResponse();
+        to_close.push_back(cgi_timeout[i]);
+    }
+
+    for (size_t i = 0; i < to_close.size(); i++)
+        closeClient(to_close[i]);
 }
 
 int Server::createServerSocket(const std::string &interface, int port)
@@ -312,23 +370,22 @@ int Server::createServerSocket(const std::string &interface, int port)
 
     int opt = 1;
     setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    setsockopt(server_fd, SOL_SOCKET, SO_REUSEPORT, &opt, sizeof(opt)); // ← adicionar
 
     sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
+    addr.sin_family      = AF_INET;
     addr.sin_addr.s_addr = htonl(ipToHex(interface));
-    addr.sin_port = htons(port);
+    addr.sin_port        = htons(port);
 
     if (bind(server_fd, (sockaddr *)&addr, sizeof(addr)) < 0)
     {
+        std::cerr << "[ERRO] Porta " << port << " já está ocupada" << std::endl;
         close(server_fd);
-        perror("bind");
-        std::ostringstream oss;
-        oss << "Falha ao bindar socket na interface " << interface << " e porta " << port;
-        throw std::runtime_error(oss.str());
+        return -1;
     }
 
-    if (listen(server_fd, 10) < 0)
+    if (listen(server_fd, SOMAXCONN) < 0) // SOMAXCONN em vez de 10
     {
         perror("listen");
         close(server_fd);
