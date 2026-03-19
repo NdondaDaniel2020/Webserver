@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 11:28:54 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/19 13:31:01 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -321,9 +321,11 @@ int Server::createServerSocket(const std::string &interface, int port)
 
     if (bind(server_fd, (sockaddr *)&addr, sizeof(addr)) < 0)
     {
-        perror("bind");
         close(server_fd);
-        return -1;
+        perror("bind");
+        std::ostringstream oss;
+        oss << "Falha ao bindar socket na interface " << interface << " e porta " << port;
+        throw std::runtime_error(oss.str());
     }
 
     if (listen(server_fd, 10) < 0)
