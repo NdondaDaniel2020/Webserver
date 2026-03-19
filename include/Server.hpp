@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 14:26:24 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/19 10:41:44 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,6 +35,7 @@ class Server
         int                      epoll_fd;
         int*                     servers;
         int                      port_count;
+        std::map<int, int>       customer_origin;
         std::string*             interface;
         epoll_event              events[64];
         const ConfigParser&      config;

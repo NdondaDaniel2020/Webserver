@@ -40,9 +40,9 @@ struct ServerConfig {
     size_t client_max_body_size;
     std::vector<LocationConfig> locations;
     
-    ServerConfig() : port(8080), 
-                     server_name("localhost"),
-                     root("www"),
+    ServerConfig() : port(0), 
+                     server_name(""),
+                     root(""),
                      client_max_body_size(0) {}
 };
 
