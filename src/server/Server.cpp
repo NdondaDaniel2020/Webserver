@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 10:53:37 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/19 11:28:54 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -22,12 +22,6 @@ Server::Server(const ConfigParser &config)
     this->interface = new std::string[this->port_count];
     for (int i = 0; i < this->port_count; i++)
     {
-        // print roots and ports n interface
-        std::cout << "Config Server " << i << ": port=" << config.getServerConfig(i).port
-                  << " interface=" << config.getServerConfig(i).interface
-                  << " root=" << config.getServerConfig(i).root
-                  << std::endl;
-
         this->ports[i] = config.getServerConfig(i).port;
         this->interface[i] = config.getServerConfig(i).interface;
     }

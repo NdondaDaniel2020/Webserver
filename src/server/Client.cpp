@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 10:02:12 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/19 11:49:57 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -320,10 +320,9 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
     const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
     if (location && !location->cgi_handlers.empty())
     {
-        bool method_allowed = true;
+        bool method_allowed = false;
         if (!location->allowed_methods.empty())
         {
-            method_allowed = false;
             for (size_t i = 0; i < location->allowed_methods.size(); ++i)
             {
                 if (location->allowed_methods[i] == request.getMethod())
