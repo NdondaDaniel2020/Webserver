@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 11:49:57 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/19 12:22:37 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -332,7 +332,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
                 }
             }
         }
-        
+
         if (!method_allowed)
         {
             std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
@@ -459,12 +459,21 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
 {
     std::string error_msg = "Fail CGI";
     std::string script_path = loc.root + req.getPath().substr(loc.path.size());
+    std::cout << "[CGI] Script path: " << script_path << std::endl;
     size_t pos = script_path.find('.');
     std::string ext;
-    if (pos != std::string::npos)
+    if (pos != std::string::npos )
         ext = script_path.substr(pos);
     else
        ext = "" ;
+    if (!fileExists(script_path))
+    {
+        StatusCodes::http404NotFound(error_msg, req, script_path, server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
     std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
     if (it == loc.cgi_handlers.end())
     {

@@ -78,7 +78,6 @@ namespace ConfigHelper
             std::string method;
             while (iss >> method)
             {
-                std::cout << "Allowed method: " << method << std::endl;
                 if (method.empty() || (method != "GET" && method != "POST" && method != "DELETE"))
                     throw std::runtime_error("invalid HTTP method in allowed_methods: " + method);
                 location.allowed_methods.push_back(method);

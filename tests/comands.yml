@@ -8,6 +8,7 @@ comands:
   wrk -t4 -c100 -d20s http://127.0.0.1:8080/index.html
   siege -c50 -r100 http://127.0.0.1:8080/index.html
 
+  curl -X POST -H "Content-Type: plain/text" --data "abc"
 cgi:
   curl -s -X POST http://127.0.0.1:8080/cgi-bin/form_save.py \
   -H "Content-Type: application/x-www-form-urlencoded" \

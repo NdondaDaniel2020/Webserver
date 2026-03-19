@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 08:09:34 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/19 12:20:30 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,7 @@
 #include "HttpRequest.hpp"
 #include "Response.hpp"
 #include "ConfigParser.hpp"
+#include "FileUtils.hpp"
 
 class Client
 {
