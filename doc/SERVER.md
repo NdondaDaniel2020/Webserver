@@ -998,3 +998,848 @@ A classe **Server** implementa um servidor HTTP **eficiente, escalável e robust
 - **Escalabilidade:** Testado com 1000+ conexões simultâneas via epoll
 
 O código está pronto para cenários de **alta carga** em produção. Design é facilmente extensível para novos recursos (IPv6, SSL/TLS, HTTP/2) sem mudanças arquiteturais.
+
+---
+
+## 📖 ANÁLISE TÉCNICA DETALHADA DOS MÉTODOS PRIVADOS
+
+### 🔧 Método: handleClientData(int fd)
+
+**Localização:** [src/server/Server.cpp, linhas 180-218](src/server/Server.cpp#L180-L218)
+
+**Propósito:** Processar dados recebidos de um cliente (HTTP header/body) ou preparar resposta
+
+**Fluxo de 3 Fases:**
+
+#### **Fase 1: Localizar Cliente (L182-186)**
+```cpp
+std::map<int, Client *>::iterator it = this->clients.find(fd);
+if (it == this->clients.end()) {
+    std::cerr << "[ERRO] Cliente fd=" << fd << " não encontrado" << std::endl;
+    return;
+}
+Client *client = it->second;
+```
+- Busca FD no map `this->clients`
+- Se não encontrar: retorna silenciosamente (evita crash)
+
+#### **Fase 2: Leitura de Dados HTTP (L188-210)**
+```cpp
+if (client->getState() == Client::READING_HEADERS ||
+    client->getState() == Client::READING_BODY)
+{
+    char buf[4096];
+    int r = read(fd, buf, sizeof(buf));  // Non-blocking
+    
+    if (r <= 0) {  // EOF (0) ou erro (<0)
+        std::cout << "[-] Cliente desconectado fd=" << fd << std::endl;
+        closeClient(fd);
+        return;
+    }
+    
+    client->appendRecvData(buf, r);  // Acumula no buffer interno
+    
+    if (client->isRequestComplete()) {
+        // Processa requisição HTTP e gera resposta
+        client->processRequest(
+            this->config.getServerConfig(client->getServerIndex()),
+            this->epoll_fd
+        );
+        
+        // 📌 CRÍTICO: Registar pipes CGI no mapa separado (L205-209)
+        if (client->isCgiActive()) {
+            int out_fd = client->getCgiOutFd();
+            int in_fd = client->getCgiInFd();
+            if (out_fd >= 0)
+                cgi_fd_map[out_fd] = client;  // ← Pipe stdout
+            if (in_fd >= 0)
+                cgi_fd_map[in_fd] = client;   // ← Pipe stdin
+        }
+    }
+}
+```
+
+⚠️ **Detalhe Crítico:** O socket é **não-bloqueante** (epoll), logo `read()` retorna imediatamente
+
+#### **Fase 3: Envio de Resposta (L211-218)**
+```cpp
+if (client->getState() == Client::SENDING_RESPONSE) {
+    if (client->hasDataToSend()) {
+        bool finished = client->sendData();  // L214
+        if (finished) {
+            if (client->isKeepAlive())
+                client->reset();      // Prepara para nova requisição
+            else
+                closeClient(fd);      // Desconecta
+        } else
+            closeClient(fd);          // Erro ao enviar
+    }
+}
+```
+
+**Parâmetros:**
+- `fd` (int): File descriptor do cliente a processar
+
+**Efeitos Colaterais:**
+- ✅ Acumula dados em Client::recv_buffer
+- ✅ Chama Client::processRequest() quando requisição completa
+- ✅ Limpa Client::send_buffer ao enviar resposta
+- ✅ Registra pipes CGI em `cgi_fd_map` se CGI ativo
+
+---
+
+### 🔧 Método: closeClient(int fd)
+
+**Localização:** [src/server/Server.cpp, linhas 220-247](src/server/Server.cpp#L220-L247)
+
+**Propósito:** Limpar e desconectar um cliente completamente
+
+**Fluxo de 9 Fases (Ordem Crítica!):**
+
+```cpp
+void Server::closeClient(int fd)
+{
+    // FASE 1: Buscar Client no map (L222-224)
+    std::map<int, Client *>::iterator it = this->clients.find(fd);
+    if (it == this->clients.end())
+        return;
+    Client *client = it->second;
+    
+    // FASE 2: Guardar FDs de pipes CGI ANTES de limpar (L227-234)
+    int cgi_out = -1;
+    int cgi_in = -1;
+    if (client->isCgiActive()) {
+        cgi_out = client->getCgiOutFd();
+        cgi_in = client->getCgiInFd();
+    }
+    
+    // FASE 3: Limpar CGI (mata processo, fecha pipes) (L235)
+    client->cleanupCgiIfActive(this->epoll_fd);
+    
+    // FASE 4: Remover pipes do mapa separado (L238-241)
+    if (cgi_out >= 0)
+        cgi_fd_map.erase(cgi_out);
+    if (cgi_in >= 0)
+        cgi_fd_map.erase(cgi_in);
+    
+    // FASE 5: Deletar objeto Client (libera Response) (L243)
+    delete client;
+    
+    // FASE 6: Remover do map clients (L244)
+    this->clients.erase(it);
+    
+    // FASE 7: Remover do epoll (L246)
+    epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    
+    // FASE 8: Fechar socket (L247)
+    close(fd);
+}
+```
+
+⚠️ **ORDEM é CRÍTICA:**
+1. Guardar FDs antes de limpar (para poder removê-los do mapa)
+2. Limpar CGI ANTES de deletar objeto (para SIGTERM chegar ao processo)
+3. Deletar ANTES de erase() (evita acesso após-morte)
+4. Erase ANTES de epoll_ctl DEL (FD pode ser reutilizado)
+5. epoll_ctl DEL ANTES de close() (FD deve estar válido para epoll)
+
+**Parâmetros:**
+- `fd` (int): File descriptor do cliente a fechar
+
+**Efeitos Colaterais:**
+- ✅ Mata processo CGI (se ativo)
+- ✅ Libera Request + Response objects
+- ✅ Desregistra todas as notificações epoll
+- ✅ Fecha socket TCP
+- ✅ Reduz contadores internos
+
+---
+
+### 🔧 Método: isServerSocket(int fd) const
+
+**Localização:** [src/server/Server.cpp, linhas 249-256](src/server/Server.cpp#L249-L256)
+
+**Propósito:** Determinar se um FD é socket servidor (listening) ou cliente
+
+```cpp
+bool Server::isServerSocket(int fd) const  // Método constante
+{
+    for (int i = 0; i < this->port_count; i++) {
+        if (fd == this->servers[i])
+            return true;
+    }
+    return false;
+}
+```
+
+**Uso:**
+```cpp
+// Em start() linha 80:
+if (isServerSocket(events[i].data.fd)) {
+    newConnection(events[i].data.fd);  // Aceitar conexão novo cliente
+} else {
+    handleClientData(events[i].data.fd);  // Processar dados cliente
+}
+```
+
+**Retorno:**
+- `true`: É socket servidor (tem `listen()` ativo)
+- `false`: É socket cliente ou inválido
+
+**Complexidade:** O(port_count) - tipicamente 1-4 iterações
+
+---
+
+### 🔧 Método: checkTimeout()
+
+**Localização:** [src/server/Server.cpp, linhas 309-362](src/server/Server.cpp#L309-L362)
+
+**Propósito:** Detectar e fechar conexões inativas ou processos CGI travados
+
+**3 Valores de Timeout:**
+
+| Timeout | Valor | Contexto | Linha |
+|---------|-------|---------|-------|
+| **epoll_wait** | 1000ms | Max tempo bloqueado esperando eventos | 71 |
+| **CGI** | 10 segundos | Execução levar > 10s → enviar 504 | 324 |
+| **Inatividade Cliente** | 120 segundos | Cliente sem atividade → desconectar | 329 |
+
+**Fluxo de 3 Fases:**
+
+#### **Fase 1: Iterar Clientes (L315-334)**
+```cpp
+time_t now = time(NULL);
+std::vector<int> to_close;      // Clientes com timeout
+std::vector<int> cgi_timeout;   // Clientes com CGI timeout
+
+for (std::map<int, Client *>::iterator it = clients.begin();
+     it != clients.end(); ++it)
+{
+    int client_fd = it->first;
+    Client *client = it->second;
+    
+    // 1A: Verificar CGI timeout (10 segundos)
+    if (client->isCgiActive()) {
+        if (now - client->getCgiStartTime() > 10) {
+            std::cout << "[TIMEOUT] CGI fd=" << client_fd
+                      << " excedeu 10s" << std::endl;
+            cgi_timeout.push_back(client_fd);
+            continue;  // Não verificar cliente para este
+        }
+    }
+    
+    // 1B: Verificar timeout inatividade (120 segundos)
+    if (now - client->getLastActivity() > TIMEOUT_SECONDS) {  // L329
+        std::cout << "[TIMEOUT] Cliente fd=" << client_fd
+                  << " inactivo por "
+                  << (now - client->getLastActivity())
+                  << "s" << std::endl;
+        to_close.push_back(client_fd);
+    }
+}
+```
+
+#### **Fase 2: Processar CGI Timeouts (L336-356)**
+```cpp
+for (size_t i = 0; i < cgi_timeout.size(); i++) {
+    std::map<int, Client *>::iterator it = clients.find(cgi_timeout[i]);
+    if (it == clients.end())
+        continue;
+    Client *client = it->second;
+    
+    // Matar processo CGI
+    client->cleanupCgiIfActive(this->epoll_fd);  // SIGTERM ao processo
+    
+    // Remover pipes do mapa
+    if (client->getCgiOutFd() >= 0)
+        cgi_fd_map.erase(client->getCgiOutFd());
+    if (client->getCgiInFd() >= 0)
+        cgi_fd_map.erase(client->getCgiInFd());
+    
+    // Enviar resposta 504 Gateway Timeout
+    client->sendTimeoutResponse();  // L351
+    
+    // Marcar para fechar
+    to_close.push_back(cgi_timeout[i]);
+}
+```
+
+#### **Fase 3: Fechar Clientes (L358-359)**
+```cpp
+for (size_t i = 0; i < to_close.size(); i++)
+    closeClient(to_close[i]);  // Limpa cada um com ordem correta
+```
+
+**Chamada:**
+- [Linha 69](src/server/Server.cpp#L69) - Chamado **antes** de cada `epoll_wait()`
+
+⚠️ **Design:** Verifica timeouts antes de esperar eventos, garantindo que ao menos a cada 1s o loop verifica inatividade
+
+---
+
+### 🔧 Método: createServerSocket(const std::string &interface, int port)
+
+**Localização:** [src/server/Server.cpp, linhas 380-430](src/server/Server.cpp#L380-L430)
+
+**Propósito:** Criar socket servidor listening em port específico e interface (IP)
+
+**Fluxo de 8 Fases:**
+
+#### **Fase 1: Criar Socket (L380-385)**
+```cpp
+int server_fd = socket(AF_INET, SOCK_STREAM, 0);  // L380
+if (server_fd < 0) {
+    std::cerr << "[ERRO] Falha ao criar socket" << std::endl;
+    return -1;
+}
+```
+
+#### **Fase 2: Ativar SO_REUSEADDR (L387-390)**
+```cpp
+int reuse = 1;
+setsockopt(server_fd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(int));
+// Permite reusar porta imediatamente após close() (evita TIME_WAIT)
+```
+
+#### **Fase 3: Preparar Endereço (L392-398)**
+```cpp
+struct sockaddr_in addr;
+memset(&addr, 0, sizeof(addr));
+addr.sin_family = AF_INET;
+addr.sin_port = htons(port);  // Converter porta para network byte order
+addr.sin_addr.s_addr = htonl(ipToHex(interface));  // ← Novo! Interface binding
+// ipToHex("127.0.0.1") → 0x7F000001
+// ipToHex("0.0.0.0")    → 0x00000000
+```
+
+#### **Fase 4: Bind Socket (L400-405)**
+```cpp
+if (bind(server_fd, (sockaddr *)&addr, sizeof(addr)) < 0) {
+    std::cerr << "[ERRO] Porta " << port << " já está ocupada" << std::endl;
+    close(server_fd);
+    return -1;
+}
+```
+
+#### **Fase 5: Listen (L407-410)**
+```cpp
+if (listen(server_fd, SOMAXCONN) < 0) {  // SOMAXCONN ~128
+    std::cerr << "[ERRO] Listen falhou" << std::endl;
+    close(server_fd);
+    return -1;
+}
+```
+
+#### **Fase 6: Ativar Non-Blocking (L412-427)**
+```cpp
+int flags = fcntl(server_fd, F_GETFL);
+if (flags < 0) {
+    perror("fcntl(F_GETFL)");
+    close(server_fd);
+    return -1;
+}
+flags |= O_NONBLOCK;
+if (fcntl(server_fd, F_SETFL, flags) < 0) {
+    perror("fcntl(F_SETFL)");
+    close(server_fd);
+    return -1;
+}
+```
+
+#### **Fase 7: Registar no Epoll (L425-430)**
+```cpp
+epoll_event ev;
+ev.events = EPOLLIN;  // Monitorar leitura (novas conexões)
+ev.data.fd = server_fd;
+epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, server_fd, &ev);
+```
+
+#### **Fase 8: Retornar FD (L429)**
+```cpp
+return server_fd;
+```
+
+**Parâmetros:**
+- `interface` (string): IP binding (ex: "127.0.0.1", "0.0.0.0")
+- `port` (int): Porta (ex: 8080)
+
+**Retorno:**
+- `≥ 0`: FD socket servidor
+- `-1`: Erro (socket não criado)
+
+---
+
+### 🔧 Método: newConnection(int server_fd)
+
+**Localização:** [src/server/Server.cpp, linhas 148-178](src/server/Server.cpp#L148-L178)
+
+**Propósito:** Aceitar nova conexão de cliente e registá-la no sistema
+
+**Fluxo de 7 Fases:**
+
+#### **Fase 1: Accept Conexão (L150-158)**
+```cpp
+sockaddr_in client_addr;
+socklen_t client_addr_len = sizeof(client_addr);
+
+int client_fd = accept(server_fd, (sockaddr *)&client_addr, &client_addr_len);
+
+if (client_fd < 0) {
+    std::cerr << "[ERRO] Accept falhou: " << strerror(errno) << std::endl;
+    return;
+}
+```
+
+#### **Fase 2: Ativar Non-Blocking (L160-165)**
+```cpp
+int flags = fcntl(client_fd, F_GETFL);
+flags |= O_NONBLOCK;
+fcntl(client_fd, F_SETFL, flags);
+```
+
+#### **Fase 3: Determinar Server Index (L161-167)**
+```cpp
+// Descobrir qual servidor (porta) recebeu conexão
+int server_index = -1;
+for (int i = 0; i < this->port_count; i++) {
+    if (server_fd == this->servers[i]) {
+        server_index = i;  // Encontrou!
+        break;
+    }
+}
+```
+⚠️ **Detalhe:** Necessário para `Client` saber qual ServerConfig usar na requisição
+
+#### **Fase 4: Criar Objeto Client (L168-171)**
+```cpp
+Client *client = new Client(
+    client_fd,              // File descriptor
+    &this->config,          // Pointer ao ConfigParser
+    server_index            // Índice server block
+);
+```
+
+#### **Fase 5: Inserir no Map (L170)**
+```cpp
+this->clients[client_fd] = client;
+```
+
+#### **Fase 6: Registar no Epoll (L172-176)**
+```cpp
+epoll_event cev;
+cev.events = EPOLLIN | EPOLLOUT;  // Monitorar leitura E escrita
+cev.data.fd = client_fd;
+epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, client_fd, &cev);
+```
+
+#### **Fase 7: Logging (L178)**
+```cpp
+std::cout << "[+] Nova conexão fd=" << client_fd
+          << " de " << inet_ntoa(client_addr.sin_addr) << std::endl;
+```
+
+**Parâmetros:**
+- `server_fd` (int): FD servidor que recebeu conexão (de `events[i].data.fd`)
+
+---
+
+## 🔗 INTEGRAÇÃO CGI VIA cgi_fd_map
+
+### 🎯 Problema Resolvido
+
+Na versão anterior, um cliente com CGI ativo criava pipes (stdout/stdin) mas estes FDs **não eram monitorados por epoll**:
+
+```
+Cliente recebe requisição CGI
+         ↓
+Client::processRequest() faz fork()
+         ↓
+Pipes criados (FD N stdout, FD M stdin)
+         ↓
+❌ PROBLEMA: epoll não monitora estes pipes!
+         ↓
+Dados do CGI nunca são lidos ✗
+```
+
+### ✅ Solução: Map Separado cgi_fd_map
+
+**Definição** (Server.hpp, linha 40):
+```cpp
+std::map<int, Client*> cgi_fd_map;  // FD pipe → Cliente que o criou
+```
+
+**Registro** (handleClientData, linhas 205-209):
+```cpp
+if (client->isCgiActive()) {
+    int out_fd = client->getCgiOutFd();  // Stdout pipe
+    int in_fd = client->getCgiInFd();    // Stdin pipe
+    if (out_fd >= 0)
+        cgi_fd_map[out_fd] = client;     // ← Registar aqui
+    if (in_fd >= 0)
+        cgi_fd_map[in_fd] = client;
+}
+```
+
+**Fluxo Completo:**
+
+```
+CLIENTE CONECTA
+         ↓
+[start() L84-87] Achado em clients[]
+         ↓
+handleClientData(client_fd)
+         ↓
+Requisição é CGI?
+    ├─ SIM: client->processRequest() ← fork() acontece aqui
+    │        ├─ Pipes (N, M) criados em internos de Client
+    │        └─ [L206-209] Registar em cgi_fd_map[N]=client, cgi_fd_map[M]=client
+    │
+    └─ NÃO: Resposta gerada normalmente
+
+PRÓXIMA ITERAÇÃO DE epoll_wait()
+         ↓
+[start() L78] eventos[] tem FD N (stdout) ou FD M (stdin)
+         ↓
+[start() L84] NÃO está em clients.find(N) ✗
+         ↓
+[start() L119] Verificar em cgi_fd_map.find(N) ✓
+         ↓
+[start() L121/124] client->handleCgiStdoutReadable()  ou
+                    client->handleCgiStdinWritable()
+         ↓
+Dados CGI são acumulados em Response
+         ↓
+Próxima iteração: Client está ready para enviar
+         ↓
+[handleClientData(client_fd)] SENDING_RESPONSE
+         ↓
+Response (com output CGI) é enviada
+         ↓
+closeClient(client_fd)
+         ↓
+[Fase 4 de closeClient] Remover pipes de cgi_fd_map
+```
+
+### 📊 Tabela de Rotas
+
+| Evento epoll | FD | Código | Ação |
+|---|---|---|---|
+| EPOLLIN | client_fd | start():87 | → handleClientData() lê header/body |
+| EPOLLIN | cgi_fd (stdout) | start():119 | → clients[cgi_fd_map[fd]]->handleCgiStdoutReadable() |
+| EPOLLOUT | cgi_fd (stdin) | start():124 | → clients[cgi_fd_map[fd]]->handleCgiStdinWritable() |
+| EPOLLIN | server_fd | start():80 | → newConnection() aceita cliente novo |
+
+### ⚠️ Race Condition Teórica
+
+```cpp
+// Em handleClientData() L205:
+if (client->isCgiActive()) {
+    int out_fd = client->getCgiOutFd();
+    cgi_fd_map[out_fd] = client;  // L207
+}
+
+// Janela de corrida:
+// Tempo 1: out_fd retornado (ex: 10)
+// Tempo 2: [JANELA] Outro thread poderia deletar este FD? 
+//          NÃO: servidor é single-threaded
+// Tempo 3: FD 10 inserido no mapa
+
+```
+
+✅ **Seguro:** Servidor é **single-threaded**, sem race conditions
+
+---
+
+## ⚠️ IMPLEMENTAÇÕES FALTANTES E GAPS
+
+### ❌ Gap #1: Copy Constructor Não Implementado
+
+**Problema:**
+```cpp
+// Server.hpp linha 12 (declaração)
+Server(const Server &other);
+
+// Server.cpp: NÃO TEM IMPLEMENTAÇÃO ✗
+```
+
+**Risco:** Deep copy de `ports[]`, `servers[]`, `interface[]` não ocorre
+
+**Exemplo de Crash:**
+```cpp
+Server s1(config, 2, ports, interface);  // Aloca: ports[], servers[]
+Server s2 = s1;                          // Shallow copy!
+                                         // s2.ports = s1.ports (MESMO POINTER)
+
+// ...
+s1.~Server();                            // Deleta ports[], interface[]
+// s1.ports[0] agora é LIXO
+
+s2.start();  // Acessa s2.ports[0] ← SEGFAULT!
+```
+
+**Solução Recomendada:**
+```cpp
+Server::Server(const Server &other) 
+    : port_count(other.port_count), 
+      epoll_fd(-1),
+      config(other.config)
+{
+    // Deep copy arrays
+    this->ports = new int[port_count];
+    std::memcpy(this->ports, other.ports, sizeof(int) * port_count);
+    
+    this->servers = new int[port_count];
+    std::memcpy(this->servers, other.servers, sizeof(int) * port_count);
+    
+    this->interface = new std::string[port_count];
+    for (int i = 0; i < port_count; i++) {
+        this->interface[i] = other.interface[i];
+    }
+    
+    // Criar novo epoll (não compartilhar!)
+    this->epoll_fd = epoll_create(64);
+    
+    // ✗ NÃO copiar clients (são conexões ativas, não reutilizáveis)
+    // ✗ NÃO copiar cgi_fd_map (ID de mapas valem só para este epoll_fd)
+}
+```
+
+---
+
+### ❌ Gap #2: Operator= Não Implementado
+
+**Problema:**
+```cpp
+// Server.hpp linha 13 (declaração)
+Server &operator=(const Server &other);
+
+// Server.cpp: NÃO TEM IMPLEMENTAÇÃO ✗
+```
+
+**Risco:** Mesmo que copy constructor
+
+**Exemplo:**
+```cpp
+Server s1(config, 2, ports1, interfaces1);
+Server s2(config, 1, ports2, interfaces2);
+
+s1 = s2;  // Shallow copy!
+          // s1.ports = s2.ports (MESMO POINTER)
+          // s1.ports original é perdido (memory leak!)
+          // Depois s1 aponta para s2.ports
+```
+
+**Solução Recomendada:**
+```cpp
+Server &Server::operator=(const Server &other) {
+    if (this == &other)
+        return *this;  // Self-assignment guard
+    
+    // Limpar recursos antigos
+    this->~Server();
+    
+    // Copiar (reusar copy constructor lógica)
+    new (this) Server(other);  // Placement new + copy constructor
+    
+    return *this;
+}
+```
+
+---
+
+### ❌ Gap #3: Método stop() Não Implementado
+
+**Problema:**
+```cpp
+// Server.hpp linha 23 (declaração)
+void stop();
+
+// Server.cpp: DESAPARECEU (completamente) ✗
+```
+
+**Risco:** Linker error ao chamar `stop()`
+
+```cpp
+int main() {
+    Server server(config, ...);
+    server.start();  // OK
+    server.stop();   // ❌ LINKER ERROR: undefined reference to `Server::stop()'
+}
+```
+
+**Localização Esperada:** Server.cpp, após `start()` ([linha ~260](src/server/Server.cpp#L260))
+
+**Implementação Recomendada:**
+```cpp
+void Server::stop() {
+    std::cout << "[*] Parando servidor..." << std::endl;
+    
+    // FASE 1: Fechar todos os clientes
+    for (std::map<int, Client *>::iterator it = clients.begin();
+         it != clients.end(); ++it) {
+        closeClient(it->first);
+    }
+    
+    // FASE 2: Fechar todos os sockets servidor
+    for (int i = 0; i < port_count; i++) {
+        if (servers[i] >= 0) {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, servers[i], NULL);
+            close(servers[i]);
+            servers[i] = -1;
+        }
+    }
+    
+    // FASE 3: Destruir epoll
+    if (epoll_fd >= 0) {
+        close(epoll_fd);
+        epoll_fd = -1;
+    }
+    
+    std::cout << "[*] Servidor parado" << std::endl;
+}
+```
+
+---
+
+### ⚠️ Gap #4: epoll_wait Tempo Bloqueio
+
+**Situação Atual** (linha 71):
+```cpp
+int n = epoll_wait(this->epoll_fd, this->events, 64, 1000);
+```
+
+**Timeout Fixo:** 1000ms (1 segundo)
+
+**Implicações:**
+
+| Cenário | Impacto |
+|---------|---------|
+| Sem eventos por 10s | `checkTimeout()` roda a cada 1s (10x overhead) |
+| Milhares clientes | Loop continua 1000x/seg desnecessariamente |
+| High-latency network | Tempo mínimo resposta = 1s de round-trip |
+
+**Alternativa Dinâmica:**
+```cpp
+// Calcular tempo até próximo timeout
+int epoll_timeout = TIMEOUT_SECONDS * 1000;  // 120000ms
+std::map<int, Client *>::iterator it = clients.begin();
+if (it != clients.end()) {
+    time_t now = time(NULL);
+    time_t oldest = it->second->getLastActivity();
+    int wait_time = (TIMEOUT_SECONDS - (now - oldest)) * 1000;
+    epoll_timeout = (wait_time > 0) ? wait_time : 1;
+}
+
+int n = epoll_wait(this->epoll_fd, this->events, 64, epoll_timeout);
+```
+
+✅ **Benefício:** Recebe eventos prácticamente imediatamente + checkTimeout() ativa apenas quando necessário
+
+---
+
+### ⚠️ Gap #5: Destrutor Não Chama stop()
+
+**Atual** (Destrutor, linhas 54-62):
+```cpp
+Server::~Server() {
+    // Limpar clientes (mas sem closeClient!)
+    for (std::map<int, Client *>::iterator it = clients.begin();
+         it != clients.end(); ++it)
+        delete it->second;
+    clients.clear();
+    
+    // Limpar arrays
+    delete [] this->ports;
+    delete [] this->servers;
+    delete [] this->interface;
+    
+    // ❌ NÃO fecha epoll_fd! ✗
+    // ❌ NÃO fecha servers[] ✗
+}
+```
+
+**Problema:** File descriptors vazam!
+
+**Solução Recomendada:**
+```cpp
+Server::~Server() {
+    this->stop();  // ← Chama stop() para limpeza completa
+}
+```
+
+Ou completo:
+```cpp
+Server::~Server() {
+    // Limpar clientes com ORDEM CORRETA
+    std::vector<int> to_close;
+    for (std::map<int, Client *>::iterator it = clients.begin();
+         it != clients.end(); ++it)
+        to_close.push_back(it->first);
+    
+    for (size_t i = 0; i < to_close.size(); i++)
+        closeClient(to_close[i]);  // Usa ordem correcta
+    
+    // Fechar sockets servidor
+    for (int i = 0; i < port_count; i++) {
+        if (servers[i] >= 0) {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, servers[i], NULL);
+            close(servers[i]);
+        }
+    }
+    
+    // Fechar epoll
+    if (epoll_fd >= 0)
+        close(epoll_fd);
+    
+    // Limpar arrays
+    delete [] this->ports;
+    delete [] this->servers;
+    delete [] this->interface;
+}
+```
+
+---
+
+### 📊 Resumo Gaps
+
+| Gap | Localização | Impacto | Prioridade |
+|-----|-------------|--------|-----------|
+| Copy constructor | Server.cpp (missing) | Crash ao copiar Server | 🔴 Alta |
+| operator= | Server.cpp (missing) | Crash ao atribuir | 🔴 Alta |
+| stop() | Server.cpp (missing) | Linker error | 🔴 Alta |
+| Destrutor stop() | [L54-62](src/server/Server.cpp#L54-L62) | FD leak | 🟠 Média |
+| epoll_wait fixo | [L71](src/server/Server.cpp#L71) | Performance | 🟡 Baixa |
+| Validação argv | main.cpp | Crash se errado | 🟠 Média |
+
+---
+
+## 🎯 RECOMENDAÇÕES FINAIS
+
+### Para Produção
+
+1. ✅ Implementar **copy constructor** e **operator=** com deep copy
+2. ✅ Implementar e testar método **stop()**
+3. ✅ Chamar `stop()` no destrutor automaticamente
+4. ✅ Considerar timeout dinâmico em epoll_wait()
+5. ✅ Adicionar validação de argumentos em main.cpp
+6. ✅ Logging de FDs abertos/fechados para auditoria
+
+### Para Debugging
+
+```cpp
+// Adicionar no start() após epoll_wait():
+std::cout << "[DEBUG] Eventos: " << n << ", Clientes: " << clients.size()
+          << ", CGI pipes: " << cgi_fd_map.size() << std::endl;
+```
+
+### Testes Críticos
+
+- [ ] Copiar Server via copy constructor
+- [ ] Atribuir Server via operator=
+- [ ] Chamar stop() enquanto clientes conectados
+- [ ] Destruir Server com destrutor automático
+- [ ] CGI timeout funciona (10s)
+- [ ] Inatividade timeout funciona (120s)
+- [ ] Interface binding em 0.0.0.0 vs 127.0.0.1
+- [ ] epoll_wait recupera de EINTR (sinal)
+

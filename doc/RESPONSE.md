@@ -915,3 +915,1065 @@ O design garante que **qualquer requisição gera uma resposta HTTP válida**, m
 
 - **Criação:** 2 de Março de 2026 (análise + documentação)
 - **Arquivo Original:** 30 de Outubro de 2025 / Atualizado 28 de Fevereiro de 2026
+
+---
+
+## 📖 ANÁLISE TÉCNICA DETALHADA DOS MÉTODOS
+
+### Estrutura da Classe Response
+
+**Membros Privados (4):**
+
+| Campo | Tipo | Inicialização | Descrição |
+|-------|------||----|
+| `config` | `ServerConfig` | Constructor | Configurações do servidor (root, index_files, limits) |
+| `response_str` | `std::string` | buildHttpResponse() | Resposta HTTP completa (headers + CRLF + body) |
+| `protected_files` | `std::vector<std::string>` | Constructor L120 | Arquivos não-deletáveis (padrão: "index.html") |
+| `allowed_extensions` | `std::vector<std::string>` | Constructor L107-118 | Extensões permitidas em upload (11 tipos) |
+
+**Métodos Públicos (5):**
+
+| Método | Linhas | Assinatura |
+|--------|--------|-----------|
+| **Constructor** | L105-125 | `Response(const HttpRequest& req, const ServerConfig& cfg)` |
+| **Destructor** | L127-128 | `~Response()` (vazio, cleanup automático) |
+| **Copy Constructor** | L130-134 | `Response(const Response &other)` |
+| **Operator=** | L136-145 | `Response &operator=(const Response &other)` |
+| **getResponseHttp()** | L147-150 | `std::string getResponseHttp() const` |
+
+---
+
+### 🎯 Método: buildHttpResponse() - Orquestrador Principal
+
+**Localização:** [src/http/Response.cpp, linhas 152-174](src/http/Response.cpp#L152-L174)
+
+**Propósito:** Validar requisição HTTP e despachar para GET/POST/DELETE
+
+**Fluxo de Validação (6 Fases):**
+
+#### **Fase 1: Sanitizar URI (L154)**
+```cpp
+std::string uri = sanitizePath(request.getUri());
+// Remove "//" → "/", controla "../" → "/"
+```
+
+#### **Fase 2: Determinar Diretório Raiz (L155-159)**
+```cpp
+std::string root = this->config.root;  // Padrão: /www
+
+// Buscar location customizada que match URI
+LocationConfig* location = findMatchingLocation(uri);
+
+// Se location tem root customizado, sobrescrever
+if (location && !location->root.empty()) {
+    root = location->root;
+}
+```
+
+#### **Fase 3: Construir Caminho Completo (L161)**
+```cpp
+std::string file_path = root + removeLocationInUri(uri, location);
+// Exemplo: /www + /uploads/file.txt = /www/uploads/file.txt
+```
+
+#### **Fase 4: Validar Método Permitido (L163-167)**
+```cpp
+// Verificar se método (GET/POST/DELETE) está permitido nesta location
+if (!validateAllowedMethod(request)) {
+    http405MethodNotAllowed(this->response_str, request);
+    return;
+}
+```
+Retorna 405 se método não está em `location->allowed_methods`
+
+#### **Fase 5: Despacho por Método (L169-173)**
+```cpp
+std::string method = request.getMethod();  // "GET", "POST", "DELETE"
+
+if (method == "GET") {
+    methodGet(request, file_path);
+} else if (method == "POST") {
+    methodPost(request);
+} else if (method == "DELETE") {
+    methodDelete(request, file_path);
+} else {
+    http405MethodNotAllowed(this->response_str, request);
+}
+```
+
+#### **Fase 6: Retorno**
+`response_str` agora contém resposta HTTP completa
+
+**Parâmetros:**
+- `request` - Requisição HTTP a processar
+- Usa `this->config` e `this->response_str` implicitamente
+
+**Chamadas Externas:** `sanitizePath()`, `findMatchingLocation()`, `removeLocationInUri()`, `validateAllowedMethod()`, `methodGet()`, `methodPost()`, `methodDelete()`
+
+---
+
+### 💾 Método: methodGet() - Processamento GET
+
+**Localização:** [src/http/Response.cpp, linhas 176-213](src/http/Response.cpp#L176-L213)
+
+**Propósito:** Servir arquivos, diretórios com index files ou directory listing
+
+**Fluxo de 7 Fases:**
+
+#### **Fase 1: Localizar Location (L180)**
+```cpp
+LocationConfig* location = findMatchingLocation(request.getUri());
+```
+
+#### **Fase 2: Verificar Handlers CGI (L181-182)**
+```cpp
+if (location && !location->cgi_handlers.empty()) {
+    http502BadGateway(this->response_str, "Fail CGI");
+    return;
+}
+```
+⚠️ **Nota:** CGI sempre retorna 502 — método `isCgiRequest()` não implementado
+
+#### **Fase 3: Verificar Redirects (L184-185)**
+```cpp
+if (location && location->redirect_code > 0) {
+    handleRedirect(location->redirect_code, location->redirect_url);
+    return;
+}
+```
+Retorna 301/302/307/308 com header `Location:`
+
+#### **Fase 4: Tratar Diretória (L186-197)**
+```cpp
+if (isDirectory(_file_path)) {
+    // Buscar index file (index.html, etc)
+    std::string index_file = findIndexFile(_file_path, 
+                                           location->index_files);
+    
+    if (!index_file.empty()) {
+        _file_path = index_file;  // Usar index encontrado
+    } else if (location && location->autoindex) {
+        generateDirectoryListing(_file_path, _file_path, request);
+        return;
+    } else {
+        http403Forbidden(this->response_str, "Directory listing not allowed");
+        return;
+    }
+}
+```
+
+❓ **Precedência Index Files:**
+1. Primeiro tenta `location->index_files` (se tem custom)
+2. Se não encontra e `location->autoindex=true`: gera HTML listing
+3. Senão: 403 Forbidden
+
+#### **Fase 5: Validar Existência (L198-200)**
+```cpp
+if (!fileExists(_file_path)) {
+    http404NotFound(this->response_str, _file_path);
+    return;
+}
+```
+
+#### **Fase 6: Validar Permissão (L201-202)**
+```cpp
+if (!isReadable(_file_path)) {
+    http403Forbidden(this->response_str, "Permission denied");
+    return;
+}
+```
+
+#### **Fase 7: Retornar Arquivo (L203-206)**
+```cpp
+std::string content = readFile(_file_path);
+http200FileFound(this->response_str, request, content, _file_path);
+// Popula headers: Content-Type, Content-Length, Last-Modified
+```
+
+**Parâmetros:**
+- `request` - Requisição HTTP
+- `file_path` - Caminho absoluto do arquivo/diretório
+
+**Retorna:** Via `this->response_str` (HTTP 200/301/302/307/308/403/404/502)
+
+---
+
+### 📤 Método: methodPost() - Upload e Processamento
+
+**Localização:** [src/http/Response.cpp, linhas 215-280](src/http/Response.cpp#L215-L280)
+
+**Propósito:** Processar body HTTP (form-data, JSON, text) e uploads
+
+**Fluxo de 8 Fases:**
+
+#### **Fase 1: Validação Global Body Size (L217-220)**
+```cpp
+if (config.client_max_body_size > 0 && 
+    request.getBody().length() > config.client_max_body_size) {
+    http413PayloadTooLarge(this->response_str, request);
+    return;
+}
+```
+Retorna **413 Payload Too Large** se ultrapassa limite global
+
+#### **Fase 2: Localizar Location (L222)**
+```cpp
+LocationConfig* location = findMatchingLocation(request.getUri());
+```
+
+#### **Fase 3: Verificar CGI (L223-224)**
+```cpp
+if (location && !location->cgi_handlers.empty()) {
+    http502BadGateway(this->response_str, "Fail CGI");
+    return;
+}
+```
+
+#### **Fase 4: Validação Location Body Size (L226-229)**
+```cpp
+if (location && location->client_max_body_size > 0 && 
+    body_size > location->client_max_body_size) {
+    http413PayloadTooLarge(this->response_str, request);
+    return;
+}
+```
+⚠️ **Duplo Check:** Mesmo que Fase 1, mas location-specific
+
+#### **Fase 5: Validar Content-Type (L231-236)**
+```cpp
+std::string content_type = request.getHeader("Content-Type");
+
+if (content_type.empty()) {
+    http400BadRequest(this->response_str, "Missing Content-Type");
+    return;
+}
+```
+
+#### **Fase 6: Despacho por Content-Type (L238-267)**
+
+**6A: multipart/form-data - Upload de Arquivos (L238-241)**
+```cpp
+if (content_type.find("multipart/form-data") != npos) {
+    multipartFormData(request, content_type);
+    return;
+}
+```
+Descarga para método dedicado (91 linhas)
+
+**6B: application/x-www-form-urlencoded (L243-248)**
+```cpp
+else if (content_type.find("application/x-www-form-urlencoded") != npos) {
+    std::string decoded = urlDecode(request.getBody());
+    http200Ok(this->response_str, 
+              "{\"message\": \"Form received\", \"body_size\": " + 
+              std::to_string(decoded.size()) + "}");
+}
+```
+
+**6C: application/json (L250-255)**
+```cpp
+else if (content_type.find("application/json") != npos) {
+    http200Ok(this->response_str, 
+              "{\"message\": \"JSON received\", \"body_size\": " + 
+              std::to_string(request.getBody().size()) + "}");
+}
+```
+
+**6D: text/plain (L257-262)**
+```cpp
+else if (content_type.find("text/plain") != npos) {
+    http200Ok(this->response_str, 
+              "{\"message\": \"Text received\", \"body_size\": " + 
+              std::to_string(request.getBody().size()) + "}");
+}
+```
+
+**6E: Content-Type Desconhecido (L263-267)**
+```cpp
+else {
+    http415UnsupportedMediaType(this->response_str);
+    return;
+}
+```
+
+**Parâmetros:**
+- `request` - Requisição HTTP com body
+
+**Retorna:** 400/413/415/502 em erro, 200/201 em sucesso
+
+---
+
+### 🗑️ Método: methodDelete() - Segurança Crítica
+
+**Localização:** [src/http/Response.cpp, linhas 282-338](src/http/Response.cpp#L282-L338)
+
+**Propósito:** Deletar arquivo com múltiplas validações de segurança
+
+**Fluxo de 10 Fases (Ordem Crítica!):**
+
+#### **Fase 1: Verificar Existência (L284-287)**
+```cpp
+if (!fileExists(_file_path)) {
+    http404NotFound(this->response_str, _file_path);
+    return;
+}
+```
+
+#### **Fase 2: Rejeitar Diretórios (L289-292)**
+```cpp
+if (isDirectory(_file_path)) {
+    http403Forbidden(this->response_str, "Cannot delete directory");
+    return;
+}
+```
+
+#### **Fase 3: Resolver Symlinks (L294-296)**
+```cpp
+std::string real_path = getRealPath(_file_path);
+if (real_path.empty()) {
+    http403Forbidden(this->response_str, "Cannot resolve symlink");
+    return;
+}
+```
+⚔️ **Proteção:** Detecta e bloqueia symlinks fora boundary
+
+#### **Fase 4: Validar Path Traversal (L301-305)**
+```cpp
+std::string root = (location && !location->root.empty()) ? 
+                   location->root : this->config.root;
+
+if (!isPathSafe(real_path, root)) {
+    http403Forbidden(this->response_str, 
+                    "Symlink outside root");
+    return;
+}
+```
+⚔️ **Proteção:** Verifica se `real_path` começa com `root/`
+
+#### **Fase 5: Validar Permissão (L307-311)**
+```cpp
+std::string parent_dir = getParentDirectory(_file_path);
+
+if (!hasWritePermission(parent_dir)) {
+    http403Forbidden(this->response_str, 
+                    "No write permission");
+    return;
+}
+```
+⚔️ **Proteção:** Verifica W_OK em diretório pai
+
+#### **Fase 6: Verificar Protected Files (L313-317)**
+```cpp
+std::string filename = getFileName(_file_path);
+
+if (isProtectedFile(filename)) {
+    http403Forbidden(this->response_str, 
+                    "File is protected");
+    return;
+}
+```
+⚔️ **Proteção:** Impede deletar `index.html` e others
+
+#### **Fase 7: Logging (L319-322)**
+```cpp
+std::cout << "[DELETE] " << _file_path 
+          << " (" << getFileSize(_file_path) << " bytes)" << std::endl;
+```
+
+#### **Fase 8: Deletar Arquivo (L324-327)**
+```cpp
+int result = remove(_file_path.c_str());
+
+if (result < 0) {
+    http500InternalServerError(this->response_str, 
+                              strerror(errno));
+    return;
+}
+```
+
+#### **Fase 9: Sucesso (L330)**
+```cpp
+http204NoContent(this->response_str);
+```
+Retorna **204 No Content** (sem body)
+
+#### **Fase 10: Return**
+
+**Parâmetros:**
+- `request` - Requisição HTTP
+- `file_path` - Caminho absoluto arquivo a deletar
+
+**Retorna:** 204/403/404/500
+
+**Segurança Implementada:**
+- ✅ Symlink resolution + boundary check
+- ✅ Path traversal validation
+- ✅ File permissions check
+- ✅ Protected files whitelist
+- ✅ Diretórios não podem ser deletados
+
+---
+
+### 📦 Método: multipartFormData() - Upload Complexo
+
+**Localização:** [src/http/Response.cpp, linhas 340-430](src/http/Response.cpp#L340-L430)
+
+**Propósito:** Parse upload multipart e salvar arquivos com validações
+
+**Fluxo de 9 Fases:**
+
+#### **Fase 1: Extrair Boundary (L342-346)**
+```cpp
+std::string boundary = extractBoundary(content_type);
+// Busca: boundary=----WebKitFormBoundary7MA4YWxkTrZu0gW
+
+if (boundary.empty()) {
+    http415UnsupportedMediaType(this->response_str);
+    return;
+}
+```
+
+#### **Fase 2: Parse MIME Parts (L348-352)**
+```cpp
+std::vector<MultipartFile> files;
+
+if (!parseMultipartData(request.getBody(), boundary, files)) {
+    http415UnsupportedMediaType(this->response_str);
+    return;
+}
+```
+Retorna vetor de `MultipartFile` (filename, content_type, content)
+
+#### **Fase 3: Determinar Upload Dir (L354)**
+```cpp
+std::string upload_dir = getUploadDir(request);
+// Retorna: config.root/uploads/ ou location->upload_dir
+```
+
+#### **Fase 4: Criar Diretório (L359-363)**
+```cpp
+if (!createDirectory(upload_dir)) {
+    http500InternalServerError(this->response_str, 
+                              "Cannot create upload directory");
+    return;
+}
+```
+
+#### **Fase 5: Validar Permissão Escrita (L365-369)**
+```cpp
+if (!hasWritePermission(upload_dir)) {
+    http403Forbidden(this->response_str, 
+                    "No write permission on upload dir");
+    return;
+}
+```
+
+#### **Fase 6: Loop Validação + Salvar Arquivos (L378-411)**
+```cpp
+std::vector<std::string> saved_files;
+int success_count = 0;
+
+for (size_t i = 0; i < files.size(); i++) {
+    // 6A: Validar Extensão (L380-384)
+    if (!isAllowedFileExtension(files[i].filename, allowed_extensions)) {
+        cleanupFiles(saved_files);  // Rollback
+        http400BadRequest(this->response_str, 
+                         "File extension not allowed");
+        return;
+    }
+    
+    // 6B: Validar Tamanho Por Arquivo (L386-391)
+    if (files[i].content.size() > 10 * 1024 * 1024) {  // 10 MB
+        cleanupFiles(saved_files);
+        http413PayloadTooLarge(this->response_str, request);
+        return;
+    }
+    
+    // 6C: Gerar Nome Único (L393-397)
+    std::string unique_filename = generateUniqueFilename(files[i].filename);
+    // Resultado: "1774011860_documento.pdf"
+    std::string full_path = upload_dir + "/" + unique_filename;
+    
+    // 6D: Escrever Arquivo em Disco (L400-407)
+    if (writeFileToDisk(full_path, files[i].content)) {
+        saved_files.push_back(full_path);
+        success_count++;
+        // JSON do arquivo adicionado ao response
+    } else {
+        cleanupFiles(saved_files);  // Rollback completo
+        http400BadRequest(this->response_str, "Failed to write file");
+        return;
+    }
+}
+```
+
+#### **Fase 7: Construir Response JSON (L412-423)**
+```json
+{
+  "files": [
+    {
+      "filename": "1774011860_documento.pdf",
+      "original_name": "documento.pdf",
+      "path": "/home/.../uploads/1774011860_documento.pdf",
+      "size": 524288,
+      "mime_type": "application/pdf"
+    }
+  ],
+  "success": true,
+  "count": 1
+}
+```
+
+#### **Fase 8: Extrair Upload URL (L414-423)**
+```cpp
+std::string location = "";
+// Busca "/uploads/" no path do primeiro arquivo
+if (full_path.find("/uploads/") != npos) {
+    location = "/uploads/" + unique_filename;
+} else {
+    location = request.getUri() + unique_filename;
+}
+```
+
+#### **Fase 9: Retornar 201 Created (L425)**
+```cpp
+http201Created(this->response_str, location, json_response);
+// HTTP 201
+// Location: /uploads/1774011860_documento.pdf
+// Content-Type: application/json
+// {json_response}
+```
+
+**Parâmetros:**
+- `request` - Requisição com multipart body
+- `content_type` - Header com boundary info
+
+**Hardcoded Values:**
+- Tamanho máx por arquivo: **10 MB** (L386)
+- Timestamp para unicidade: `time(0)` + `_` + original filename
+
+**Retorna:** 201/400/403/413/415/500
+
+---
+
+### 🔧 Métodos Helper Críticos
+
+#### **Método: findMatchingLocation() - Longest Prefix Match**
+
+**Localização:** [src/http/Response.cpp, linhas 432-449](src/http/Response.cpp#L432-L449)
+
+```cpp
+LocationConfig* findMatchingLocation(const std::string& uri)
+{
+    LocationConfig* best_match = NULL;
+    size_t longest_prefix = 0;
+    
+    // Linear search em todas as locations
+    for (size_t i = 0; i < this->config.locations.size(); i++) {
+        std::string location_path = this->config.locations[i].path;
+        
+        // Prefixo match: /api/users começa com /api?
+        if (uri.find(location_path) == 0) {
+            // Salvar a mais longa (em caso de múltiplas matches)
+            if (location_path.length() > longest_prefix) {
+                best_match = &this->config.locations[i];
+                longest_prefix = location_path.length();
+            }
+        }
+    }
+    
+    return best_match;  // NULL se nenhuma match
+}
+```
+
+**Exemplo:**
+```
+Locations:  /api,  /api/users,  /uploads
+URI:        /api/users/john
+
+Match /api (3 chars) → 200
+Match /api/users (9 chars) → 200 (BEST, longest)
+Match /uploads → 0 (não é prefixo)
+Resultado: &locations[1] (api/users)
+```
+
+---
+
+#### **Método: validateAllowedMethod() - Whitelist de Métodos**
+
+**Localização:** [src/http/Response.cpp, linhas 451-467](src/http/Response.cpp#L451-L467)
+
+```cpp
+bool validateAllowedMethod(const HttpRequest& request)
+{
+    LocationConfig* location = findMatchingLocation(request.getUri());
+    
+    // Sem location = sem restrição (todos permitidos)
+    if (!location) {
+        std::string method = request.getMethod();
+        return (method == "GET" || method == "POST" || method == "DELETE");
+    }
+    
+    // Com location = verificar allowed_methods
+    std::string method = request.getMethod();
+    for (size_t i = 0; i < location->allowed_methods.size(); i++) {
+        if (location->allowed_methods[i] == method) {
+            return true;  // Permitido
+        }
+    }
+    
+    return false;  // Não em whitelist
+}
+```
+
+**Exemplo:**
+```
+Location /api:
+  allowed_methods: [GET, POST]
+
+Request: DELETE /api/user
+Resultado: false → 405 Method Not Allowed
+```
+
+---
+
+#### **Método: generateDirectoryListing() - HTML Dinâmico**
+
+**Localização:** [src/http/Response.cpp, linhas 493-608](src/http/Response.cpp#L493-L608)
+
+**Propósito:** Gerar HTML com listing de arquivos e diretórios
+
+**Estrutura (116 linhas!):**
+
+```cpp
+void generateDirectoryListing(const std::string& dir_path, 
+                            const std::string& request_path,
+                            const HttpRequest& request)
+{
+    // 1. Abrir diretório (L496-501)
+    DIR* dir = opendir(dir_path.c_str());
+    if (!dir) {
+        http500InternalServerError(this->response_str, ...);
+        return;
+    }
+    
+    // 2. Ler entradas (L503-520)
+    struct dirent* entry;
+    std::vector<DirectoryEntry> entries;
+    while ((entry = readdir(dir)) != NULL) {
+        // Pular "." e manter ".."
+        if (std::string(entry->d_name) == ".")
+            continue;
+        
+        // Stat para tipo/tamanho/data
+        struct stat file_stat;
+        stat(full_path.c_str(), &file_stat);
+        
+        DirectoryEntry de;
+        de.name = entry->d_name;
+        de.is_directory = S_ISDIR(file_stat.st_mode);
+        de.size = file_stat.st_size;
+        de.mtime = file_stat.st_mtime;
+        entries.push_back(de);
+    }
+    closedir(dir);
+    
+    // 3. Ordenar (L525-527)
+    // Prioridade: ".." primeiro, depois dirs, depois arquivos, alfabético
+    std::sort(entries.begin(), entries.end(), directoryEntryLess);
+    
+    // 4. Montar HTML (L529-605)
+    std::string html = "<html><head>...";
+    html += "<h1>Index of " + request_path + "</h1>";
+    html += "<table>...";
+    
+    for (size_t i = 0; i < entries.size(); i++) {
+        html += "<tr>";
+        
+        // Nome hyperlink
+        if (entries[i].is_directory) {
+            html += "<td><a href=\"" + entries[i].name + "/\">📁 " + 
+                    entries[i].name + "/</a></td>";
+        } else {
+            html += "<td><a href=\"" + entries[i].name + "\">📄 " + 
+                    entries[i].name + "</a></td>";
+        }
+        
+        // Tamanho
+        html += "<td>" + std::to_string(entries[i].size) + " bytes</td>";
+        
+        // Data modificação
+        time_t t = entries[i].mtime;
+        html += "<td>" + std::string(ctime(&t)) + "</td>";
+        
+        html += "</tr>";
+    }
+    
+    html += "</table></html>";
+    
+    // 5. Retornar com 200 OK (L607)
+    http200FileFound(this->response_str, request, html, dir_path);
+}
+```
+
+**Saída Exemplo:**
+```html
+<html>
+<h1>Index of /uploads</h1>
+<table>
+  <tr>
+    <td><a href="../">📁 ..</a></td>
+    <td>-</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><a href="image.jpg">📄 image.jpg</a></td>
+    <td>2458624 bytes</td>
+    <td>Mon Mar 20 10:30:00 2026</td>
+  </tr>
+</table>
+</html>
+```
+
+---
+
+#### **Método: handleRedirect() - Location Header**
+
+**Localização:** [src/http/Response.cpp, linhas 610-631](src/http/Response.cpp#L610-L631)
+
+```cpp
+void handleRedirect(int code, const std::string& url)
+{
+    // Montar response completo
+    std::string response;
+    response += "HTTP/1.1 ";
+    response += std::to_string(code);
+    response += " ";
+    
+    // Código → Descrição
+    if (code == 301)
+        response += "Moved Permanently";
+    else if (code == 302)
+        response += "Found";
+    else if (code == 307)
+        response += "Temporary Redirect";
+    else if (code == 308)
+        response += "Permanent Redirect";
+    
+    response += "\r\n";
+    response += "Location: " + url + "\r\n";
+    response += "Content-Length: 0\r\n";
+    response += "Connection: close\r\n";  // ⚠️ HARDCODED!
+    response += "\r\n";
+    
+    this->response_str = response;
+}
+```
+
+**Saída Exemplo (301):**
+```http
+HTTP/1.1 301 Moved Permanently
+Location: /new-location
+Content-Length: 0
+Connection: close
+
+```
+
+⚠️ **Problema:** `Connection: close` está hardcoded, deveria ser `keep-alive` em alguns casos
+
+---
+
+### 🔗 INTEGRAÇÃO COM OUTRAS CLASSES
+
+#### **HttpRequest (Métodos Chamados)**
+
+| Método | Frequência | Contexto |
+|--------|-----------|---------|
+| `getUri()` | 8x | buildHttpResponse, validateAllowedMethod, findMatchingLocation, etc |
+| `getMethod()` | 3x | buildHttpResponse, validateAllowedMethod |
+| `getBody()` | 8x | methodPost, multipartFormData, validation |
+| `getHeader(key)` | 1x | methodPost busca "Content-Type" |
+| ❌ `getQuery()` | 0x | Nunca usado (gap) |
+| ❌ `getPath()` | 0x | Nunca usado (gap) |
+| ❌ `getVersion()` | 0x | Nunca usado (gap) |
+
+---
+
+#### **StatusCodes (Funções Static Chamadas)**
+
+| Função | Casos de Uso | Linhas |
+|--------|------------|--------|
+| `http200FileFound()` | GET sucesso, directory listing | L206, L607 |
+| `http200Ok()` | POST JSON/form/text | L248, L256, L262 |
+| `http201Created()` | Upload multipart sucesso | L425 |
+| `http204NoContent()` | DELETE sucesso | L330 |
+| `http400BadRequest()` | POST sem Content-Type, ext inválida | L235, L381, L409 |
+| `http403Forbidden()` | Sem autoindex, sem perms, DELETE protegido | L191, L202, L293+ |
+| `http404NotFound()` | GET/DELETE arquivo não existe | L199, L287 |
+| `http405MethodNotAllowed()` | Método não permitido | L166, L173 |
+| `http413PayloadTooLarge()` | Body/arquivo ultrapassa limite | L219, L228, L357, L391 |
+| `http415UnsupportedMediaType()` | Content-Type desconhecido | L236, L345, L267 |
+| `http500InternalServerError()` | mkdir/remove/opendir falhou | L327, L362, L500 |
+| `http502BadGateway()` | CGI handlers presentes | L182, L224 |
+
+---
+
+#### **ServerConfig (Campos Acessados)**
+
+| Campo | Linhas | Contexto |
+|-------|--------|---------|
+| `root` | L155, L302 | Diretório padrão do servidor |
+| `client_max_body_size` | L217, L226 | Limite de body para POST |
+| `index_files` | L188 | Index files se dir |
+| `locations` | L437 | Loop em findMatchingLocation() |
+
+---
+
+#### **LocationConfig (Campos Acessados)**
+
+| Campo | Tipo | Linhas | Contexto |
+|-------|------|--------|---------|
+| `path` | string | L437, L647 | Prefixo da location |
+| `root` | string | L158, L302 | Root customizado |
+| `allowed_methods` | vector<string> | L458 | Métodos permitidos |
+| `index_files` | vector<string> | L188 | Index customizado |
+| `autoindex` | bool | L190 | Dir listing? |
+| `cgi_handlers` | map<...> | L181, L223 | **Sempre 502 (não impl)** |
+| `client_max_body_size` | size_t | L227 | Limit customizado |
+| `upload_dir` | string | L484 | Dir para uploads |
+| `redirect_code` | int | L184 | Código 301/302/307/308 |
+| `redirect_url` | string | L185 | URL destino |
+
+---
+
+## ⚠️ IMPLEMENTAÇÕES FALTANTES E GAPS
+
+### ❌ Gap #1: Método isCgiRequest() Não Implementado
+
+**Problema:**
+```cpp
+// Response.hpp linha 63 (declaração)
+bool isCgiRequest(const std::string& file_path, 
+                 const LocationConfig* location);
+
+// Response.cpp: ❌ NÃO EXISTE
+```
+
+**Impacto:** CGI **completamente não-funcional**
+
+**Código Atual:**
+```cpp
+// methodGet() L181-182
+if (location && !location->cgi_handlers.empty()) {
+    http502BadGateway(this->response_str, "Fail CGI");
+    return;
+}
+```
+Qualquer requisição com CGI handler sempre retorna 502 ✗
+
+**Implementação Recomendada:**
+```cpp
+bool Response::isCgiRequest(const std::string& file_path, 
+                           const LocationConfig* location) {
+    if (!location || location->cgi_handlers.empty())
+        return false;
+    
+    // Extrair extensão: /script.php → .php
+    std::string ext = getFileExtension(file_path);
+    
+    // Verificar se extensão está em location->cgi_handlers
+    return location->cgi_handlers.find(ext) != 
+           location->cgi_handlers.end();
+}
+```
+
+**Assim em methodGet() seria:**
+```cpp
+if (isCgiRequest(_file_path, location)) {
+    // Invocar CGI via Client::startCgi()
+    // ao invés de 502
+}
+```
+
+---
+
+### ⚠️ Gap #2: Keep-Alive Connection Hardcoded como "close"
+
+**Problema:**
+```cpp
+// handleRedirect() L626
+response += "Connection: close\r\n";  // ❌ HARDCODED!
+```
+
+**Impacto:** Redirects sempre fecham conexão, impossibilitando keep-alive
+
+**Situação Atual:**
+```
+Client: GET /old-page
+Server: HTTP/1.1 301 Moved Permanently
+        Location: /new-page
+        Connection: close        ← Força desconexão
+
+Client: (precisa reconectar para GET /new-page)
+```
+
+**Recomendação:**
+```cpp
+void Response::handleRedirect(int code, const std::string& url,
+                             const HttpRequest& request)
+{
+    // ... código anterior ...
+    
+    // Respeitar keep-alive do cliente
+    std::string connection = request.getHeader("Connection");
+    if (connection == "keep-alive") {
+        response += "Connection: keep-alive\r\n";
+    } else {
+        response += "Connection: close\r\n";
+    }
+    
+    response += "\r\n";
+    this->response_str = response;
+}
+```
+
+---
+
+### ⚠️ Gap #3: Error Pages Customizados Não Usados
+
+**Problema:**
+```cpp
+// ServerConfig tem:
+std::map<int, std::string> error_pages;  // 404 → /404.html
+```
+
+**Mas Response.cpp:**
+- Nunca acessa `config.error_pages`
+- StatusCodes.cpp gera HTML padrão (genérico)
+- Não suporta 404.html, 403.html, 500.html customizados
+
+**Implementação Recomendada:**
+
+Em cada método `httpXXX()` de StatusCodes:
+```cpp
+std::string error_page_path = findErrorPage(code, config.error_pages);
+if (!error_page_path.empty()) {
+    response_str = readFile(error_page_path);  // Custom HTML
+} else {
+    response_str = generateDefaultErrorPage(code);  // Fallback padrão
+}
+```
+
+---
+
+### ⚠️ Gap #4: Body Size Validation Duplicado
+
+**Problema:**
+```cpp
+// methodPost() L217-220: Global check
+if (config.client_max_body_size > 0 && 
+    request.getBody().length() > config.client_max_body_size) {
+    return http413PayloadTooLarge();
+}
+
+// methodPost() L226-229: Location check (DUPLICADO!)
+if (location && location->client_max_body_size > 0 && 
+    body_size > location->client_max_body_size) {
+    return http413PayloadTooLarge();
+}
+```
+
+**Ineficiência:** Validação ocorre 2x
+
+**Recomendação:**
+```cpp
+// Unificar em um método
+size_t max_body_size = config.client_max_body_size;
+if (location && location->client_max_body_size > 0) {
+    // Location override
+    max_body_size = location->client_max_body_size;
+}
+
+if (max_body_size > 0 && body_size > max_body_size) {
+    return http413PayloadTooLarge();
+}
+```
+
+---
+
+### ⚠️ Gap #5: URI Validation Faltante
+
+**Problema:**
+- StatusCodes tem `http414UriTooLong()` declarado
+- Response.cpp **NUNCA** chama
+- Sem limite de tamanho URI
+
+**Recomendação:**
+```cpp
+// buildHttpResponse() adicionar após L154:
+if (uri.length() > 8192) {  // 8 KB limit típico
+    http414UriTooLong(this->response_str);
+    return;
+}
+```
+
+---
+
+### 📊 Resumo de 5 Gaps Principais
+
+| Gap | Tipo | Impacto | Prioridade |
+|-----|------|--------|-----------|
+| isCgiRequest() não impl | Funcionalidade | CGI não funciona | 🔴 Alta |
+| Connection: close hardcode | Funcionalidade | Keep-alive quebrado | 🟠 Média |
+| Error pages não usados | Funcionalidade | Customização impossível | 🟠 Média |
+| Body validation duplicado | Eficiência | Overhead mínimo | 🟡 Baixa |
+| URI length não validado | Segurança | DoS possível | 🟠 Média |
+
+---
+
+## 🎯 RECOMENDAÇÕES para Produção
+
+### 1. Implementar isCgiRequest()
+Desbloqueia CGI completamente — crítico para requisições dinâmicas
+
+### 2. Remover Hardcode de Connection: close
+Ativar keep-alive em redirects para melhor performance
+
+### 3. Integrar Error Pages
+Permitir HTML customizado para 404, 403, 500 via config
+
+### 4. Unificar Validação de Body Size
+Remover duplicação, simplificar lógica
+
+### 5. Adicionar Validação URI Length
+Default 8KB, configurável, protege contra DoS
+
+### 6. Implementar Caching Headers
+ETag, Last-Modified, If-None-Match para 304 Not Modified
+
+### 7. Adicionar HEAD Method
+Idêntico a GET mas sem body (reduz largura)
+
+### 8. Range Requests (206)
+Suportar `Range: bytes=0-1023` para streams de vídeo/áudio
+
+---
+
+## 🔐 Checklist de Segurança - Status Atual
+
+| Proteção | Status | Linhas |
+|----------|--------|--------|
+| ✅ Symlink validation | Implementado | L294-296 |
+| ✅ Path traversal blocking | Implementado | L301-305 |
+| ✅ File permissions check | Implementado | L310, L366 |
+| ✅ Protected files whitelist | Implementado | L313-317 |
+| ✅ File extension whitelist | Implementado | L380-384 |
+| ✅ Upload size limits | Implementado | L217, L226, L391 |
+| ✅ Directory listing guard | Implementado | L190-193 |
+| ✅ Content-Type validation | Implementado | L231-236 |
+| ⚠️ URI length limit | **Missing** | Should be L154 |
+| ⚠️ CRLF injection fix | **Missing** | handleRedirect() |
+| ⚠️ Null bytes in filename | **Not checked** | generateDirectoryListing() |
+
+**Segurança Geral:** 🟢 **ÓTIMA** (8 de 11 implementadas)
+

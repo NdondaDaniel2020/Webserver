@@ -1229,3 +1229,750 @@ Requisição HTTP → HttpRequest::parse() → Response ✅
 ```
 
 Os dois parsers trabalham juntos transformando **texto em estruturas C++** que o servidor processa com segurança e eficiência.
+
+---
+
+## 📖 ANÁLISE TÉCNICA DETALHADA - HttpRequest
+
+### Estrutura da Classe HttpRequest
+
+**Localização:** [include/HttpRequest.hpp](../include/HttpRequest.hpp) (52 linhas)
+
+**Membros Privados (7):**
+
+| Campo | Tipo | Inicialização | Descrição |
+|-------|------||----|
+| `method` | `std::string` | Constructor | GET, POST, DELETE, etc |
+| `uri` | `std::string` | Constructor | URI completa (com modificações) |
+| `version` | `std::string` | Constructor | HTTP/1.0, HTTP/1.1, HTTP/2 |
+| `path` | `std::string` | parseRequestLine() | Caminho sem query string |
+| `query` | `std::string` | parseRequestLine() | Query string (após ?) |
+| `headers` | `std::map<string, string>` | parseHeaders() | Mapa de headers HTTP |
+| `body` | `std::string` | parseBody() | Corpo da requisição |
+
+**Métodos Públicos (22):**
+
+| Método | Tipo Retorno | Descrição |
+|--------|-------------|-----------|
+| `HttpRequest()` | void | Constructor padrão |
+| `~HttpRequest()` | void | Destrutor vazio |
+| `HttpRequest(const HttpRequest&)` | void | Copy constructor |
+| `operator=(const HttpRequest&)` | HttpRequest& | Assignment operator |
+| `parse()` | **static HttpRequest** | Ponto de entrada principal |
+| `getMethod()` | const string& | Retorna método HTTP |
+| `getUri()` | const string& | Retorna URI completa |
+| `getPath()` | const string& | Retorna path (sem query) |
+| `getQuery()` | const string& | Retorna query string |
+| `getVersion()` | const string& | Retorna versão HTTP |
+| `getHeaders()` | const map& | Retorna mapa inteiro |
+| `getBody()` | const string& | Retorna corpo |
+| `hasHeader(key)` | bool | Verifica existência |
+| `getHeader(key)` | string | Retorna valor (ou "") |
+| `getContentLength()` | size_t | Parse Content-Length header |
+| `setBody(body)` | void | **Setter único** |
+
+---
+
+### 🔧 Método: parse() - Ponto de Entrada
+
+**Localização:** [src/http/HttpRequest.cpp, linhas 41-56](src/http/HttpRequest.cpp#L41-L56)
+
+**Assinatura:**
+```cpp
+static HttpRequest HttpRequest::parse(const std::string& raw_request)
+```
+
+**Propósito:** Converter string bruta com requisição HTTP em objeto HttpRequest
+
+**Fluxo de 5 Fases:**
+
+#### **Fase 1: Criar Stream (L42-44)**
+```cpp
+HttpRequest req;                    // L42 - Cria objeto vazio
+std::istringstream stream(raw_request);  // L43 - Wrapper de string
+std::string line;                   // L44 - Buffer para getline()
+```
+
+#### **Fase 2: Parse Request Line (L46-51)**
+```cpp
+if (std::getline(stream, line))     // L47 - Lê primeira linha
+{
+    // Remove \r se presente (Windows CRLF)
+    if (!line.empty() && line[line.size() - 1] == '\r')
+        line.erase(line.size() - 1);
+    
+    req.parseRequestLine(line);     // L51 - Delega parsing
+}
+```
+
+Exemplo: `"GET /index.html HTTP/1.1\r\n"` → `"GET /index.html HTTP/1.1"`
+
+#### **Fase 3: Parse Headers (L54)**
+```cpp
+req.parseHeaders(stream);           // Lê até linha vazia
+```
+
+#### **Fase 4: Parse Body (L57)**
+```cpp
+req.parseBody(stream);              // Lê resto
+```
+
+#### **Fase 5: Retornar (L59)**
+```cpp
+return req;                         // Cópia de retorno
+```
+
+**Parâmetro:**
+- `raw_request` - String completa com requisição HTTP (headers + body)
+
+**Retorno:** `HttpRequest` por cópia (novo objeto com todos membros preenchidos)
+
+**Efeitos Colaterais:** Nenhum (função pura, sem side effects)
+
+**Total:** 16 linhas (L41-L56)
+
+**Erro Handling:** Nenhum - se getline falha, campos ficam vazios
+
+---
+
+### 🔧 Método: parseRequestLine() - Parse "GET /path HTTP/1.1"
+
+**Localização:** [src/http/HttpRequest.cpp, linhas 58-79](src/http/HttpRequest.cpp#L58-L79)
+
+**Propósito:** Extrair método, URI e versão da primeira linha HTTP
+
+**Fluxo de 4 Fases:**
+
+#### **Fase 1: Tokenizar (L59-60)**
+```cpp
+std::istringstream iss(line);       // L59
+iss >> this->method >> this->uri >> this->version;  // L60
+```
+Lê 3 palavras separadas por espaço (mesmo comportamento de `scanf`)
+
+**Exemplo:**
+```
+Input: "GET /index.html?id=1 HTTP/1.1"
+Output: method="GET", uri="/index.html?id=1", version="HTTP/1.1"
+```
+
+#### **Fase 2: Splittar Query String (L62-71)**
+```cpp
+size_t pos = this->uri.find('?');   // L62 - Procura ?
+if (pos != std::string::npos)       // L63 - Encontrou
+{
+    this->path = this->uri.substr(0, pos);      // L65 - /index.html
+    this->query = this->uri.substr(pos + 1);    // L66 - id=1&name=john
+}
+else                                // L68 - Sem query string
+{
+    this->path = this->uri;         // L70
+    this->query = "";               // L71
+}
+```
+
+**Exemplos:**
+```
+URI: /index.html?id=1
+  → path="/index.html", query="id=1"
+
+URI: /api/users
+  → path="/api/users", query="" (vazio)
+```
+
+#### **Fase 3: Hardcoded Default (L74-75)**
+```cpp
+if (this->uri == "/")              // L74 - Se URI é exatamente /
+    this->uri = "/index.html";     // L75 - Reescreve para index.html
+```
+
+⚠️ **Problema:** Esta transformação deveria ser em Response, não em HttpRequest!
+
+#### **Fase 4: Logging (L76-77)**
+```cpp
+std::cout << "[REQUEST] " << this->method << " " 
+          << this->uri << " " << this->version << std::endl;
+```
+
+Debug output para terminal
+
+**Total:** 22 linhas (L58-L79)
+
+**Modificações de Membros:** method, uri, version, path, query
+
+**Erro Handling:** Nenhum - se <3 tokens, campos ficam vazios/parciais
+
+---
+
+### 🔧 Método: parseHeaders() - Loop Headers até Linha Vazia
+
+**Localização:** [src/http/HttpRequest.cpp, linhas 81-107](src/http/HttpRequest.cpp#L81-L107)
+
+**Propósito:** Ler todos os headers HTTP até encontrar linha vazia
+
+**Fluxo de 6 Fases:**
+
+#### **Fase 1: Loop getline() (L84)**
+```cpp
+while (std::getline(stream, line))  // Continua até EOF
+{
+```
+
+#### **Fase 2: Remover CRLF (L86-87)**
+```cpp
+if (!line.empty() && line[line.size() - 1] == '\r')
+    line.erase(line.size() - 1);    // Remove \r (mantém \n)
+```
+
+#### **Fase 3: Detectar Fim dos Headers (L90)**
+```cpp
+if (line.empty())                   // Linha vazia = fim headers
+    break;
+```
+
+Na requisição HTTP, headers terminam com:
+```
+Header1: value1\r\n
+Header2: value2\r\n
+\r\n                    ← Este ponto (depois trim, vira "")
+```
+
+#### **Fase 4: Procurar Colon (L93-94)**
+```cpp
+size_t colon_pos = line.find(':');  // Procura ':'
+if (colon_pos != std::string::npos) // Encontrou ':'
+{
+```
+
+Headers sem `:` são silenciosamente ignorados
+
+#### **Fase 5: Extrair e Trim (L96-101)**
+```cpp
+std::string key = line.substr(0, colon_pos);        // L96 - Antes de :
+std::string value = line.substr(colon_pos + 1);    // L97 - Depois de :
+
+key = StringUtils::trim(key);       // L100 - Remove espaços
+value = StringUtils::trim(value);   // L101 - Remove espaços
+```
+
+**Exemplo:**
+```
+Input: "Content-Type:   application/json   "
+After substr: key="Content-Type", value="   application/json   "
+After trim: key="Content-Type", value="application/json"
+```
+
+#### **Fase 6: Inserir no Map (L103)**
+```cpp
+this->headers[key] = value;         // Insere no mapa
+```
+
+**Total:** 27 linhas (L81-L107)
+
+**Modificações:** headers[] map
+
+**Erro Handling:** Ignora linhas sem `:` silenciosamente
+
+**Problema:** ⚠️ **Case-sensitive lookup!**
+- `"Content-Length"` ≠ `"content-length"`
+- RFC 2616: header names são case-INSENSITIVE
+- Mas código não normaliza case
+
+---
+
+### 🔧 Método: parseBody() - Acumula Resto
+
+**Localização:** [src/http/HttpRequest.cpp, linhas 109-132](src/http/HttpRequest.cpp#L109-L132)
+
+**Propósito:** Ler e acumular corpo da requisição
+
+**Fluxo de 5 Fases:**
+
+#### **Fase 1: Criar Acumulador (L110-111)**
+```cpp
+std::string line;                   // L110 - Buffer para cada linha
+std::ostringstream body_stream;     // L111 - Acumula todas linhas
+```
+
+#### **Fase 2: Loop getline() (L113)**
+```cpp
+while (std::getline(stream, line))  // Lê TODA linha
+{
+```
+
+#### **Fase 3: Remover CRLF (L115-116)**
+```cpp
+if (!line.empty() && line[line.size() - 1] == '\r')
+    line.erase(line.size() - 1);    // Remove \r
+```
+
+#### **Fase 4: Acumular com Newline (L117)**
+```cpp
+body_stream << line << "\n";        // Adiciona \n
+```
+
+**Exemplo:**
+```
+Stream contém:
+{"name":"test"}
+{"id":123}
+
+Após loop:
+body_stream = "{"name":"test"}\n{"id":123}\n"
+```
+
+#### **Fase 5: Finalizando (L120-122)**
+```cpp
+this->body = body_stream.str();     // L120 - Copia resultado
+
+// Remove último \n de mais (L121-122)
+if (!this->body.empty() && this->body[this->body.size() - 1] == '\n')
+    this->body.erase(this->body.size() - 1);
+```
+
+**Total:** 24 linhas (L109-L132)
+
+**Performance:** Ineficiente para corpos grandes (copia inteira ao final)
+
+**Problema:** ⚠️ Presume body é **linha-delimitado**
+- Não funciona com dados binários ou multipart
+- Não respeita Content-Length
+- Adiciona \n entre linhas originalmente separadas por \r\n
+
+---
+
+### 🔧 Getters e Setters
+
+#### **All Getters (L134-167)**
+```cpp
+const std::string& getMethod() const;      // L134-137
+const std::string& getQuery() const;       // L139-142
+const std::string& getPath() const;        // L144-147
+const std::string& getUri() const;         // L149-152
+const std::string& getVersion() const;     // L154-157
+const std::map<string, string>& getHeaders() const;  // L159-162
+const std::string& getBody() const;        // L164-167
+```
+
+**Padrão:** Retornam `const&` (sem cópia, leitura only)
+
+**Total:** 34 linhas com boilerplate
+
+#### **setBody() - Setter Único (L170-173)**
+```cpp
+void HttpRequest::setBody(const std::string& body)
+{
+    this->body = body;
+}
+```
+
+**Propósito:** Permitir Client modificar body APÓS parsing (para dados acumulados)
+
+**Uso Typical:**
+```cpp
+HttpRequest req = HttpRequest::parse(headers_only);
+// ...mais tarde...
+std::string accumulated_body = ...;
+req.setBody(accumulated_body);  // Atualiza
+```
+
+---
+
+### 🔧 Métodos Utilitários de Headers
+
+#### **hasHeader(key) - Busca Existência**
+
+**Localização:** [L176-179](src/http/HttpRequest.cpp#L176-L179)
+
+```cpp
+bool HttpRequest::hasHeader(const std::string& key) const
+{
+    return this->headers.find(key) != this->headers.end();
+}
+```
+
+**Exemplo:**
+```cpp
+if (request.hasHeader("Content-Length")) {
+    // Processar body
+}
+```
+
+**Complexidade:** O(log n) onde n = número de headers
+
+---
+
+#### **getHeader(key) - Busca Valor**
+
+**Localização:** [L181-187](src/http/HttpRequest.cpp#L181-L187)
+
+```cpp
+std::string HttpRequest::getHeader(const std::string& key) const
+{
+    std::map<...>::const_iterator it = this->headers.find(key);
+    if (it != this->headers.end())
+        return it->second;
+    return "";  // Default: string vazia
+}
+```
+
+**Exemplo:**
+```cpp
+std::string host = request.getHeader("Host");  // "localhost:8080" ou ""
+std::string type = request.getHeader("Content-Type");  // "application/json" ou ""
+```
+
+**Problema:** ⚠️ **Case-sensitive!**
+```cpp
+getHeader("Content-Length")     // ✅ Encontra
+getHeader("content-length")     // ❌ Não encontra (retorna "")
+```
+
+---
+
+#### **getContentLength() - Parse e Converte**
+
+**Localização:** [L192-197](src/http/HttpRequest.cpp#L192-L197)
+
+```cpp
+size_t HttpRequest::getContentLength() const
+{
+    std::string content_length = getHeader("Content-Length");  // L193
+    if (content_length.empty())                                // L194
+        return 0;
+    return atoi(content_length.c_str());                       // L196
+    // ❌ ARQUIVO TRUNCADO (falta })
+}
+```
+
+🔴 **BUG CRÍTICO:** Função não tem `}` de fechamento!
+
+**Comportamento (se fosse completo):**
+```cpp
+request.getContentLength();  // Se "Content-Length: 1024"
+                             // Retorna: 1024
+
+request.getContentLength();  // Se sem header
+                             // Retorna: 0
+```
+
+**Problema:** `atoi()` não valida erros
+```cpp
+atoi("1024abc")  // Retorna 1024 (aceita lixo)
+atoi("abc")      // Retorna 0 (não erro)
+```
+
+---
+
+## 🔄 Máquina de Estados Implícita
+
+HttpRequest não tem state machine explícita, mas fluxo é linear:
+
+```
+[RAW REQUEST STRING]
+        ↓
+[parse(raw)]
+        ├─→ [getline()] → "GET /path HTTP/1.1"
+        │       ↓
+        │   [parseRequestLine()] ← ESTADO 1
+        │   method, uri, version, path, query
+        │
+        ├─→ [getline()] → "Host: localhost"
+        │   [getline()] → "Content-Type: application/json"
+        │   [getline()] → "" (vazio)
+        │       ↓
+        │   [parseHeaders()] ← ESTADO 2
+        │   headers[] map preenchido
+        │
+        └─→ [getline()] → "{\"data\":...}"
+                [getline()] → EOF
+                    ↓
+                [parseBody()] ← ESTADO 3
+                body preenchido
+```
+
+**Estados Implícitos:**
+1. **REQUEST_LINE** - Lê primeira linha (método URI versão)
+2. **HEADERS** - Lê até linha vazia
+3. **BODY** - Lê tudo restante
+
+**Transição:** Automática (sem checagem ou validação)
+
+---
+
+## ⚠️ IMPLEMENTAÇÕES FALTANTES E GAPS
+
+### ❌ Gap #1: Função Truncada
+
+**Problema (L192-197):**
+```cpp
+size_t HttpRequest::getContentLength() const
+{
+    std::string content_length = getHeader("Content-Length");
+    if (content_length.empty())
+        return 0;
+    return atoi(content_length.c_str());
+    // ❌ ARQUIVO TERMINA AQUI
+}
+```
+
+**Impacto:** Compilação falha - **symbol undefined** ou linker error
+
+**Solução:**
+```cpp
+size_t HttpRequest::getContentLength() const
+{
+    std::string content_length = getHeader("Content-Length");
+    if (content_length.empty())
+        return 0;
+    return atoi(content_length.c_str());
+}  // ← Adicionar fecheta
+```
+
+---
+
+### ❌ Gap #2: URL Decoding Não Implementado
+
+**Problema:**
+- URI contém `%20`, `%2F`, etc
+- Não há `urlDecode()` em HttpRequest
+- Query string fica like: `"name=Jo%C3%A3o"`
+
+**Implementação Recomendada:**
+```cpp
+std::string HttpRequest::urlDecode(const std::string& encoded) {
+    std::string decoded;
+    for (size_t i = 0; i < encoded.size(); ++i) {
+        if (encoded[i] == '%' && i + 2 < encoded.size()) {
+            char hex[3];
+            hex[0] = encoded[i+1];
+            hex[1] = encoded[i+2];
+            hex[2] = '\0';
+            int byte = strtol(hex, NULL, 16);
+            decoded += (char)byte;
+            i += 2;
+        } else if (encoded[i] == '+') {
+            decoded += ' ';  // Form data
+        } else {
+            decoded += encoded[i];
+        }
+    }
+    return decoded;
+}
+```
+
+---
+
+### ❌ Gap #3: Chunked Transfer Encoding Não Suportado
+
+**Problema:**
+```
+Transfer-Encoding: chunked
+
+1e\r\n
+This is the data in the first chunk\r\n
+1c\r\n
+and this is the second one\r\n
+0\r\n
+\r\n
+```
+
+**Status:** Não há método `parseChunked()`
+
+**Solução:**
+```cpp
+void HttpRequest::parseChunked(std::istringstream& stream) {
+    size_t chunk_size;
+    std::string line;
+    
+    while (std::getline(stream, line)) {
+        // Parse tamanho em hex
+        chunk_size = std::strtol(line.c_str(), NULL, 16);
+        if (chunk_size == 0)
+            break;  // Última chunk
+        
+        // Ler dados
+        char* chunk = new char[chunk_size];
+        stream.read(chunk, chunk_size);
+        body.append(chunk, chunk_size);
+        delete[] chunk;
+        
+        // Skip \r\n
+        std::getline(stream, line);
+    }
+}
+```
+
+---
+
+### ❌ Gap #4: Multipart Form-Data Não Suportado
+
+**Problema:**
+```
+Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
+
+------WebKitFormBoundary
+Content-Disposition: form-data; name="file"; filename="test.txt"
+Content-Type: text/plain
+
+[binary data]
+------WebKitFormBoundary--
+```
+
+**Status:** Não há método `parseMultipart()`
+
+**Nota:** Response.cpp tem `multipartFormData()` mas é diferente
+
+---
+
+### ⚠️ Gap #5: Case-Sensitive Header Lookup
+
+**Problema:**
+```cpp
+// Cliente pode enviar
+"content-length: 1024"
+
+// Código procura
+getHeader("Content-Length")  // ❌ Não encontra!
+
+// RFC 2616: header names são case-INSENSITIVE
+```
+
+**Impacto:** Body não é processado corretamente se case diverge
+
+**Solução:** Normalizar headers ao inserir
+```cpp
+void parseHeaders(std::istringstream& stream) {
+    // ...
+    key = StringUtils::toLower(key);  // Normalizar
+    this->headers[key] = value;
+}
+
+// Usar lowercase em getHeader()
+getHeader("content-length")
+```
+
+---
+
+### ⚠️ Gap #6: Sem Validação de Request Line
+
+**Problema:**
+```cpp
+if (std::getline(stream, line)) {
+    req.parseRequestLine(line);  // ← Sem validação
+}
+```
+
+Se linha for `"INVALID"` (apenas 1 palavra):
+```cpp
+iss >> method >> uri >> version;
+// method="INVALID", uri="", version=""
+```
+
+**Solução:**
+```cpp
+void parseRequestLine(const std::string& line) {
+    std::istringstream iss(line);
+    
+    if (!(iss >> method >> uri >> version)) {
+        throw std::runtime_error("Invalid request line");
+    }
+    
+    // Validar método
+    if (method != "GET" && method != "POST" && 
+        method != "DELETE" && method != "PUT" &&
+        method != "HEAD" && method != "OPTIONS") {
+        throw std::runtime_error("Unknown method: " + method);
+    }
+    // ...
+}
+```
+
+---
+
+### ⚠️ Gap #7: Sem Limite de Tamanho de Requisição
+
+**Problema:**
+```cpp
+// parse() aceita qualquer string
+static HttpRequest parse(const std::string& raw_request) {
+    std::istringstream stream(raw_request);
+    // Sem limite!
+}
+```
+
+**Impact:** DoS possível com requisição gigante
+
+**Solução:**
+```cpp
+static HttpRequest parse(const std::string& raw_request, 
+                        size_t max_size = 1024 * 1024) {  // 1 MB default
+    if (raw_request.size() > max_size)
+        throw std::runtime_error("Request too large");
+    
+    std::istringstream stream(raw_request);
+    // ...
+}
+```
+
+---
+
+### ⚠️ Gap #8: Hardcoded "/" → "/index.html"
+
+**Problema (L74-75):**
+```cpp
+if (this->uri == "/")
+    this->uri = "/index.html";
+```
+
+**Por quê é ruim:**
+1. Lógica de aplicação em parser
+2. Não é papel de HttpRequest modificar URI
+3. Pode quebrar requisições específicas para "/"
+4. Response deveria descidir (não parser)
+
+**Correto:** Passar como-está e deixar Response.cpp decidir
+
+---
+
+## 📊 Resumo de Gaps
+
+| Gap | Tipo | Impacto | Prioridade |
+|-----|------|--------|-----------|
+| Função truncada | Compilação | **Builder falha** | 🔴 CRÍTICA |
+| URL decoding | Funcionalidade | Query string errada | 🟠 Média |
+| Chunked encoding | Funcionalidade | Streams não funcionam | 🟠 Média |
+| Multipart | Funcionalidade | Upload via form quebrado | 🟠 Média |
+| Case-sensitive | Bug | Headers lowercase ignorados | 🟠 Média |
+| Sem validação | Robustez | Silent fail em erro | 🟡 Baixa |
+| Sem limite | Segurança | DoS possível | 🟠 Média |
+| Hardcoded "/" | Design | Lógica no lugar errado | 🟡 Baixa |
+
+---
+
+## 🎯 RECOMENDAÇÕES para Produção
+
+### 1. **Corrigir função truncada (CRÍTICO)**
+Adicionar `}` fecheta em `getContentLength()`
+
+### 2. **Implementar URL Decoding**
+Para processar queries como `page=2&name=Jo%C3%A3o` corretamente
+
+### 3. **Normalizar headers para lowercase**
+`getHeader("Content-Length")` deve funcionar independentemente de case
+
+### 4. **Adicionar validação de Request Line**
+Assegurar que método/URI/versão são válidos
+
+### 5. **Remover hardcoded "/" → "/index.html"**
+Deixar Response.cpp fazer essa decisão
+
+### 6. **Implementar parseChunked() e parseMultipart()**
+Para suportar features HTTP avançadas
+
+### 7. **Adicionar limite de tamanho de request**
+Proteger contra DoS
+
+### 8. **Adicionar error handling**
+Lançar exceções em vez de silent fail
+

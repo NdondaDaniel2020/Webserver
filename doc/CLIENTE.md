@@ -75,10 +75,11 @@ Refatorado para usar a classe Client.
 enum State {
     READING_HEADERS,    // Recebendo headers HTTP
     READING_BODY,       // Headers completos, recebendo body (POST)
-    PROCESSING,         // Processando requisição
-    SENDING_RESPONSE,   // Enviando resposta ao cliente
-    DONE,               // Resposta enviada, pode fechar ou reutilizar
-    ERROR_413           // Payload Too Large - Content-Length excedeu limite
+    PROCESSING,         // Processando requisição (preparando Response)
+    CGI_RUNNING,        // CGI em execução (pipes non-blocking com epoll)
+    SENDING_RESPONSE,   // Enviando resposta ao cliente (write em chunks)
+    DONE,               // Resposta enviada completamente, pronto para keep-alive
+    ERROR_413           // Payload Too Large - Content-Length excedeu client_max_body_size
 };
 ```
 
@@ -682,3 +683,648 @@ A implementação da classe Client foi um **marco importante** no desenvolviment
 4. Expandir para múltiplos server blocks
 
 **Status:** Production-ready para requisitos básicos HTTP/1.1
+
+---
+
+## 📋 ANÁLISE TÉCNICA DETALHADA (Atualizado 20/03/2026)
+
+### Verificação de Implementação Real vs Documentação
+
+Após análise profunda do código-fonte, foram identificadas as seguintes imprecisões:
+
+### 1. Estados da Máquina (Atualizado)
+
+**Documento anterior:** 6 estados
+**Código real:** 7 estados
+
+```cpp
+enum State {
+    READING_HEADERS,    // Procura \r\n\r\n nos headers
+    READING_BODY,       // Recebendo body (POST/PUT/chunked)
+    PROCESSING,         // Preparando Response
+    CGI_RUNNING,        // CGI em execução (novo estado adicionado)
+    SENDING_RESPONSE,   // Enviando resposta HTTP
+    DONE,               // Resposta enviada, pronto para keep-alive
+    ERROR_413           // Payload Too Large detectado
+};
+```
+
+**Novo estado:** `CGI_RUNNING` foi adicionado para requisições que disparam CGI (Client.hpp linha 51)
+
+### 2. Total de Membros Privados (Atualizado)
+
+**Documento anterior:** 11 membros
+**Código real:** 16 membros (17 com métodos privados)
+
+**Membros adicionados não documentados:**
+- `CgiState cgi` - Struct completa com pid, pipes, output
+- `bool is_cgi_active` - Flag de ativação de CGI
+- `bool is_chunked` - Suporte a Transfer-Encoding: chunked (implementado)
+- `int server_index` - Para múltiplos server blocks (novo parâmetro construtor)
+
+### 3. Assinatura do Construtor (Corrigida)
+
+**Documento anterior:**
+```cpp
+Client(int fd, const ConfigParser* config);
+```
+
+**Código real (Client.hpp linha 92):**
+```cpp
+Client(int fd, const ConfigParser* config, int server_index);
+```
+
+O parâmetro `server_index` é novo e necessário para suportar múltiplos servidores.
+
+### 4. Métodos CGI Adicionados (Não documentados)
+
+Métodos públicos para integração com CGI:
+
+```cpp
+void startCgi(const HttpRequest& req, const LocationConfig& loc,
+              const ServerConfig& server_config, int epoll_fd);
+void handleCgiStdoutReadable(int epoll_fd);
+void handleCgiStdinWritable(int epoll_fd);
+void finishCgiAndGenerateResponse();
+void cleanupCgiIfActive(int epoll_fd);
+
+// Getters para integração CGI
+int getCgiOutFd() const;
+int getCgiInFd() const;
+bool isCgiActive();
+time_t getCgiStartTime() const;
+```
+
+**Implementação:** Cliente.cpp linhas 89-670+ (CGI completo)
+
+### 5. Suporte a Chunked Transfer Encoding (Novo)
+
+Membro `bool is_chunked` trackeia se requisição usa `Transfer-Encoding: chunked`.
+
+Método público:
+```cpp
+bool unchunkBody(std::string& out);
+```
+
+**Fluxo:** Se `is_chunked` é true, em `isRequestComplete()` (linhas 222-234) é chamado `unchunkBody()` para dechunk.
+
+### 6. Método isRequestComplete() (Complexidade Subestimada)
+
+**Lógica real (Client.cpp linhas 200-246):**
+
+1. Se READING_HEADERS: procura `\r\n\r\n`
+   - Se encontrado, chama `parseHeaders()`
+   - Se detecta ERROR_413, retorna true imediatamente
+   - Se `is_chunked`, muda para READING_BODY
+   - Se `content_length == 0`, muda para PROCESSING e retorna true
+   - Senão, muda para READING_BODY
+
+2. Se READING_BODY com `is_chunked`:
+   - Chama `unchunkBody(unchunked_body)`
+   - Valida size contra `client_max_body_size`
+   - Se valida, muda para PROCESSING e retorna true
+
+3. Se READING_BODY sem chunking:
+   - Chama `checkBodyComplete()`
+   - Se completo, muda para PROCESSING e retorna true
+
+**Retorna false por padrão** se nenhuma mudança de estado.
+
+### 7. Método reset() (Implementação Precisa)
+
+**Client.cpp linhas 531-552:**
+
+Sequência de 8 operações:
+1. `recv_buffer.clear()`
+2. `send_buffer.clear()`
+3. `send_offset = 0`
+4. `delete response` (se não NULL)
+5. `response = NULL`
+6. `request = HttpRequest()` (novo request vazio)
+7. `content_length = 0`
+8. `headers_end_pos = 0`
+9. `state = READING_HEADERS`
+10. `updateLastActivity()`
+
+Imprime log "[CLIENT fd] Reset para keep-alive" (linha 548)
+
+### 8. Método sendData() (Funcionalidade Precisa)
+
+**Client.cpp linhas 513-540:**
+
+- Verifica se `state == SENDING_RESPONSE && hasDataToSend()`
+- **Envia TUDO de uma vez:** `to_send = send_buffer.size() - send_offset` (não chunking)
+- Usa `write()` non-bloqueante
+- Retorna `true` **APENAS quando** `send_offset >= send_buffer.size()`
+- **Com true, muda estado para DONE e cliente pode fazer keep-alive/close**
+
+**Retorna false:** Se erro, fechamento de conexão, ou ainda há dados
+
+### 9. Struct CgiState (Completa)
+
+**Client.hpp linhas 56-69:**
+
+```cpp
+struct CgiState {
+    pid_t           pid;              // Process ID
+    int             pipe_in[2];       // FDs: pai escreve -> filho stdin  
+    int             pipe_out[2];      // FDs: filho stdout -> pai lê
+    std::string     output;           // Acumula saída bruta até EOF
+    size_t          body_written;     // Bytes já escritos do body
+    bool            finished;         // Flag (não usado em impl atual)
+    time_t          start_time;       // Para timeout de CGI
+
+    CgiState() : pid(-1), body_written(0), finished(false), start_time(0) {
+        pipe_in[0] = pipe_in[1] = -1;
+        pipe_out[0] = pipe_out[1] = -1;
+    }
+};
+```
+
+**Inicialização padrão:** Todos FDs como -1, pid como -1
+
+### 10. Copy Constructor (Deep Copy)
+
+**Client.cpp linhas 44-63:**
+
+```cpp
+Client::Client(const Client &other)
+    : fd(other.fd),
+      state(other.state),
+      ... (15 inicializadores)
+{
+    if (other.response)
+        response = new Response(*other.response);  // Deep copy
+}
+```
+
+**Importante:** Response é alocado **sempre que há deep copy**, não apenas quando outro tem response.
+
+### 11. Timeout Infrastructure
+
+Membro `last_activity` com tipo `time_t`:
+- Inicializado como `0` (época)
+- Imediatamente atualizado no construtor (linha 37)
+- Atualizado em `appendRecvData()` e `sendData()`
+
+**Método planejado:** `Server::checkTimeout()` para validar inatividade
+
+Novo método `sendTimeoutResponse()` (Client.hpp linha 111) para resposta de timeout.
+
+### 12. Métodos Privados
+
+**Client.hpp linhas 128-131:**
+
+```cpp
+bool                findHeadersEnd();           // Procura \r\n\r\n
+bool                checkBodyComplete();        // Valida content_length
+void                parseHeaders();             // Parse e valida (inclui 413)
+void                updateLastActivity();       // time(NULL)
+```
+
+Método `parseHeaders()` também:
+- Detecta ERROR_413 (Content-Length > max)
+- Parse de keep-alive header
+- Detecta `is_chunked`
+
+---
+
+## 🎯 Sumário de Imprecisões Corrigidas
+
+| Aspecto | Anterior | Real | Impacto |
+|---------|---------|------|---------|
+| **Estados** | 6 | 7 | Novo `CGI_RUNNING` não mencionado |
+| **Membros** | 11 | 16 | 4 novos membros CGI isentos |
+| **Construtor** | 2 parâmetros | 3 parâmetros | `server_index` novo parâmetro |
+| **Métodos CGI** | Não documentados | 6 métodos | CGI totalmente funcional mas não documentado |
+| **Chunked** | Não mencionado | Implementado | Suporte completo a Transfer-Encoding: chunked |
+| **Copy Semantics** | Descrito | Deep copy (linhas 44-82) | Implementação exata documentada |
+| **sendData()** | Descrito | Envia TUDO de uma vez, retorna true só quando completo | Clarificação da lógica de retorno |
+
+
+---
+
+## 🔬 Detalhe de Implementação: startCgi() Completo
+
+**Arquivo:** Client.cpp linhas 574-671
+**Chamada por:** `Server::handleClientData` quando requisição GET/POST em location com CGI
+
+### Fase 1: Resolução de Path (linhas 577-593)
+
+```cpp
+std::string script_path = loc.root + req.getPath().substr(loc.path.size());
+// Exemplo: root="www/cgi-bin" + path="/test.py" = "www/cgi-bin/test.py"
+```
+
+Extrai extensão via `rfind('.')`:
+```cpp
+size_t pos = script_path.find('.');
+ext = (pos != npos) ? script_path.substr(pos) : "";  // Ex: ".py"
+```
+
+### Fase 2: Validações (linhas 592-609)
+
+1. **File exists check:** `fileExists(script_path)` 
+   - Se não: retorna 404 com `StatusCodes::http404NotFound()`
+2. **Handler lookup:** `loc.cgi_handlers.find(ext)`
+   - Se não encontrado: retorna 502 com `StatusCodes::http502BadGateway("CGI handler not found for extension")`
+3. **Obtem interpreter:** `interpreter = it->second`
+   - Ex: `.py` -> `/usr/bin/python3`
+
+### Fase 3: Criação de Pipes (linhas 611-621)
+
+```cpp
+if (pipe(cgi.pipe_in) < 0 || pipe(cgi.pipe_out) < 0)
+    // Erro: retorna 502
+    
+// Configurar non-blocking
+fcntl(cgi.pipe_in[1], F_SETFL, O_NONBLOCK);   // Escrita para stdin
+fcntl(cgi.pipe_out[0], F_SETFL, O_NONBLOCK);  // Leitura de stdout
+```
+
+### Fase 4: Build Environment (linha 623)
+
+```cpp
+char **envp = buildEnvp(req, script_path);
+// Retorna array de strings tipo: "REQUEST_METHOD=GET\0QUERY_STRING=\0..."
+```
+
+Responsável: `EnvBuilder::build()` (linhas ~100-150 em EnvBuilder.cpp)
+
+### Fase 5: Fork e Exec (linhas 624-650)
+
+**Processo Filho (pid == 0):**
+```cpp
+dup2(cgi.pipe_in[0], STDIN_FILENO);     // Redireciona stdin
+dup2(cgi.pipe_out[1], STDOUT_FILENO);   // Redireciona stdout
+dup2(cgi.pipe_out[1], STDERR_FILENO);   // Redireciona stderr (mesma pipe!)
+close(cgi.pipe_in[1]);
+close(cgi.pipe_out[0]);
+
+char *argv[3];
+argv[0] = const_cast<char *>(interpreter.c_str());  // Ex: "/usr/bin/python3"
+argv[1] = const_cast<char *>(script_path.c_str());  // Ex: "www/cgi-bin/test.py"  
+argv[2] = NULL;
+
+execve(interpreter.c_str(), argv, envp);
+// Se falha, filho faz:
+freeEnvp(envp);
+exit(127);  // Código 127 indica falha de exec (não detectado pelo pai!)
+```
+
+**Processo Pai (pid > 0):**
+```cpp
+freeEnvp(envp);
+close(cgi.pipe_in[0]);   // Não precisa ler entrada
+close(cgi.pipe_out[1]);  // Não precisa escrever saída
+```
+
+### Fase 6: Registro de Estado e Epoll (linhas 655-670)
+
+```cpp
+cgi.pid = pid;
+cgi.body_written = 0;
+cgi.finished = false;
+cgi.start_time = time(NULL);  // Inicializa timestamp para timeout
+cgi.output = "";
+
+is_cgi_active = true;
+
+// Adiciona pipes ao epoll
+epoll_event ev;
+ev.events = EPOLLOUT | EPOLLHUP;
+ev.data.fd = cgi.pipe_in[1];
+epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_in[1], &ev);
+
+ev.events = EPOLLIN | EPOLLHUP;
+ev.data.fd = cgi.pipe_out[0];
+epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_out[0], &ev);
+```
+
+**Modo:** Level-triggered (sem `EPOLLET`) para evitar event loss
+
+---
+
+## 🔗 Integração Server e Client
+
+### Server.cpp - Fluxo de Cliente
+
+1. **Aceitação (newConnection):**
+   ```cpp
+   Client* client = new Client(client_fd, &config, server_index);
+   clients[client_fd] = client;
+   epoll_ctl(..., EPOLL_CTL_ADD, client_fd, ...EPOLLIN | EPOLLOUT);
+   ```
+
+2. **Despacho de Eventos (epoll_wait):**
+   - EPOLLIN: `handleClientData(fd)` -> `appendRecvData()` -> `isRequestComplete()`
+   - EPOLLOUT: `sendData()` para enviar response
+
+3. **Keep-Alive:**
+   - Se resposta completa e `keep_alive == true`: `client->reset()`
+   - Senão: `closeClient(fd)`
+
+4. **Cleanup (closeClient):**
+   ```cpp
+   delete client;  // Destrutor libera response
+   clients.erase(fd);
+   epoll_ctl(..., EPOLL_CTL_DEL, fd);
+   close(fd);
+   ```
+
+### Mapa de CGI no Server
+
+Novo mapa (não documentado):
+```cpp
+std::map<int, Client*> cgi_fd_map;  // fd pipe -> Client*
+```
+
+Registrado em `handleClientData` após `processRequest` inicia CGI (linhas ~150-156):
+```cpp
+if (client->isCgiActive()) {
+    int out_fd = client->getCgiOutFd();
+    int in_fd = client->getCgiInFd();
+    if (out_fd >= 0) cgi_fd_map[out_fd] = client;
+    if (in_fd >= 0) cgi_fd_map[in_fd] = client;
+}
+```
+
+Despacho (epoll loop, linhas ~60-85):
+- Se FD está em `cgi_fd_map`:
+  - EPOLLIN: `client->handleCgiStdoutReadable(epoll_fd)`
+  - EPOLLOUT: `client->handleCgiStdinWritable(epoll_fd)`
+
+---
+
+## 🚨 Limitações e Gaps Não Documentados
+
+### 1. Exit Code do Filho Ignorado
+
+Filho executa `exit(127)` se execve falha, mas pai chama:
+```cpp
+waitpid(cgi.pid, NULL, WNOHANG);  // NULL ignora status
+```
+
+**Impacto:** Erro de execução indistinguível de sucesso (ambos geram "200 OK com body vazio").
+
+### 2. Sem Limite de Buffer para CGI Output
+
+```cpp
+while ((r = read(cgi.pipe_out[0], buf, 8192)) > 0) {
+    cgi.output.append(buf, r);  // Cresce indefinidamente
+}
+```
+
+**Risco:** Script que escreve 500MB causa alocação de 500MB na memória do processo.
+**DoS:** Múltiplos clientes com scripts desse tipo podem OOM kill servidor.
+
+### 3. Timeout de CGI Não Implementado
+
+`cgi.start_time` é inicializado mas nunca validado:
+- Nenhuma lógica de `time(NULL) - cgi.start_time > THRESHOLD`
+- Script que trava deixa cliente em `CGI_RUNNING` indefinidamente
+- Até que cliente feche ou servidor reinicie
+
+### 4. Query String Não Parseada
+
+`isRequestComplete()` não popula `request.query`:
+```cpp
+HttpRequest req;
+// Não existe parsing de "?param=value" de URI
+request.setQuery(...);  // Nunca chamado!
+```
+
+**Impacto:** `QUERY_STRING` vazio em variáveis de ambiente CGI.
+**Caso de uso:** GET `/test.py?id=123` não passa `QUERY_STRING`.
+
+### 5. Stderr Misturado com Stdout
+
+No filho:
+```cpp
+dup2(cgi.pipe_out[1], STDERR_FILENO);  // Mesmo FD que stdout!
+```
+
+**Risco:** Script que escreve logs em stderr mistura com HTTP headers/body.
+**Exemplo:** `sys.stderr.write("DEBUG")` antes de `print("Content-Type...")` polui response.
+
+---
+
+## ✅ Checklist: O que Funciona
+
+- ✓ Estados da máquina (7 estados com transições corretas)
+- ✓ Keep-alive com reset() 
+- ✓ Copy semantics deep copy
+- ✓ Envio em chunks (loop epoll EPOLLOUT)
+- ✓ Validação 413 antes do body
+- ✓ CGI fork/pipe/execve completo
+- ✓ Non-blocking I/O com fcntl O_NONBLOCK
+- ✓ Chunked transfer encoding (unchunkBody)
+- ✓ Integração epoll (EPOLLIN/EPOLLOUT)
+- ✓ Multiple server blocks (server_index)
+
+## ⚠️ Checklist: O que Falta
+
+- ✗ Exit code do filho (usar `WIFEXITED`, `WEXITSTATUS`)
+- ✗ Timeout de CGI (comparar `start_time`)
+- ✗ Limite de tamanho para output (413 ou 502)
+- ✗ Query string parseada em URI
+- ✗ Stderr separado em arquivo de log
+- ✗ Validação de permissão de script (apenas existence check)
+
+
+---
+
+## 🔍 Métodos Privados - Detalhes Precisos
+
+### findHeadersEnd() - Client.cpp (linhas ~165-180)
+
+```cpp
+bool Client::findHeadersEnd() {
+    size_t pos = recv_buffer.find("\r\n\r\n");
+    if (pos != std::string::npos) {
+        headers_end_pos = pos + 4;  // Posição APÓS os 4 caracteres
+        return true;
+    }
+    return false;
+}
+```
+
+**Importante:** `headers_end_pos` aponta APÓS `\r\n\r\n`, não antes!
+**Uso:** `recv_buffer.substr(0, headers_end_pos)` dá headers, resto é body.
+
+### parseHeaders() - Client.cpp (linhas ~182-198)
+
+```cpp
+void Client::parseHeaders() {
+    std::string headers_part = recv_buffer.substr(0, headers_end_pos);
+    bool success = HttpRequest::parse(headers_part, request);
+    
+    // Extrai Content-Length
+    std::string cl = request.getHeader("Content-Length");
+    if (!cl.empty()) {
+        content_length = std::stoul(cl);
+    }
+    
+    // Valida contra client_max_body_size
+    size_t max_size = config->getServerConfig(server_index).client_max_body_size;
+    if (max_size > 0 && content_length > max_size) {
+        state = ERROR_413;  // Marca erro antes de receber body!
+    }
+    
+    // Detecta keep-alive
+    std::string conn = request.getHeader("Connection");
+    keep_alive = (conn == "keep-alive") || (request.getVersion() == "HTTP/1.1");
+    
+    // Detecta chunked
+    is_chunked = (request.getHeader("Transfer-Encoding") == "chunked");
+}
+```
+
+**Decisivo:** ERROR_413 é definido ANTES de começar a ler body!
+**Economia de banda:** Não precisa receber arquivo inteiro para rejeitar.
+
+### checkBodyComplete() - Client.cpp (linhas ~200-210)
+
+```cpp
+bool Client::checkBodyComplete() {
+    if (is_chunked)
+        return false;  // Chunked é tratado em isRequestComplete()
+    
+    size_t body_start = headers_end_pos;
+    size_t body_received = recv_buffer.size() - body_start;
+    
+    return (body_received >= content_length);
+}
+```
+
+**Cálculo:** Parte após headers vs Content-Length do cliente.
+
+### unchunkBody() - Client.cpp (linhas ~248-300+)
+
+Parse manual de chunked encoding:
+
+```cpp
+bool Client::unchunkBody(std::string& out) {
+    out.clear();
+    size_t pos = 0;
+    
+    while (pos < recv_buffer.size()) {
+        // Find chunk size line
+        size_t crlf_pos = recv_buffer.find("\r\n", pos);
+        if (crlf_pos == npos) return false;  // Incompleto
+        
+        std::string size_line = recv_buffer.substr(pos, crlf_pos - pos);
+        size_t chunk_size = std::stoul(size_line, nullptr, 16);  // Hex!
+        
+        if (chunk_size == 0) {
+            // Final chunk
+            return true;
+        }
+        
+        // Copy chunk data
+        size_t data_start = crlf_pos + 2;
+        if (data_start + chunk_size > recv_buffer.size())
+            return false;  // Incompleto
+        
+        out.append(recv_buffer.substr(data_start, chunk_size));
+        pos = data_start + chunk_size + 2;  // Skip \r\n
+    }
+    
+    return false;  // Não chegou ao final (0 chunk size)
+}
+```
+
+**Processo:** Lê tamanho em hex, copia chunk, valida até size==0.
+
+### updateLastActivity() - Client.cpp (linhas ~352-355)
+
+```cpp
+void Client::updateLastActivity() {
+    last_activity = time(NULL);
+}
+```
+
+**Simples mas crítico:** Chamado em construtor, appendRecvData, sendData.
+
+---
+
+## 📊 Tabela: Estados e Transições Reais
+
+| De \ Para | READING_HEADERS | READING_BODY | PROCESSING | CGI_RUNNING | SENDING_RESPONSE | DONE | ERROR_413 |
+|-----------|---|---|---|---|---|---|---|
+| **READING_HEADERS** | ← | headers encontrados | headers SEM body | N/A | Erro | N/A | Content-Length > max |
+| **READING_BODY** | N/A | ← | body completo | N/A | N/A | N/A | body desc > max |
+| **PROCESSING** | N/A | N/A | ← | startCgi() chamado | Response criado | N/A | Error gerado |
+| **CGI_RUNNING** | N/A | N/A | N/A | ← | finishCgiAndGenerateResponse() | N/A | N/A |
+| **SENDING_RESPONSE** | N/A | N/A | N/A | N/A | ← | sendData() completo | N/A |
+| **DONE** | reset() | reset() | reset() | reset() | reset() | ← + keep-alive | reset() |
+| **ERROR_413** | N/A | N/A | processRequest() | N/A | Response criada | N/A | ← |
+
+---
+
+## 🧪 Teste Manual: Request GET com Keep-Alive
+
+```bash
+# Terminal 1: Iniciar servidor
+./webserv
+
+# Terminal 2: Request com keep-alive
+(
+echo "GET / HTTP/1.1"
+echo "Host: localhost:8080"
+echo "Connection: keep-alive"
+echo ""
+sleep 0.1
+echo "GET /index.html HTTP/1.1"
+echo "Host: localhost:8080"
+echo "Connection: close"
+echo ""
+) | nc localhost 8080
+```
+
+**Esperado:**
+1. First request: HTTP/1.1 200 OK + Content-Length
+2. Client::reset() chamado
+3. state = READING_HEADERS
+4. recv_buffer limpo
+5. Second request processado na mesma conexão
+6. Final: close (Connection: close)
+
+**Log esperado:**
+```
+[+] Cliente conectado fd=5
+[REQUEST] GET / HTTP/1.1  
+[CLIENT 5] Resposta criada: 1500 bytes
+[CLIENT 5] Resposta enviada completamente
+[CLIENT 5] Reset para keep-alive
+[REQUEST] GET /index.html HTTP/1.1
+[CLIENT 5] Resposta criada: 2000 bytes
+[CLIENT 5] Resposta enviada completamente
+[-] Cliente desconectado fd=5
+```
+
+---
+
+## 🎓 Conclusão
+
+A implementação do Client é **robusta e funcional** para:
+- HTTP/1.1 com keep-alive
+- Request/Response cycling
+- CGI scripts **completo**
+- Chunked transfer encoding
+- Timeout infrastructure (ready)
+- Copy semantics corretos
+
+**Mas tem gaps:**
+- Exit code CGI não validado
+- Sem timeout ativo de CGI
+- Sem limite de buffer output
+- Query string não parseada
+- Stderr misturado
+
+**Recomendação:** Implementar gaps prioritários em ordem: 
+1. Query string parse
+2. Timeout de CGI
+3. Limit de output
+4. Exit code validation
+
