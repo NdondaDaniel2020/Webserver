@@ -35,7 +35,6 @@ class Server
         int                      epoll_fd;
         int*                     servers;
         int                      port_count;
-        std::map<int, int>       customer_origin;
         std::string*             interface;
         epoll_event              events[64];
         const ConfigParser&      config;

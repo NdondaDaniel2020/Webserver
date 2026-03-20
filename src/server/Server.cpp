@@ -48,7 +48,7 @@ Server::Server(const ConfigParser &config)
         }
 
         epoll_event ev;
-        ev.events  = EPOLLIN;
+        ev.events = EPOLLIN;
         ev.data.fd = this->servers[i];
         epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, this->servers[i], &ev);
     }
@@ -92,10 +92,10 @@ void Server::start()
                 continue;
             }
 
-            std::map<int, Client*>::iterator it = clients.find(fd);
+            std::map<int, Client *>::iterator it = clients.find(fd);
             if (it != clients.end())
             {
-                Client* client = it->second;
+                Client *client = it->second;
 
                 if (events[i].events & (EPOLLERR | EPOLLHUP))
                 {
@@ -114,8 +114,7 @@ void Server::start()
 
                 if (events[i].events & EPOLLOUT)
                 {
-                    if (client->getState() == Client::SENDING_RESPONSE
-                        && client->hasDataToSend())
+                    if (client->getState() == Client::SENDING_RESPONSE && client->hasDataToSend())
                     {
                         bool finished = client->sendData();
                         if (finished)
@@ -133,10 +132,10 @@ void Server::start()
             else
             {
                 // fd pertence a um pipe CGI
-                std::map<int, Client*>::iterator cit = cgi_fd_map.find(fd);
+                std::map<int, Client *>::iterator cit = cgi_fd_map.find(fd);
                 if (cit != cgi_fd_map.end())
                 {
-                    Client* c = cit->second;
+                    Client *c = cit->second;
                     if (events[i].events & (EPOLLIN | EPOLLERR | EPOLLHUP))
                         c->handleCgiStdoutReadable(epoll_fd);
                     else if (events[i].events & EPOLLOUT)
@@ -159,10 +158,19 @@ void Server::newConnection(int fd)
     fcntl(client_fd, F_SETFL, O_NONBLOCK);
 
     std::cout << "[+] Cliente conectado fd=" << client_fd << std::endl;
-
-    Client *client = new Client(client_fd, &this->config);
+    
+    int server_index = -1;
+    for (int i = 0; i < this->port_count; i++)
+    {
+        if (fd == this->servers[i])
+        {
+            server_index = i;
+            break;
+        }
+    }
+    Client *client = new Client(client_fd, &this->config, server_index);
+    
     this->clients[client_fd] = client;
-    this->customer_origin[client_fd] = fd;
 
     epoll_event cev;
     cev.events = EPOLLIN | EPOLLOUT;
@@ -173,14 +181,14 @@ void Server::newConnection(int fd)
 
 void Server::handleClientData(int fd)
 {
-    std::map<int, Client*>::iterator it = this->clients.find(fd);
+    std::map<int, Client *>::iterator it = this->clients.find(fd);
     if (it == this->clients.end())
     {
         std::cerr << "[ERRO] Cliente fd=" << fd << " não encontrado" << std::endl;
         return;
     }
 
-    Client* client = it->second;
+    Client *client = it->second;
 
     if (client->getState() == Client::READING_HEADERS ||
         client->getState() == Client::READING_BODY)
@@ -199,22 +207,16 @@ void Server::handleClientData(int fd)
 
         if (client->isRequestComplete())
         {
-            for (int i = 0; i < this->port_count; i++)
-            {
-                if (this->customer_origin[fd] == this->servers[i])
-                {
-                    client->processRequest(this->config.getServerConfig(i), this->epoll_fd);
-                    break;
-                }
-            }
-
+            client->processRequest(this->config.getServerConfig(client->getServerIndex()), this->epoll_fd);
             // Registar pipes CGI no mapa separado, nunca em clients
             if (client->isCgiActive())
             {
                 int out_fd = client->getCgiOutFd();
-                int in_fd  = client->getCgiInFd();
-                if (out_fd >= 0) cgi_fd_map[out_fd] = client;
-                if (in_fd  >= 0) cgi_fd_map[in_fd]  = client;
+                int in_fd = client->getCgiInFd();
+                if (out_fd >= 0)
+                    cgi_fd_map[out_fd] = client;
+                if (in_fd >= 0)
+                    cgi_fd_map[in_fd] = client;
             }
         }
     }
@@ -239,27 +241,29 @@ void Server::handleClientData(int fd)
 
 void Server::closeClient(int fd)
 {
-    std::map<int, Client*>::iterator it = this->clients.find(fd);
+    std::map<int, Client *>::iterator it = this->clients.find(fd);
     if (it == this->clients.end())
         return;
 
-    Client* client = it->second;
+    Client *client = it->second;
 
     // Guardar fds dos pipes ANTES do cleanup os fechar
     int cgi_out = -1;
-    int cgi_in  = -1;
+    int cgi_in = -1;
     if (client->isCgiActive())
     {
         cgi_out = client->getCgiOutFd();
-        cgi_in  = client->getCgiInFd();
+        cgi_in = client->getCgiInFd();
     }
 
     // Cleanup: mata processo, fecha e anula pipes
     client->cleanupCgiIfActive(this->epoll_fd);
 
     // Remover pipes do mapa separado
-    if (cgi_out >= 0) cgi_fd_map.erase(cgi_out);
-    if (cgi_in  >= 0) cgi_fd_map.erase(cgi_in);
+    if (cgi_out >= 0)
+        cgi_fd_map.erase(cgi_out);
+    if (cgi_in >= 0)
+        cgi_fd_map.erase(cgi_in);
 
     delete client;
     this->clients.erase(it);
@@ -296,8 +300,8 @@ void Client::sendTimeoutResponse()
 
     send_buffer = oss.str();
     send_offset = 0;
-    keep_alive  = false;
-    state       = SENDING_RESPONSE;
+    keep_alive = false;
+    state = SENDING_RESPONSE;
 
     // Envia directamente — não espera pelo epoll
     write(fd, send_buffer.c_str(), send_buffer.size());
@@ -309,11 +313,11 @@ void Server::checkTimeout()
     std::vector<int> to_close;
     std::vector<int> cgi_timeout;
 
-    for (std::map<int, Client*>::iterator it = clients.begin();
+    for (std::map<int, Client *>::iterator it = clients.begin();
          it != clients.end(); ++it)
     {
-        int     client_fd = it->first;
-        Client* client    = it->second;
+        int client_fd = it->first;
+        Client *client = it->second;
 
         if (client->isCgiActive())
         {
@@ -339,16 +343,19 @@ void Server::checkTimeout()
     // CGI timeout — envia 504 antes de fechar
     for (size_t i = 0; i < cgi_timeout.size(); i++)
     {
-        std::map<int, Client*>::iterator it = clients.find(cgi_timeout[i]);
-        if (it == clients.end()) continue;
-        Client* client = it->second;
+        std::map<int, Client *>::iterator it = clients.find(cgi_timeout[i]);
+        if (it == clients.end())
+            continue;
+        Client *client = it->second;
 
         // Mata o CGI
         client->cleanupCgiIfActive(this->epoll_fd);
 
         // Remove pipes do mapa
-        if (client->getCgiOutFd() >= 0) cgi_fd_map.erase(client->getCgiOutFd());
-        if (client->getCgiInFd()  >= 0) cgi_fd_map.erase(client->getCgiInFd());
+        if (client->getCgiOutFd() >= 0)
+            cgi_fd_map.erase(client->getCgiOutFd());
+        if (client->getCgiInFd() >= 0)
+            cgi_fd_map.erase(client->getCgiInFd());
 
         // Envia 504 e fecha
         client->sendTimeoutResponse();
@@ -374,9 +381,9 @@ int Server::createServerSocket(const std::string &interface, int port)
 
     sockaddr_in addr;
     std::memset(&addr, 0, sizeof(addr));
-    addr.sin_family      = AF_INET;
+    addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = htonl(ipToHex(interface));
-    addr.sin_port        = htons(port);
+    addr.sin_port = htons(port);
 
     if (bind(server_fd, (sockaddr *)&addr, sizeof(addr)) < 0)
     {

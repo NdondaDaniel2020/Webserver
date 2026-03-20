@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 12:22:37 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/20 14:00:21 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -14,7 +14,7 @@
 #include "StatusCodes.hpp"
 #include "EnvBuilder.hpp" // para gerar envp correto para CGI
 
-Client::Client(int fd, const ConfigParser *config)
+Client::Client(int fd, const ConfigParser *config, int server_index)
     : fd(fd),
       state(READING_HEADERS),
       last_activity(0), // ← corrigido
@@ -28,7 +28,9 @@ Client::Client(int fd, const ConfigParser *config)
       headers_end_pos(0),
       config(config),
       cgi(), // default constructor
-      is_cgi_active(false)
+      is_cgi_active(false),
+      is_chunked(false),
+      server_index(server_index)
 {
     updateLastActivity();
 }
@@ -53,7 +55,9 @@ Client::Client(const Client &other)
       headers_end_pos(other.headers_end_pos),
       config(other.config),
       cgi(other.cgi),
-      is_cgi_active(other.is_cgi_active)
+      is_cgi_active(other.is_cgi_active),
+      is_chunked(other.is_chunked),
+      server_index(other.server_index)
 {
     if (other.response)
         response = new Response(*other.response);
@@ -81,6 +85,8 @@ Client &Client::operator=(const Client &other)
         config = other.config;
         cgi = other.cgi;
         is_cgi_active = other.is_cgi_active;
+        is_chunked = other.is_chunked;
+        server_index = other.server_index;
     }
     return *this;
 }
@@ -115,6 +121,11 @@ void Client::cleanupCgiIfActive(int epoll_fd)
 
     std::cout << "[CGI CLEANUP] Processo filho do cliente fd=" << fd
               << " terminado (SIGKILL enviado)" << std::endl;
+}
+
+int Client::getServerIndex()
+{
+    return server_index;
 }
 
 // ========== Getters ==========
@@ -172,6 +183,31 @@ void Client::appendRecvData(const char *data, size_t len)
     updateLastActivity();
 }
 
+bool  Client::unchunkBody(std::string& out)
+{
+    const std::string& buffer = recv_buffer;
+    size_t pos = headers_end_pos;
+
+    while (pos < buffer.size())
+    {
+        size_t control_f = buffer.find("\r\n", pos);
+        if (control_f == std::string::npos)
+            return false;
+        std::string value_hex = buffer.substr(pos, control_f - pos);
+        size_t chunk_size = 0;
+        std::stringstream iss(value_hex);
+        iss >> std::hex >> chunk_size;
+        pos = control_f + 2;
+        if (chunk_size == 0)
+            return true;
+        if (pos + chunk_size + 2 > buffer.size())
+            return false;
+        out += buffer.substr(pos, chunk_size);
+        pos += chunk_size + 2;
+    }
+    return false;
+}
+
 bool Client::isRequestComplete()
 {
     if (state == READING_HEADERS)
@@ -183,9 +219,10 @@ bool Client::isRequestComplete()
             // Se parseHeaders detectou erro 413, marcar como completo
             if (state == ERROR_413)
                 return true;
-
+            if (is_chunked)
+                state = READING_BODY;
             // Se não tem body (GET, POST, DELETE) e Content-Length: 0
-            if ((request.getMethod() == "GET" ||
+            else if ((request.getMethod() == "GET" ||
                  request.getMethod() == "POST" ||
                  request.getMethod() == "DELETE") &&
                 content_length == 0)
@@ -193,18 +230,40 @@ bool Client::isRequestComplete()
                 state = PROCESSING;
                 return true;
             }
-
-            // Se tem body, muda para READING_BODY
-            state = READING_BODY;
+            else
+                state = READING_BODY;
         }
     }
 
     if (state == READING_BODY)
     {
-        if (checkBodyComplete())
+        if (is_chunked)
         {
-            state = PROCESSING;
-            return true;
+            std::string unchunked_body;
+
+            if (unchunkBody(unchunked_body))
+            {
+                size_t max_size = config->getServerConfig(getServerIndex()).client_max_body_size;
+                if (max_size > 0 && unchunked_body.size() > max_size)
+                {
+                    request.setBody(unchunked_body);
+                    state = ERROR_413;
+                }
+                else
+                {
+                    request.setBody(unchunked_body);
+                    state = PROCESSING;
+                }
+                return true;
+            }
+        }
+        else
+        {
+            if (checkBodyComplete())
+            {
+                state = PROCESSING;
+                return true;
+            }
         }
     }
 
@@ -237,9 +296,7 @@ void Client::parseHeaders()
         // ✅ VALIDAR Content-Length ANTES de receber o body
         if (config)
         {
-            const ServerConfig &server_cfg = config->getServerConfig(0);
-            size_t max_size = server_cfg.client_max_body_size;
-
+            size_t max_size = config->getServerConfig(getServerIndex()).client_max_body_size;
             if (max_size > 0 && content_length > max_size)
             {
                 std::cout << "[413] Content-Length (" << content_length
@@ -261,6 +318,15 @@ void Client::parseHeaders()
     {
         // HTTP/1.1 default é keep-alive
         keep_alive = (request.getVersion() == "HTTP/1.1");
+    }
+    if (request.hasHeader("Transfer-Encoding"))
+    {
+        std::string transf_enco = request.getHeader("Transfer-Encoding");
+        if (transf_enco == "chunked")
+        {
+            is_chunked = true;
+            content_length = 0;
+        }
     }
 }
 
@@ -311,7 +377,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
     if (state != PROCESSING)
         return;
 
-    if (content_length > 0 && headers_end_pos > 0)
+    if (!is_chunked && content_length > 0 && headers_end_pos > 0)
     {
         size_t body_size = recv_buffer.size() - headers_end_pos;
         if (body_size >= content_length)
@@ -438,9 +504,9 @@ void Client::updateLastActivity()
 }
 
 // Cria envp usando EnvBuilder para suportar php-cgi com force-cgi-redirect
-static char **buildEnvp(const HttpRequest &req, const std::string &script, const LocationConfig &loc)
+static char **buildEnvp(const HttpRequest &req, const std::string &script)
 {
-    std::vector<std::string> envStrings = EnvBuilder::build(req, loc, script);
+    std::vector<std::string> envStrings = EnvBuilder::build(req, script);
     char **envp = new char *[envStrings.size() + 1];
     size_t i = 0;
     for (; i < envStrings.size(); ++i)
@@ -501,7 +567,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     fcntl(cgi.pipe_in[1], F_SETFL, O_NONBLOCK);
     fcntl(cgi.pipe_out[0], F_SETFL, O_NONBLOCK);
 
-    char **envp = buildEnvp(req, script_path, loc);
+    char **envp = buildEnvp(req, script_path);
     pid_t pid = fork();
     if (pid < 0)
     {
@@ -588,11 +654,7 @@ void Client::handleCgiStdinWritable(int epoll_fd)
         }
     }
     else if (w == 0)
-    {
-        // w == 0 pode significar que o pipe está cheio (raro)
         std::cout << "[CLIENT " << fd << "] CGI stdin write retornou 0" << std::endl;
-        // Epoll sinalizará novamente quando houver espaço
-    }
     else  // w < 0
     {
         // Erro em write: pipe quebrado, processo morreu, etc
@@ -624,7 +686,7 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
         close(cgi.pipe_out[0]);
         cgi.pipe_out[0] = -1;
-        finishCgiAndGenerateResponse(epoll_fd);
+        finishCgiAndGenerateResponse();
         return;
     }
 
@@ -634,7 +696,7 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
         close(cgi.pipe_out[0]);
         cgi.pipe_out[0] = -1;
-        finishCgiAndGenerateResponse(epoll_fd);
+        finishCgiAndGenerateResponse();
         return;
     }
 
@@ -652,7 +714,7 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
             close(cgi.pipe_out[0]);
             cgi.pipe_out[0] = -1;
             cgi.pid = -1;
-            finishCgiAndGenerateResponse(epoll_fd);
+            finishCgiAndGenerateResponse();
         }
     }
     else
@@ -661,9 +723,8 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
     }
 }
 
-void Client::finishCgiAndGenerateResponse(int epoll_fd)
+void Client::finishCgiAndGenerateResponse()
 {
-    (void)epoll_fd;
     int status;
     if (cgi.pid > 0)
     {

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   EnvBuilder.hpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ajacinto <marvin@42.fr>                    +#+  +:+       +#+        */
+/*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 12:18:28 by ajacinto          #+#    #+#             */
-/*   Updated: 2026/03/05 12:18:35 by ajacinto         ###   ########.fr       */
+/*   Updated: 2026/03/20 14:01:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,6 @@
 
 namespace EnvBuilder {
     std::vector<std::string> build(const HttpRequest& request,
-                                   const LocationConfig& location,
                                    const std::string& scriptPath);
 }
 

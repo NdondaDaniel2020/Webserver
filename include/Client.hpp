@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 12:20:30 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/20 14:08:25 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -81,10 +81,12 @@ private:
     const ConfigParser* config;
     CgiState            cgi;
     bool                is_cgi_active;
+    bool                is_chunked;
+    int                 server_index;
 
 public:
     // Construtor / Destrutor / Copia
-    Client(int fd, const ConfigParser* config);
+    Client(int fd, const ConfigParser* config, int server_index);
     ~Client();
     Client(const Client& other);
     Client& operator=(const Client& other);
@@ -101,6 +103,7 @@ public:
     bool                hasDataToSend() const;
     bool                isCgiActive() const { return is_cgi_active; }
     void                cleanupCgiIfActive(int epoll_fd);
+    int                 getServerIndex();
 
     // FDs do CGI (para epoll no Server)
     void sendTimeoutResponse();
@@ -123,8 +126,8 @@ public:
                                  const ServerConfig& server_config, int epoll_fd);
     void                handleCgiStdoutReadable(int epoll_fd);
     void                handleCgiStdinWritable(int epoll_fd);
-    void                finishCgiAndGenerateResponse(int epoll_fd);
-
+    void                finishCgiAndGenerateResponse();
+    bool                unchunkBody(std::string& out);
 private:
     // Helpers internos
     bool                findHeadersEnd();

@@ -3,10 +3,10 @@
 /*                                                        :::      ::::::::   */
 /*   EnvBuilder.cpp                                     :+:      :+:    :+:   */
 /*                                                    +:+ +:+         +:+     */
-/*   By: ajacinto <marvin@42.fr>                    +#+  +:+       +#+        */
+/*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 12:17:35 by ajacinto          #+#    #+#             */
-/*   Updated: 2026/03/05 12:17:37 by ajacinto         ###   ########.fr       */
+/*   Updated: 2026/03/20 14:00:38 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,12 +25,10 @@ static std::string toUpper(const std::string& str)
 }
 
 std::vector<std::string> build(const HttpRequest& request,
-                               const LocationConfig& location,
                                const std::string& scriptPath)
 {
     // location might not be used in the simple implementation but kept for
     // future flexibility (e.g. root override, custom vars)
-    (void)location;
     std::vector<std::string> env;
 
      std::cerr << "[ENV] query='" << request.getQuery() << "'\n";
