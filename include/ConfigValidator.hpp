@@ -29,6 +29,7 @@ namespace ConfigValidator
     bool validateErrorPages(const std::map<std::string, std::string>& error_pages);
     bool validateServerName(std::string& server_name);
     bool validateReturn(std::string value);
+    void validateServerConfigDefault(const ServerConfig& server);
 }
 
 #endif

@@ -237,4 +237,23 @@ namespace ConfigValidator
         }
         return true;
     }
+
+    void validateServerConfigDefault(const ServerConfig& server)
+    {
+        if (!server.port || server.interface.empty())
+            throw std::runtime_error("Missing required field: listen (IP/port)");
+
+        if (server.port <= 1024)
+            throw std::runtime_error("Invalid listen: port must be greater than 1024");
+
+        if (server.server_name.empty())
+            throw std::runtime_error("Missing required field: server_name");
+
+        if (server.root.empty())
+            throw std::runtime_error("Missing required field: root");
+
+        if (server.client_max_body_size <= 0)
+            throw std::runtime_error("Invalid client_max_body_size: must be greater than 0");
+    }
+
 }
