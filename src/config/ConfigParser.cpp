@@ -35,7 +35,7 @@ bool ConfigParser::loadFromFile(const std::string& filename)
         line = StringUtils::trim(line);
 
         if (line.empty() || line[0] == '#')
-            continue;
+            continue ;
         
         if (line.find("server") != std::string::npos && line.find("{") != std::string::npos)
         {
@@ -67,7 +67,7 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         line = StringUtils::trim(line);
 
         if (line.empty() || line[0] == '#')
-            continue;
+            continue ;
 
         if (line == "}")
             break ;
@@ -79,6 +79,9 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         
         std::string key, value;
         ConfigHelper::extractKeyValue(line, key, value);
+
+        if (!key.size()  || !value.size())
+            throw std::runtime_error("Invalid key or value: " + line);
 
         if (key == "listen")
         {
@@ -126,6 +129,7 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         else
             ConfigHelper::parseCommonConfig(key, value, server);
     }
+    ConfigValidator::validateServerConfigDefault(server);
 }
 
 void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& location)
