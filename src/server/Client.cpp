@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 15:31:41 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 16:21:53 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -673,11 +673,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_in[1], &ev) < 0)
     {
         std::cerr << "[CGI] epoll_ctl(pipe_in) failed: " << strerror(errno) << std::endl;
-        // CORREÇÃO: Cleanup em cascata se epoll_ctl falha
-        close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
-        close(cgi.pipe_out[1]);
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
         cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
         if (cgi.pid > 0)
@@ -700,10 +697,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     {
         std::cerr << "[CGI] epoll_ctl(pipe_out) failed: " << strerror(errno) << std::endl;
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
-        close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
-        close(cgi.pipe_out[1]);
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
         cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
         if (cgi.pid > 0)

@@ -6,55 +6,73 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 15:03:44 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 16:01:08 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "Server.hpp"
 
 Server::Server(const ConfigParser &config)
-    : port_count(config.getServerCount()),
+    : ports(NULL),
+      epoll_fd(-1),
+      servers(NULL),
+      port_count(config.getServerCount()),
+      interface(NULL),
       config(config),
       TIMEOUT_SECONDS(120)
 {
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
+    this->servers = new int[this->port_count];
+
     for (int i = 0; i < this->port_count; i++)
     {
         this->ports[i] = config.getServerConfig(i).port;
         this->interface[i] = config.getServerConfig(i).interface;
+        servers[i] = -1;
     }
 
     this->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (this->epoll_fd < 0)
     {
         perror("epoll_create");
-        return;
+        cleanup();
+        throw std::runtime_error("Failed to create epoll");
     }
 
-    this->servers = new int[this->port_count];
     for (int i = 0; i < this->port_count; i++)
     {
         this->servers[i] = createServerSocket(this->interface[i], this->ports[i]);
         if (this->servers[i] < 0)
         {
-            std::cerr << "[ERRO] Falha ao criar socket para porta "
-                      << this->ports[i]
-                      << " — abortando" << std::endl;
-            // Fecha os sockets já criados
-            for (int j = 0; j < i; j++)
-                close(this->servers[j]);
-            return;
+            std::cerr << "[ERRO] Falha ao criar socket para porta " << this->ports[i] << std::endl;
+            cleanup();
+            throw std::runtime_error("Failed to create server socket");
         }
 
         epoll_event ev;
         ev.events = EPOLLIN;
         ev.data.fd = this->servers[i];
-        epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, this->servers[i], &ev);
+        if (epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, this->servers[i], &ev) < 0)
+        {
+            perror("epoll_ctl");
+            close(this->servers[i]);
+            this->servers[i] = -1;
+            cleanup();
+            std::cerr << "[ERRO] Falha ao adicionar socket à lista epoll" << std::endl;
+            throw std::runtime_error("Failed to add server socket to epoll");
+        }
     }
+
+    std::cout << "[SERVER] Inicializado com sucesso" << std::endl;
 }
 
 Server::~Server()
+{
+    this->cleanup();
+}
+
+void Server::cleanup()
 {
     std::cout << "[SERVER] Shutting down..." << std::endl;
 
@@ -101,6 +119,10 @@ Server::~Server()
     delete[] ports;
     delete[] servers;
     delete[] interface;
+
+    ports = NULL;
+    servers = NULL;
+    interface = NULL;
 }
 
 void Server::start()
@@ -181,6 +203,7 @@ void Server::start()
         }
     }
 }
+
 
 void Server::newConnection(int fd)
 {

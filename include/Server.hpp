@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 10:41:44 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 16:22:13 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -46,6 +46,7 @@ class Server
         Server(const ConfigParser& config);
         ~Server();
 
+        void cleanup();
         void start();
         void stop();
 
