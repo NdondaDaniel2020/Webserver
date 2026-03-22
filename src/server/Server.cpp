@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 16:01:08 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 16:50:09 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -63,8 +63,6 @@ Server::Server(const ConfigParser &config)
             throw std::runtime_error("Failed to add server socket to epoll");
         }
     }
-
-    std::cout << "[SERVER] Inicializado com sucesso" << std::endl;
 }
 
 Server::~Server()
@@ -233,15 +231,32 @@ void Server::newConnection(int fd)
             break;
         }
     }
-    Client *client = new Client(client_fd, &this->config, server_index);
     
-    this->clients[client_fd] = client;
+    Client *client = NULL;
+    try
+    {
+        client = new Client(client_fd, &this->config, server_index);
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "[ERROR] Failed to create Client: " << e.what() << std::endl;
+        close(client_fd);
+        return;
+    }
 
     epoll_event cev;
     cev.events = EPOLLIN | EPOLLOUT;
     cev.data.fd = client_fd;
 
-    epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, client_fd, &cev);
+    if (epoll_ctl(this->epoll_fd, EPOLL_CTL_ADD, client_fd, &cev) < 0)
+    {
+        perror("epoll_ctl");
+        delete client;
+        close(client_fd);
+        std::cerr << "[ERRO] Falha ao adicionar cliente à lista epoll" << std::endl;
+        return;
+    }
+    this->clients[client_fd] = client;
 }
 
 void Server::handleClientData(int fd)
