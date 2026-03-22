@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 13:49:35 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 15:03:44 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,7 @@ Server::Server(const ConfigParser &config)
         this->interface[i] = config.getServerConfig(i).interface;
     }
 
-    this->epoll_fd = epoll_create(1);
+    this->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
     if (this->epoll_fd < 0)
     {
         perror("epoll_create");
@@ -188,6 +188,12 @@ void Server::newConnection(int fd)
     if (client_fd < 0)
     {
         perror("accept");
+        return;
+    }
+
+    if (setClosExec(client_fd) < 0) {
+        std::cerr << "[ERRO] Falha ao seta FD_CLOEXEC no client_fd" << std::endl;
+        close(client_fd);
         return;
     }
 
@@ -404,7 +410,7 @@ void Server::checkTimeout()
 
 int Server::createServerSocket(const std::string &interface, int port)
 {
-    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int server_fd = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
     if (server_fd < 0)
     {
         perror("socket");

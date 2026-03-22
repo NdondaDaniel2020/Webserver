@@ -564,6 +564,34 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         return;
     }
 
+    // Seta FD_CLOEXEC em pipe_in[0] e pipe_in[1]
+    if (setClosExec(cgi.pipe_in[0]) < 0 || setClosExec(cgi.pipe_in[1]) < 0) {
+        std::cerr << "[CGI] Falha ao seta FD_CLOEXEC em pipe_in" << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on pipes", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    // Seta FD_CLOEXEC em pipe_out[0] e pipe_out[1]
+    if (setClosExec(cgi.pipe_out[0]) < 0 || setClosExec(cgi.pipe_out[1]) < 0) {
+        std::cerr << "[CGI] Falha ao seta FD_CLOEXEC em pipe_out" << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on pipes", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
     fcntl(cgi.pipe_in[1], F_SETFL, O_NONBLOCK);
     fcntl(cgi.pipe_out[0], F_SETFL, O_NONBLOCK);
 

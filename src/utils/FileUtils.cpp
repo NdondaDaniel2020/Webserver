@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/16 14:45:18 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 14:58:10 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -479,5 +479,24 @@ std::string getFileName(const std::string& path)
     if (pos == std::string::npos)
         return path;
     return path.substr(pos + 1);
+}
+
+int setClosExec(int fd)
+{
+    if (fd < 0)
+        return -1;
+
+    int flags = fcntl(fd, F_GETFD);
+    if (flags < 0) {
+        close(fd);
+        return -1;
+    }
+
+    if (fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0) {
+        close(fd);
+        return -1;
+    }
+
+    return 0;
 }
 
