@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/19 13:31:01 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 13:49:35 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -56,15 +56,51 @@ Server::Server(const ConfigParser &config)
 
 Server::~Server()
 {
-    // Limpar todos os clientes
-    for (std::map<int, Client *>::iterator it = clients.begin(); it != clients.end(); ++it)
+    std::cout << "[SERVER] Shutting down..." << std::endl;
+
+    for (std::map<int, Client *>::iterator it = clients.begin();
+         it != clients.end(); ++it)
     {
-        delete it->second;
+        Client *client = it->second;
+
+        if (client->isCgiActive())
+            client->cleanupCgiIfActive(epoll_fd);
+
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, it->first, NULL);
+
+        close(it->first);
+
+        delete client;
     }
     clients.clear();
-    delete[] this->ports;
-    delete[] this->servers;
-    delete[] this->interface;
+
+    for (std::map<int, Client *>::iterator it = cgi_fd_map.begin();
+         it != cgi_fd_map.end(); ++it)
+    {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, it->first, NULL);
+        close(it->first);
+    }
+    cgi_fd_map.clear();
+
+    for (int i = 0; i < port_count; i++)
+    {
+        if (servers[i] >= 0)
+        {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, servers[i], NULL);
+            close(servers[i]);
+            std::cout << "[SERVER] Closed port " << ports[i] << std::endl;
+        }
+    }
+
+    if (epoll_fd >= 0)
+    {
+        close(epoll_fd);
+        std::cout << "[SERVER] Closed epoll fd" << std::endl;
+    }
+
+    delete[] ports;
+    delete[] servers;
+    delete[] interface;
 }
 
 void Server::start()
