@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 17:08:58 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 17:18:46 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -327,7 +327,6 @@ void Server::closeClient(int fd)
 
     Client *client = it->second;
 
-    // Guardar fds dos pipes ANTES do cleanup os fechar
     int cgi_out = -1;
     int cgi_in = -1;
     if (client->isCgiActive())
@@ -336,10 +335,8 @@ void Server::closeClient(int fd)
         cgi_in = client->getCgiInFd();
     }
 
-    // Cleanup: mata processo, fecha e anula pipes
     client->cleanupCgiIfActive(this->epoll_fd);
 
-    // Remover pipes do mapa separado
     if (cgi_out >= 0)
         cgi_fd_map.erase(cgi_out);
     if (cgi_in >= 0)
