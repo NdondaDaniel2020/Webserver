@@ -27,3 +27,6 @@ cgi_cook:
   # 2. Usar cookie em requisições subsequentes:
       curl -b "NAGSID=e5c74d64038d5035c02e63640f571e9e" \
       http://127.0.0.1:8080/cgi-bin/arena_action.py?action=state
+
+valgrind:
+   valgrind --leak-check=full  --track-fds=yes  --show-leak-kinds=all  ./webserv config/default.conf
