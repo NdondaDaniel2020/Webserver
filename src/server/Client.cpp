@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/20 14:00:21 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/22 15:31:41 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -555,37 +555,58 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         return;
     }
     std::string interpreter = it->second;
-    if (pipe(cgi.pipe_in) < 0 || pipe(cgi.pipe_out) < 0)
+
+    cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+    cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+
+    if (pipe(cgi.pipe_in) < 0)
     {
-        StatusCodes::http502BadGateway(error_msg, req, "Failed to create pipes", server_config);
+        std::cerr << "[CGI] pipe(pipe_in) failed: " << strerror(errno) << std::endl;
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to create input pipe", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
         return;
     }
 
-    // Seta FD_CLOEXEC em pipe_in[0] e pipe_in[1]
     if (setClosExec(cgi.pipe_in[0]) < 0 || setClosExec(cgi.pipe_in[1]) < 0) {
-        std::cerr << "[CGI] Falha ao seta FD_CLOEXEC em pipe_in" << std::endl;
+        std::cerr << "[CGI] setClosExec(pipe_in) failed: " << strerror(errno) << std::endl;
         close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
-        close(cgi.pipe_out[0]);
-        close(cgi.pipe_out[1]);
-        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on pipes", server_config);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on input pipe", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
         return;
     }
 
-    // Seta FD_CLOEXEC em pipe_out[0] e pipe_out[1]
+    if (pipe(cgi.pipe_out) < 0)
+    {
+        std::cerr << "[CGI] pipe(pipe_out) failed: " << strerror(errno) << std::endl;
+        // CORREÇÃO: Cleanup do pipe_in anterior
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to create output pipe", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
     if (setClosExec(cgi.pipe_out[0]) < 0 || setClosExec(cgi.pipe_out[1]) < 0) {
-        std::cerr << "[CGI] Falha ao seta FD_CLOEXEC em pipe_out" << std::endl;
+        std::cerr << "[CGI] setClosExec(pipe_out) failed: " << strerror(errno) << std::endl;
+        // CORREÇÃO: Cleanup de AMBOS os pipes
         close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
         close(cgi.pipe_out[1]);
-        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on pipes", server_config);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on output pipe", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
@@ -599,7 +620,14 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     pid_t pid = fork();
     if (pid < 0)
     {
+        std::cerr << "[CGI] fork() failed: " << strerror(errno) << std::endl;
         freeEnvp(envp);
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
         StatusCodes::http502BadGateway(error_msg, req, "Failed to fork process", server_config);
         send_buffer = error_msg;
         send_offset = 0;
@@ -639,15 +667,58 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     cgi.output = "";
     is_cgi_active = true;
 
-    // Adiciona pipes ao epoll (level-triggered; evita perda de eventos com EPOLLET)
     epoll_event ev;
     ev.events = EPOLLOUT | EPOLLHUP;
     ev.data.fd = cgi.pipe_in[1];
-    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_in[1], &ev);
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_in[1], &ev) < 0)
+    {
+        std::cerr << "[CGI] epoll_ctl(pipe_in) failed: " << strerror(errno) << std::endl;
+        // CORREÇÃO: Cleanup em cascata se epoll_ctl falha
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        if (cgi.pid > 0)
+        {
+            kill(cgi.pid, SIGKILL);
+            waitpid(cgi.pid, NULL, 0);
+            cgi.pid = -1;
+        }
+        is_cgi_active = false;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to register input pipe in epoll", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
 
     ev.events = EPOLLIN | EPOLLHUP;
     ev.data.fd = cgi.pipe_out[0];
-    epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_out[0], &ev);
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_out[0], &ev) < 0)
+    {
+        std::cerr << "[CGI] epoll_ctl(pipe_out) failed: " << strerror(errno) << std::endl;
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        if (cgi.pid > 0)
+        {
+            kill(cgi.pid, SIGKILL);
+            waitpid(cgi.pid, NULL, 0);
+            cgi.pid = -1;
+        }
+        is_cgi_active = false;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to register output pipe in epoll", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
 }
 
 void Client::handleCgiStdinWritable(int epoll_fd)
