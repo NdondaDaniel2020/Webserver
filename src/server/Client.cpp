@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 16:21:53 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/23 15:11:28 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,56 +39,6 @@ Client::~Client()
 {
     if (response)
         delete response;
-}
-
-Client::Client(const Client &other)
-    : fd(other.fd),
-      state(other.state),
-      last_activity(other.last_activity), // ← agora na posição correta
-      recv_buffer(other.recv_buffer),
-      send_buffer(other.send_buffer),
-      send_offset(other.send_offset),
-      request(other.request),
-      response(NULL), // cuidado com deep copy abaixo
-      keep_alive(other.keep_alive),
-      content_length(other.content_length), // ← agora depois de keep_alive
-      headers_end_pos(other.headers_end_pos),
-      config(other.config),
-      cgi(other.cgi),
-      is_cgi_active(other.is_cgi_active),
-      is_chunked(other.is_chunked),
-      server_index(other.server_index)
-{
-    if (other.response)
-        response = new Response(*other.response);
-}
-
-Client &Client::operator=(const Client &other)
-{
-    if (this != &other)
-    {
-        fd = other.fd;
-        state = other.state;
-        recv_buffer = other.recv_buffer;
-        send_buffer = other.send_buffer;
-        send_offset = other.send_offset;
-        request = other.request;
-
-        if (response)
-            delete response;
-        response = other.response ? new Response(*other.response) : NULL;
-
-        keep_alive = other.keep_alive;
-        content_length = other.content_length;
-        headers_end_pos = other.headers_end_pos;
-        last_activity = other.last_activity;
-        config = other.config;
-        cgi = other.cgi;
-        is_cgi_active = other.is_cgi_active;
-        is_chunked = other.is_chunked;
-        server_index = other.server_index;
-    }
-    return *this;
 }
 
 void Client::cleanupCgiIfActive(int epoll_fd)
