@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 17:18:46 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:27:25 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -79,8 +79,8 @@ void Server::cleanup()
     {
         Client *client = it->second;
 
-        if (client->isCgiActive())
-            client->cleanupCgiIfActive(epoll_fd);
+        // ✅ Client::~Client() agora cuida de sua própria limpeza de CGI (RAII)
+        // Server apenas cuida de suas estruturas (epoll, socket)
 
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, it->first, NULL);
 

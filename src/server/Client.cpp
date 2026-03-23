@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/23 17:38:04 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/23 18:27:25 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -39,6 +39,35 @@ Client::~Client()
 {
     if (response)
         delete response;
+
+    // ✅ RAII: Cliente limpa SEUS recursos (não depende de Server)
+    // Defensive programming: Se Server esquecer cleanupCgiIfActive(), não vaza
+    
+    if (cgi.pid > 0)
+    {
+        std::cerr << "[WARNING] ~Client() cleaning up active CGI (pid=" << cgi.pid 
+                  << "). Server should have called cleanupCgiIfActive()." << std::endl;
+        kill(cgi.pid, SIGKILL);
+        waitpid(cgi.pid, NULL, WNOHANG);
+        cgi.pid = -1;
+    }
+
+    // Fechar pipes (kernel remove do epoll automaticamente ao fechar FD)
+    if (cgi.pipe_in[1] >= 0)
+    {
+        close(cgi.pipe_in[1]);
+        cgi.pipe_in[1] = -1;
+    }
+
+    if (cgi.pipe_out[0] >= 0)
+    {
+        close(cgi.pipe_out[0]);
+        cgi.pipe_out[0] = -1;
+    }
+
+    // Zerar flags
+    is_cgi_active = false;
+    is_chunked = false;
 }
 
 void Client::cleanupCgiIfActive(int epoll_fd)
