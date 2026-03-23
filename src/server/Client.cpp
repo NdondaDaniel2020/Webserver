@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/23 15:11:28 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/23 17:38:04 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -439,11 +439,15 @@ void Client::reset()
     request = HttpRequest();
     content_length = 0;
     headers_end_pos = 0;
-    state = READING_HEADERS;
 
+    is_chunked = false;
+    is_cgi_active = false;
+    cgi = CgiState();
+    
+    state = READING_HEADERS;
     updateLastActivity();
 
-    std::cout << "[CLIENT " << fd << "] Reset para keep-alive" << std::endl;
+    std::cout << "[CLIENT " << fd << "] Reset para keep-alive (is_cgi_active=false, is_chunked=false)" << std::endl;
 }
 
 // ========== Privados ==========
