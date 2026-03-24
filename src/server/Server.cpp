@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/23 18:27:25 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 10:26:13 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -342,11 +342,10 @@ void Server::closeClient(int fd)
     if (cgi_in >= 0)
         cgi_fd_map.erase(cgi_in);
 
-    delete client;
-    this->clients.erase(it);
-
     epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
+    this->clients.erase(it);
     close(fd);
+    delete client;
 
     std::cout << "[-] Cliente fd=" << fd << " fechado" << std::endl;
 }
