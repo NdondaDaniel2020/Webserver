@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 11:03:14 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 15:07:45 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -19,7 +19,8 @@ Server::Server(const ConfigParser &config)
       port_count(config.getServerCount()),
       interface(NULL),
       config(config),
-      TIMEOUT_SECONDS(120)
+      TIMEOUT_SECONDS(120),
+      CGI_TIMEOUT_SECONDS(20)
 {
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
@@ -418,10 +419,10 @@ void Server::checkTimeout()
 
         if (client->isCgiActive())
         {
-            if (now - client->getCgiStartTime() > 10)
+            if (now - client->getCgiStartTime() > CGI_TIMEOUT_SECONDS)
             {
                 std::cout << "[TIMEOUT] CGI fd=" << client_fd
-                          << " excedeu 10s" << std::endl;
+                          << " excedeu " << CGI_TIMEOUT_SECONDS << "s" << std::endl;
                 cgi_timeout.push_back(client_fd);
                 continue;
             }
