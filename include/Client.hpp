@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/23 18:40:06 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 11:03:32 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,6 +101,9 @@ public:
     bool                isCgiActive() const { return is_cgi_active; }
     void                cleanupCgiIfActive(int epoll_fd);
     int                 getServerIndex();
+
+    // Estado do CGI (acesso público para Server processar EPOLLHUP)
+    CgiState&           getCgiState();
 
     // FDs do CGI (para epoll no Server)
     void sendTimeoutResponse();

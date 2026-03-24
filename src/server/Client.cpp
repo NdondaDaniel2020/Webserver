@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/23 18:27:25 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 11:04:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -105,6 +105,11 @@ void Client::cleanupCgiIfActive(int epoll_fd)
 int Client::getServerIndex()
 {
     return server_index;
+}
+
+Client::CgiState &Client::getCgiState()
+{
+     return cgi;
 }
 
 // ========== Getters ==========
@@ -544,7 +549,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
 
     if (pipe(cgi.pipe_in) < 0)
     {
-        std::cerr << "[CGI] pipe(pipe_in) failed: " << strerror(errno) << std::endl;
+        int saved_errno = errno;
+        std::cerr << "[CGI] pipe(pipe_in) failed: " << strerror(saved_errno) << std::endl;
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
         StatusCodes::http502BadGateway(error_msg, req, "Failed to create input pipe", server_config);
         send_buffer = error_msg;
@@ -553,8 +559,22 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         return;
     }
 
-    if (setClosExec(cgi.pipe_in[0]) < 0 || setClosExec(cgi.pipe_in[1]) < 0) {
-        std::cerr << "[CGI] setClosExec(pipe_in) failed: " << strerror(errno) << std::endl;
+    if (setClosExec(cgi.pipe_in[0]) < 0) {
+        int saved_errno = errno;
+        std::cerr << "[CGI] setClosExec(pipe_in[0]) failed: " << strerror(saved_errno) << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on input pipe", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (setClosExec(cgi.pipe_in[1]) < 0) {
+        int saved_errno = errno;
+        std::cerr << "[CGI] setClosExec(pipe_in[1]) failed: " << strerror(saved_errno) << std::endl;
         close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
@@ -567,7 +587,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
 
     if (pipe(cgi.pipe_out) < 0)
     {
-        std::cerr << "[CGI] pipe(pipe_out) failed: " << strerror(errno) << std::endl;
+        int saved_errno = errno;
+        std::cerr << "[CGI] pipe(pipe_out) failed: " << strerror(saved_errno) << std::endl;
         // CORREÇÃO: Cleanup do pipe_in anterior
         close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
@@ -580,8 +601,26 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         return;
     }
 
-    if (setClosExec(cgi.pipe_out[0]) < 0 || setClosExec(cgi.pipe_out[1]) < 0) {
-        std::cerr << "[CGI] setClosExec(pipe_out) failed: " << strerror(errno) << std::endl;
+    if (setClosExec(cgi.pipe_out[0]) < 0) {
+        int saved_errno = errno;
+        std::cerr << "[CGI] setClosExec(pipe_out[0]) failed: " << strerror(saved_errno) << std::endl;
+        // CORREÇÃO: Cleanup de AMBOS os pipes
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on output pipe", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (setClosExec(cgi.pipe_out[1]) < 0) {
+        int saved_errno = errno;
+        std::cerr << "[CGI] setClosExec(pipe_out[1]) failed: " << strerror(saved_errno) << std::endl;
         // CORREÇÃO: Cleanup de AMBOS os pipes
         close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
@@ -603,7 +642,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     pid_t pid = fork();
     if (pid < 0)
     {
-        std::cerr << "[CGI] fork() failed: " << strerror(errno) << std::endl;
+        int saved_errno = errno;
+        std::cerr << "[CGI] fork() failed: " << strerror(saved_errno) << std::endl;
         freeEnvp(envp);
         close(cgi.pipe_in[0]);
         close(cgi.pipe_in[1]);
@@ -655,7 +695,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     ev.data.fd = cgi.pipe_in[1];
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_in[1], &ev) < 0)
     {
-        std::cerr << "[CGI] epoll_ctl(pipe_in) failed: " << strerror(errno) << std::endl;
+        int saved_errno = errno;
+        std::cerr << "[CGI] epoll_ctl(pipe_in) failed: " << strerror(saved_errno) << std::endl;
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
@@ -678,7 +719,8 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     ev.data.fd = cgi.pipe_out[0];
     if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_out[0], &ev) < 0)
     {
-        std::cerr << "[CGI] epoll_ctl(pipe_out) failed: " << strerror(errno) << std::endl;
+        int saved_errno = errno;
+        std::cerr << "[CGI] epoll_ctl(pipe_out) failed: " << strerror(saved_errno) << std::endl;
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
@@ -703,6 +745,7 @@ void Client::handleCgiStdinWritable(int epoll_fd)
 {
     if (!is_cgi_active)
         return;
+
     std::cout << "[CLIENT " << fd << "] CGI stdin writable" << std::endl;
 
     const std::string &body = request.getBody();
@@ -717,8 +760,12 @@ void Client::handleCgiStdinWritable(int epoll_fd)
     if (cgi.body_written >= body.size())
         return;
 
+    // Fazer UMA escrita
     ssize_t w = write(cgi.pipe_in[1], body.c_str() + cgi.body_written,
                       body.size() - cgi.body_written);
+
+    // Salvar errno IMEDIATAMENTE
+    int saved_errno = errno;
 
     if (w > 0)
     {
@@ -729,17 +776,22 @@ void Client::handleCgiStdinWritable(int epoll_fd)
             close(cgi.pipe_in[1]);
             cgi.pipe_in[1] = -1;
         }
+        return;
     }
-    else if (w == 0)
-        std::cout << "[CLIENT " << fd << "] CGI stdin write retornou 0" << std::endl;
-    else  // w < 0
+
+    // w <= 0: erro ou EAGAIN
+    if (saved_errno == EAGAIN || saved_errno == EWOULDBLOCK)
     {
-        // Erro em write: pipe quebrado, processo morreu, etc
-        std::cerr << "[CLIENT " << fd << "] CGI stdin write error: " << strerror(errno) << std::endl;
-        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
-        close(cgi.pipe_in[1]);
-        cgi.pipe_in[1] = -1;
+        // Sem espaço, epoll chamará novamente
+        return;
     }
+
+    // Erro real ou write == 0
+    std::cerr << "[CLIENT " << fd << "] CGI stdin write error: " << strerror(saved_errno) << std::endl;
+    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+    close(cgi.pipe_in[1]);
+    cgi.pipe_in[1] = -1;
+    return;
 }
 
 void Client::handleCgiStdoutReadable(int epoll_fd)
@@ -750,54 +802,45 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
     std::cout << "[CLIENT " << fd << "] CGI stdout readable" << std::endl;
 
     char buf[8192];
-    ssize_t r;
-    while ((r = read(cgi.pipe_out[0], buf, sizeof(buf))) > 0)
+    // Fazer UM read() apenas
+    ssize_t r = read(cgi.pipe_out[0], buf, sizeof(buf));
+    
+    // Salvar errno IMEDIATAMENTE
+    int saved_errno = errno;
+
+    if (r > 0)
     {
+        // Sucesso: armazenar dados e retornar
         std::cout << "[CLIENT " << fd << "] CGI read " << r << " bytes" << std::endl;
         cgi.output.append(buf, r);
-    }
-    
-    if (r < 0 && errno != EAGAIN && errno != EWOULDBLOCK)
-    {
-        std::cerr << "[CLIENT " << fd << "] CGI read error: " << strerror(errno) << std::endl;
-        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
-        close(cgi.pipe_out[0]);
-        cgi.pipe_out[0] = -1;
-        finishCgiAndGenerateResponse();
         return;
     }
 
     if (r == 0)
     {
+        // EOF: stdout fechado
         std::cout << "[CLIENT " << fd << "] CGI stdout EOF" << std::endl;
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
         close(cgi.pipe_out[0]);
         cgi.pipe_out[0] = -1;
-        finishCgiAndGenerateResponse();
+        // Não finalizar aqui - esperar EPOLLHUP/EPOLLERR que sinalizará término do CGI
         return;
     }
 
-    if (errno == EAGAIN || errno == EWOULDBLOCK)
+    // r < 0: erro ou EAGAIN
+    if (saved_errno == EAGAIN || saved_errno == EWOULDBLOCK)
     {
-        int status;
-        pid_t result = waitpid(cgi.pid, &status, WNOHANG);
-        if (result == cgi.pid)
-        {
-            std::cout << "[CLIENT " << fd << "] CGI processo terminou, drenando pipe..." << std::endl;
-            while ((r = read(cgi.pipe_out[0], buf, sizeof(buf))) > 0)
-                cgi.output.append(buf, r);
+        // Sem dados disponíveis, epoll chamará novamente
+        return;
+    }
 
-            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
-            close(cgi.pipe_out[0]);
-            cgi.pipe_out[0] = -1;
-            cgi.pid = -1;
-            finishCgiAndGenerateResponse();
-        }
-    }
-    else
-    {
-        std::cerr << "[CLIENT " << fd << "] CGI read error: " << strerror(errno) << std::endl;
-    }
+    // Erro real
+    std::cerr << "[CLIENT " << fd << "] CGI read error: " << strerror(saved_errno) << std::endl;
+    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+    close(cgi.pipe_out[0]);
+    cgi.pipe_out[0] = -1;
+    // Não finalizar aqui - esperar término do CGI via EPOLLHUP
+    return;
 }
 
 void Client::finishCgiAndGenerateResponse()

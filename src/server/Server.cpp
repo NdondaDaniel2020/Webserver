@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 10:26:13 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 11:03:14 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -196,6 +196,27 @@ void Server::start()
                         c->handleCgiStdoutReadable(epoll_fd);
                     else if (events[i].events & EPOLLOUT)
                         c->handleCgiStdinWritable(epoll_fd);
+
+                    // Após handler I/O, verificar se CGI terminou via EPOLLHUP
+                    if (events[i].events & EPOLLHUP)
+                    {
+                        std::cout << "[EPOLLHUP] CGI pipe closed for client fd=" << c->getFd() << std::endl;
+                        
+                        // Tentar recolher status do processo
+                        Client::CgiState& cgi_state = c->getCgiState();
+                        int status;
+                        pid_t result = waitpid(cgi_state.pid, &status, WNOHANG);
+                        if (result == cgi_state.pid)
+                        {
+                            std::cout << "[CGI] Processo terminou (status=" << WEXITSTATUS(status) << ")" << std::endl;
+                            c->finishCgiAndGenerateResponse();
+                        }
+                        else if (result < 0)
+                        {
+                            std::cerr << "[CGI] waitpid error: " << strerror(errno) << std::endl;
+                            c->finishCgiAndGenerateResponse();
+                        }
+                    }
                 }
             }
         }
