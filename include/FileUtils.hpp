@@ -61,6 +61,7 @@ std::string getFileModifiedDate(const std::string& path);
 // POST utilities
 bool createDirectory(const std::string& path);
 bool hasWritePermission(const std::string& path);
+std::string sanitizeFilename(const std::string& filename);
 std::string generateUniqueFilename(const std::string& original_name);
 bool writeFileToDisk(const std::string& filepath, const std::string& content);
 std::string urlDecode(const std::string& str);

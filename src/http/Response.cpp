@@ -408,8 +408,19 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
             return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
         }
 
-        std::string unique_filename = generateUniqueFilename(files[i].filename);
+        // SANITIZAR filename para evitar path traversal
+        std::string safe_filename = sanitizeFilename(files[i].filename);
+        std::string unique_filename = generateUniqueFilename(safe_filename);
         std::string full_path = upload_dir + "/" + unique_filename;
+
+        // Validação adicional de segurança: verificar que o arquivo está dentro do upload_dir
+        std::string real_path = getRealPath(full_path);
+        if (!isPathSafe(real_path, upload_dir))
+        {
+            std::cerr << "[403] Attempted path traversal: " << files[i].filename << std::endl;
+            cleanupFiles(saved_files);
+            return StatusCodes::http403Forbidden(this->response_str, request, "", this->config);
+        }
 
         if (writeFileToDisk(full_path, files[i].content))
         {

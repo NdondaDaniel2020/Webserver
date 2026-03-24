@@ -267,6 +267,42 @@ bool hasWritePermission(const std::string& path)
     return access(path.c_str(), W_OK) == 0;
 }
 
+std::string sanitizeFilename(const std::string& filename)
+{
+    std::string safe_name;
+
+    // 1. Extrair apenas basename (remover paths)
+    size_t last_slash = filename.find_last_of("/\\");
+    std::string basename = (last_slash != std::string::npos)
+                          ? filename.substr(last_slash + 1)
+                          : filename;
+
+    // 2. Remover caracteres perigosos (aceitar só: a-z A-Z 0-9 . _ -)
+    for (size_t i = 0; i < basename.size(); i++)
+    {
+        unsigned char c = basename[i];
+        if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-')
+        {
+            safe_name += c;
+        }
+        else
+        {
+            safe_name += '_';  // Substituir caracteres perigosos
+        }
+    }
+
+    // 3. Validações adicionais
+    if (safe_name.empty())
+        safe_name = "unnamed_file";
+    if (safe_name[0] == '.')
+        safe_name = "_" + safe_name;  // Prevenir .htaccess e arquivos ocultos
+    if (safe_name.size() > 255)
+        safe_name = safe_name.substr(0, 255);  // Limite de tamanho
+
+    return safe_name;
+}
+
 std::string generateUniqueFilename(const std::string& original_name)
 {
     // Timestamp + nome original
