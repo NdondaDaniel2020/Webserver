@@ -393,7 +393,15 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
 
     for (size_t i = 0; i < files.size(); ++i)
     {
-        if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
+        std::string safe_filename = sanitizeFilename(files[i].filename);
+        if (safe_filename.empty())
+        {
+            std::cout << "[400] Filename inválido após sanitização: " << files[i].filename << std::endl;
+            cleanupFiles(saved_files);
+            return StatusCodes::http400BadRequest(this->response_str, "Invalid filename", this->config);
+        }
+
+        if (!isAllowedFileExtension(safe_filename, this->allowed_extensions))
         {
             std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
             cleanupFiles(saved_files); // Limpar arquivos já salvos
@@ -408,7 +416,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
             return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
         }
 
-        std::string unique_filename = generateUniqueFilename(files[i].filename);
+        std::string unique_filename = generateUniqueFilename(safe_filename);
         std::string full_path = upload_dir + "/" + unique_filename;
 
         if (writeFileToDisk(full_path, files[i].content))
@@ -421,11 +429,11 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
                 json_response << ",";
 
             json_response << "{";
-            json_response << "\"filename\":\"" << unique_filename << "\",";
-            json_response << "\"original_name\":\"" << files[i].filename << "\",";
-            json_response << "\"path\":\"" << full_path << "\",";
+            json_response << "\"filename\":\"" << jsonEscape(unique_filename) << "\",";
+            json_response << "\"original_name\":\"" << jsonEscape(files[i].filename) << "\",";
+            json_response << "\"path\":\"" << jsonEscape(full_path) << "\",";
             json_response << "\"size\":" << files[i].content.size() << ",";
-            json_response << "\"mime_type\":\"" << getMimeType(files[i].filename) << "\"";
+            json_response << "\"mime_type\":\"" << jsonEscape(getMimeType(safe_filename)) << "\"";
             json_response << "}";
             success_count++;
         }
@@ -433,7 +441,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         {
             std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
             cleanupFiles(saved_files); // Limpar todos em caso de erro
-            return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + files[i].filename, this->config);
+            return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + safe_filename, this->config);
         }
     }
 

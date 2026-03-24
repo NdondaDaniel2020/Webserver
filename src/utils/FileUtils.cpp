@@ -500,3 +500,62 @@ int setClosExec(int fd)
     return 0;
 }
 
+std::string sanitizeFilename(const std::string& filename)
+{
+    // 1. Extrair apenas o componente base (strip path traversal sequences)
+    size_t last_slash = filename.find_last_of("/\\");
+    std::string base = (last_slash != std::string::npos)
+                       ? filename.substr(last_slash + 1)
+                       : filename;
+
+    // 2. Remover bytes nulos e permitir apenas: a-z A-Z 0-9 . _ -
+    std::string result;
+    for (size_t i = 0; i < base.size(); ++i)
+    {
+        char c = base[i];
+        if (c == '\0')
+            continue;
+        if ((c >= 'a' && c <= 'z') ||
+            (c >= 'A' && c <= 'Z') ||
+            (c >= '0' && c <= '9') ||
+            c == '.' || c == '_' || c == '-')
+            result += c;
+    }
+
+    // 3. Se o resultado estiver vazio, usar nome genérico
+    if (result.empty() || result == "." || result == "..")
+        return "upload";
+
+    return result;
+}
+
+std::string jsonEscape(const std::string& value)
+{
+    std::string result;
+    for (size_t i = 0; i < value.size(); ++i)
+    {
+        unsigned char c = static_cast<unsigned char>(value[i]);
+        switch (c)
+        {
+            case '"':  result += "\\\""; break;
+            case '\\': result += "\\\\"; break;
+            case '\n': result += "\\n";  break;
+            case '\r': result += "\\r";  break;
+            case '\t': result += "\\t";  break;
+            case '\b': result += "\\b";  break;
+            case '\f': result += "\\f";  break;
+            default:
+                if (c < 0x20)
+                {
+                    char buf[7];
+                    snprintf(buf, sizeof(buf), "\\u%04x", c);
+                    result += buf;
+                }
+                else
+                    result += static_cast<char>(c);
+                break;
+        }
+    }
+    return result;
+}
+

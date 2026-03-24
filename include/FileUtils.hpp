@@ -82,6 +82,10 @@ std::string getParentDirectory(const std::string& path);
 size_t getFileSize(const std::string& path);
 std::string getFileName(const std::string& path);
 
+// Upload security
+std::string sanitizeFilename(const std::string& filename);
+std::string jsonEscape(const std::string& value);
+
 int setClosExec(int fd);
 
 #endif
