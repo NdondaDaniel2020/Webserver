@@ -146,17 +146,59 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         else if (key == "location")
         {
             LocationConfig location;
-            std::string path;
-            std::istringstream lss(StringUtils::trim(value));
-            lss >> path;
+            std::string path = StringUtils::trim(value);
+            
+            // Remove "{" do final se existir
             size_t bracePos = path.find('{');
+            
             if (bracePos != std::string::npos)
-            path = path.substr(0, bracePos);
+            {
+                // Extrai o path antes de "{"
+                std::string beforeBrace = path.substr(0, bracePos);
+                beforeBrace = StringUtils::trim(beforeBrace);
+                
+                if (beforeBrace.empty())
+                    throw std::runtime_error("Invalid location declaration: location must have a path");
+                
+                // Valida que entre path e "{" só há whitespace
+                std::string between = path.substr(beforeBrace.length(), bracePos - beforeBrace.length());
+                // Não trima, deixa como está - ser whitespace é válido
+                for (size_t i = 0; i < between.length(); i++)
+                {
+                    if (!std::isspace(between[i]))
+                        throw std::runtime_error("Invalid location declaration: unexpected text between path and '{'");
+                }
+                
+                path = beforeBrace;
+            }
+            else
+            {
+                // Sem "{" na mesma linha, procura a próxima linha
+                if (path.empty())
+                    throw std::runtime_error("Invalid location declaration: location must have a path");
+                
+                std::string nextLine;
+                bool foundBrace = false;
+                
+                while (std::getline(file, nextLine))
+                {
+                    nextLine = StringUtils::trim(nextLine);
+                    if (!nextLine.empty() && nextLine[0] != '#')
+                    {
+                        if (nextLine == "{")
+                        {
+                            foundBrace = true;
+                        }
+                        break;
+                    }
+                }
+                
+                if (!foundBrace)
+                    throw std::runtime_error("Invalid location declaration: expected '{' after 'location " + path + "'");
+            }
             
             location.path = path;
             parseLocationBlock(file, location);
-            if (!ConfigValidator::validateAllowedMethods(location))
-                std::runtime_error("invalid method");
             server.locations.push_back(location);
         }
         else
@@ -177,6 +219,8 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
         
         if (line == "}")
             break;
+        
+        // Valida que a linha tem semicolon no final (exceto para blocos nested)
         if (line[line.size() - 1] != ';' && line.find("location") == std::string::npos)
             throw std::runtime_error("Missing semicolon: " + line);
         
@@ -185,6 +229,11 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
         
         std::string key, value;
         ConfigHelper::extractKeyValue(line, key, value);
+        
+        // Valida que key e value não estão vazios
+        if (key.empty() && !value.empty())
+            throw std::runtime_error("Invalid location configuration: invalid key in line: " + line);
+        
         if (key == "autoindex")
         {
            if (ConfigValidator::validateAutoIndex(value))
@@ -199,8 +248,10 @@ void ConfigParser::parseLocationBlock(std::ifstream& file, LocationConfig& locat
             else
                 throw std::runtime_error("invalid return " + line);
         }
-        else
+        else if (!key.empty())
             ConfigHelper::parseCommonConfig(key, value, location);
+        else
+            throw std::runtime_error("Invalid location configuration: " + line);
     }
 }
 
