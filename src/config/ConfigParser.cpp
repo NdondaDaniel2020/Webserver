@@ -37,17 +37,50 @@ bool ConfigParser::loadFromFile(const std::string& filename)
         if (line.empty() || line[0] == '#')
             continue ;
         
-        if (line.find("server") != std::string::npos && line.find("{") != std::string::npos)
+        if (line.find("server") != std::string::npos)
         {
             size_t serverPos = line.find("server");
-            size_t bracePos = line.find("{", serverPos);
-            if (bracePos != std::string::npos && serverPos < bracePos)
+            size_t bracePos = line.find("{");
+
+            if (serverPos != 0)
+                throw std::runtime_error("Invalid server declaration: 'server' must be at the beginning of the line");
+            
+            std::string openingBrace = line;
+            
+            if (bracePos == std::string::npos)
             {
-                parseServerBlock(file, config);
-                servers.push_back(config);
-                config = ServerConfig();
+                std::string afterServer = line.substr(6);
+                afterServer = StringUtils::trim(afterServer);
+                if (!afterServer.empty())
+                    throw std::runtime_error("Invalid server declaration: unexpected text between 'server' and '{'");
+                
+                bool foundOpening = false;
+                while (std::getline(file, openingBrace))
+                {
+                    openingBrace = StringUtils::trim(openingBrace);
+                    if (!openingBrace.empty() && openingBrace[0] != '#')
+                    {
+                        foundOpening = true;
+                        break;
+                    }
+                }
+                if (!foundOpening || openingBrace != "{")
+                    throw std::runtime_error("Expected '{' after 'server' declaration");
             }
+            else
+            {
+                std::string between = line.substr(6, bracePos - 6); // entre "server" e "{"
+                between = StringUtils::trim(between);
+                if (!between.empty())
+                    throw std::runtime_error("Invalid server declaration: unexpected text between 'server' and '{'");
+            }
+            
+            parseServerBlock(file, config);
+            servers.push_back(config);
+            config = ServerConfig();
         }
+        else
+            throw std::runtime_error("Invalid configuration: unexpected content outside server block: " + line);
     }
     file.close();
     if (servers.empty())
