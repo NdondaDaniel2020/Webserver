@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 13:46:37 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 14:50:39 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,6 +29,9 @@ class StatusCodes
         static void http200Ok(std::string& response_str, const std::string& message);
         static void http200FileFound(std::string& response_str, const HttpRequest& request, 
                                      const std::string& content, const std::string& file_path);
+        static void http200CgiResponse(std::string& response_str, const std::string& status_line,
+                                       const std::string& headers, const std::string& body,
+                                       bool keep_alive);
         static void http201Created(std::string& response_str, const std::string& location, 
                                    const std::string& message);
         static void http204NoContent(std::string& response_str);

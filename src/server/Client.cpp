@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 11:04:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 14:54:49 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -846,14 +846,67 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
 void Client::finishCgiAndGenerateResponse()
 {
     int status;
+    bool cgi_failed = false;
+    std::string failure_reason = "";
+
     if (cgi.pid > 0)
     {
-        waitpid(cgi.pid, &status, WNOHANG);
+        pid_t result = waitpid(cgi.pid, &status, WNOHANG);
+        if (result == cgi.pid)
+        {
+            if (WIFEXITED(status))
+            {
+                int exit_code = WEXITSTATUS(status);
+                
+                // ✅ Se exit_code != 0, script falhou
+                if (exit_code != 0)
+                {
+                    cgi_failed = true;
+                    if (exit_code == 127)
+                        failure_reason = "CGI interpreter not found (exit code 127)";
+                    else
+                    {
+                        std::ostringstream oss;
+                        oss << "CGI exited with code " << exit_code;
+                        failure_reason = oss.str();
+                    }
+                    std::cerr << "[CLIENT " << fd << "] " << failure_reason << std::endl;
+                }
+            }
+            else if (WIFSIGNALED(status))
+            {
+                // Processo morreu por sinal
+                cgi_failed = true;
+                int signal = WTERMSIG(status);
+                const char *signal_name = strsignal(signal);
+                
+                std::ostringstream oss;
+                oss << "CGI killed by signal " << signal;
+                if (signal_name)
+                    oss << " (" << signal_name << ")";
+                failure_reason = oss.str();
+                
+                std::cerr << "[CLIENT " << fd << "] " << failure_reason << std::endl;
+            }
+        }
         cgi.pid = -1;
     }
 
     is_cgi_active = false;
 
+    // ✅ SE CGI FALHOU, RETORNAR 502 IMEDIATAMENTE
+    if (cgi_failed)
+    {
+        std::string error_msg;
+        StatusCodes::http502BadGateway(error_msg, request, failure_reason,
+                                       config->getServerConfig(server_index));
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;  // ← Não processar headers CGI
+    }
+
+    // ✅ CGI SUCEDEU, processar seu output
     // Separar headers CGI do body
     size_t pos = cgi.output.find("\r\n\r\n");
     size_t header_end_len = 4;
@@ -893,15 +946,8 @@ void Client::finishCgiAndGenerateResponse()
             extra_headers += line + "\r\n";
     }
 
-    std::ostringstream oss;
-    oss << "HTTP/1.1 " << status_line << "\r\n"
-        << extra_headers
-        << "Content-Length: " << cgi_body.size() << "\r\n"
-        << "Connection: " << (keep_alive ? "keep-alive" : "close") << "\r\n"
-        << "\r\n"
-        << cgi_body;
-
-    send_buffer = oss.str();
+    StatusCodes::http200CgiResponse(send_buffer, status_line, extra_headers, 
+                                    cgi_body, keep_alive);
     send_offset = 0;
     state       = SENDING_RESPONSE;
 }

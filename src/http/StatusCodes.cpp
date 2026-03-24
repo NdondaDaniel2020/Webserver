@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/18 13:54:41 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/24 14:50:49 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -97,6 +97,23 @@ void StatusCodes::http200FileFound(std::string& response_str, const HttpRequest&
 
     oss << "\r\n";
     oss << content;
+    
+    response_str = oss.str();
+}
+
+void StatusCodes::http200CgiResponse(std::string& response_str, const std::string& status_line,
+                                     const std::string& headers, const std::string& body,
+                                     bool keep_alive)
+{
+    std::cout << "[CGI] " << status_line << " - Body: " << body.size() << " bytes" << std::endl;
+    
+    std::ostringstream oss;
+    oss << "HTTP/1.1 " << status_line << "\r\n";
+    oss << headers;
+    oss << "Content-Length: " << body.size() << "\r\n";
+    oss << "Connection: " << (keep_alive ? "keep-alive" : "close") << "\r\n";
+    oss << "\r\n";
+    oss << body;
     
     response_str = oss.str();
 }
