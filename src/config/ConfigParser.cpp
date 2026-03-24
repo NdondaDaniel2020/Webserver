@@ -199,6 +199,7 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
             
             location.path = path;
             parseLocationBlock(file, location);
+            ConfigValidator::validateLocationConfigDefault(location);
             server.locations.push_back(location);
         }
         else

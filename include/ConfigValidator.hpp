@@ -30,6 +30,7 @@ namespace ConfigValidator
     bool validateServerName(std::string& server_name);
     bool validateReturn(std::string value);
     void validateServerConfigDefault(const ServerConfig& server);
+    void validateLocationConfigDefault(const LocationConfig& location);
 }
 
 #endif

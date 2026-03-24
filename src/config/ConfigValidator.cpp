@@ -93,23 +93,19 @@ namespace ConfigValidator
         if (code.size() != 3)
             return false;
 
-        // Primeiro dígito deve ser numérico
         if (!isdigit(code[0]))
             return false;
 
-        // Segundo e terceiro caracteres podem ser dígitos ou 'x'/'X'
         for (size_t i = 1; i < code.size(); i++)
         {
             if (!isdigit(code[i]) && code[i] != 'x' && code[i] != 'X')
                 return false;
         }
 
-        // Validar range do primeiro dígito (1-5 para códigos HTTP)
         int first_digit = code[0] - '0';
         if (first_digit < 1 || first_digit > 5)
             return false;
 
-        // Se for um código específico (sem 'x'), validar o range completo
         if (isdigit(code[1]) && isdigit(code[2]))
         {
             int int_code = atoi(code.c_str());
@@ -254,6 +250,40 @@ namespace ConfigValidator
 
         if (server.client_max_body_size <= 0)
             throw std::runtime_error("Invalid client_max_body_size: must be greater than 0");
+    }
+
+    void validateLocationConfigDefault(const LocationConfig& location)
+    {
+        if (location.path.empty())
+            throw std::runtime_error("Invalid location: path is required");
+
+        if (location.redirect_code != 0)
+        {
+            if (location.redirect_url.empty())
+                throw std::runtime_error("Invalid location redirect: redirect_url is required");
+            return;
+        }
+
+        if (!location.cgi_handlers.empty())
+        {
+            if (location.cgi_path.empty())
+                throw std::runtime_error("Invalid location CGI: cgi_handlers defined but cgi_path missing");
+        }
+
+        if (!location.upload_dir.empty())
+        {
+            bool hasPost = false;
+            for (size_t i = 0; i < location.allowed_methods.size(); i++)
+            {
+                if (location.allowed_methods[i] == "POST")
+                {
+                    hasPost = true;
+                    break;
+                }
+            }
+            if (!hasPost)
+                throw std::runtime_error("Invalid location: upload_dir defined but POST not in allowed_methods");
+        }
     }
 
 }
