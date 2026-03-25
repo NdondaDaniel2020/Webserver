@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/25 10:09:07 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/25 12:01:04 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -27,7 +27,7 @@ Client::Client(int fd, const ConfigParser *config, int server_index)
       content_length(0),
       headers_end_pos(0),
       config(config),
-      cgi(), // default constructor
+      cgi(),
       is_cgi_active(false),
       is_chunked(false),
       server_index(server_index)
@@ -533,6 +533,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         state = SENDING_RESPONSE;
         return;
     }
+
     std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
     if (it == loc.cgi_handlers.end())
     {
@@ -544,6 +545,42 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     }
     std::string interpreter = it->second;
 
+    if (!fileExists(interpreter))
+    {
+        std::cerr << "[CGI] Interpreter not found: " << interpreter << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, 
+            "CGI interpreter not found: " + interpreter, server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+    
+    if (access(interpreter.c_str(), X_OK) != 0)
+    {
+        int saved_errno = errno;
+        std::cerr << "[CGI] Interpreter not executable: " << interpreter 
+                  << " - " << strerror(saved_errno) << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, 
+            "CGI interpreter not executable: " + interpreter, server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+    
     cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
     cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
 
@@ -786,11 +823,43 @@ void Client::handleCgiStdinWritable(int epoll_fd)
         return;
     }
 
-    // Erro real ou write == 0
     std::cerr << "[CLIENT " << fd << "] CGI stdin write error: " << strerror(saved_errno) << std::endl;
+    
     epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
     close(cgi.pipe_in[1]);
     cgi.pipe_in[1] = -1;
+
+    if (cgi.pid > 0) {
+        std::cerr << "[CLIENT " << fd << "] Killing CGI process (PID=" 
+                  << cgi.pid << ") due to write error" << std::endl;
+        kill(cgi.pid, SIGKILL);
+        int status;
+        waitpid(cgi.pid, &status, 0);  // Aguardar a morte do processo
+        cgi.pid = -1;
+    }
+
+    if (cgi.pipe_out[0] >= 0) {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+        close(cgi.pipe_out[0]);
+        cgi.pipe_out[0] = -1;
+    }
+    if (cgi.pipe_out[1] >= 0) {
+        close(cgi.pipe_out[1]);
+        cgi.pipe_out[1] = -1;
+    }
+
+    std::string error_msg;
+    int server_idx = 0;
+    const ServerConfig &srv_config = config->getServerConfig(server_idx);
+    StatusCodes::http502BadGateway(error_msg, request,
+        "CGI process died unexpectedly while reading input", srv_config);
+    
+    send_buffer = error_msg;
+    send_offset = 0;
+    state = SENDING_RESPONSE;
+    is_cgi_active = false;
+    
+    std::cerr << "[CLIENT " << fd << "] Sent 502 error response, CGI finalized" << std::endl;
     return;
 }
 
