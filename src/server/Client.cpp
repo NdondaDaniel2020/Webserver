@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 14:54:49 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/25 10:09:07 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -857,8 +857,6 @@ void Client::finishCgiAndGenerateResponse()
             if (WIFEXITED(status))
             {
                 int exit_code = WEXITSTATUS(status);
-                
-                // ✅ Se exit_code != 0, script falhou
                 if (exit_code != 0)
                 {
                     cgi_failed = true;

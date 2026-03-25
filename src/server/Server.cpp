@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 15:07:45 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/25 09:50:13 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,7 @@ Server::Server(const ConfigParser &config)
       interface(NULL),
       config(config),
       TIMEOUT_SECONDS(120),
-      CGI_TIMEOUT_SECONDS(20)
+      CGI_TIMEOUT_SECONDS(60)
 {
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
