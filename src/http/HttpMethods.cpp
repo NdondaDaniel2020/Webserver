@@ -1,4 +1,5 @@
 # include "Response.hpp"
+# include "ResponseHelpers.hpp"
 # include "FileUtils.hpp"
 # include "StringUtils.hpp"
 # include "StatusCodes.hpp"
@@ -12,12 +13,12 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 {
     std::string _file_path = file_path;
 
-    const LocationConfig *location = findMatchingLocation(request.getUri());
+    const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
     if (location && !location->cgi_handlers.empty())
         return StatusCodes::http502BadGateway(this->response_str, request, "Fail CGI", this->config);
 
     if (location && location->redirect_code > 0)
-        return handleRedirect(location->redirect_code, location->redirect_url);
+        return handleRedirect(this->response_str, location->redirect_code, location->redirect_url);
     if (isDirectory(_file_path))
     {
         std::vector<std::string> index_files = this->config.index_files;
@@ -63,7 +64,7 @@ void Response::methodPost(const HttpRequest &request)
         return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
     }
 
-    const LocationConfig *location = findMatchingLocation(request.getUri());
+    const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
     if (location && !location->cgi_handlers.empty())
         return StatusCodes::http502BadGateway(this->response_str, request, "Fail CGI", this->config);
 
@@ -141,7 +142,7 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     }
 
     std::string root = this->config.root;
-    const LocationConfig *location = findMatchingLocation(request.getUri());
+    const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
     if (location && !location->root.empty())
         root = location->root;
 
@@ -159,7 +160,7 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     }
 
     std::string filename = getFileName(file_path);
-    if (isProtectedFile(filename))
+    if (isProtectedFile(this->protected_files, filename))
     {
         std::cout << "[403] Arquivo protegido, não pode ser deletado: " << file_path << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);

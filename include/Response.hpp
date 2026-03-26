@@ -49,13 +49,7 @@ class Response
         
         void multipartFormData(const HttpRequest& request, const std::string& content_type);
         
-        const LocationConfig* findMatchingLocation(const std::string& uri) const;
-        bool validateAllowedMethod(const HttpRequest& request);
-        std::string getUploadDir(const HttpRequest& request);
         void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
-        void handleRedirect(int code, const std::string& url);
-        bool isProtectedFile(const std::string& filename);
-        std::string removeLocationInUri(const std::string& uri, const LocationConfig* location) const;
         bool isCgiRequest(const std::string& file_path, const LocationConfig* location);
 };
 
