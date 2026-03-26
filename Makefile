@@ -33,6 +33,7 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/http/Response.cpp \
 			  $(SRCDIR)/http/StatusCodes.cpp \
 			  $(SRCDIR)/http/HttpRequest.cpp \
+			  $(SRCDIR)/http/HttpMethods.cpp \
 			  $(SRCDIR)/server/Client.cpp \
 			  $(SRCDIR)/cgi/EnvBuilder.cpp \
 
