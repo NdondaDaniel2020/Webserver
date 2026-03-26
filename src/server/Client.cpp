@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 15:31:17 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 15:45:17 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -714,7 +714,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     { // filho
         dup2(cgi.pipe_in[0], STDIN_FILENO);
         dup2(cgi.pipe_out[1], STDOUT_FILENO);
-        dup2(cgi.pipe_out[1], STDERR_FILENO);
+    
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
 
