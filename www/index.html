@@ -1,73 +1,67 @@
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
     <meta charset="UTF-8">
     <title>Web Ninjas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
 
     <!-- link css -->
-    <link rel="stylesheet" href="assets/index.css">
+    <link rel="stylesheet" href="assets/css/index.css">
 </head>
+
 <body>
 
-<!-- Background Lines -->
-<div class="background-lines"></div>
+    <!-- Background Lines -->
+    <div class="background-lines"></div>
 
-<!-- Particle dots -->
-<div class="particles" id="particles"></div>
+    <!-- Particle dots -->
+    <div class="particles" id="particles"></div>
 
-<section class="hero">
-    <div class="hero-content">
-        <img class="hero-icon" src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png" alt="Web Ninjas Logo">
-        
-        <div class="hero-tag">&lt; WEB_NINJAS /&gt;</div>
+    <section class="hero">
+        <div class="hero-content">
+            <img class="hero-icon" src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png"
+                alt="Web Ninjas Logo">
 
-        <h1>
-            <span class="highlight">WEB</span> NINJAS
-        </h1>
+            <div class="hero-tag">&lt; WEB_NINJAS /&gt;</div>
 
-        <p class="hero-description">
-            Mastering HTTP in Silence.<br>
-            A high-performance non-blocking HTTP server built in C++98.
-        </p>
+            <h1>
+                <span class="highlight">WEB</span> NINJAS
+            </h1>
 
-        <div class="tech-badges">
-            <span class="badge">C++98</span>
-            <span class="badge">HTTP/1.1</span>
-            <span class="badge">poll()</span>
-            <span class="badge">Non-blocking</span>
-            <span class="badge">CGI</span>
+            <p class="hero-description">
+                Mastering HTTP in Silence.<br>
+                A high-performance non-blocking HTTP server built in C++98.
+            </p>
+
+            <div class="tech-badges">
+                <span class="badge">C++98</span>
+                <span class="badge">HTTP/1.1</span>
+                <span class="badge">poll()</span>
+                <span class="badge">Non-blocking</span>
+                <span class="badge">CGI</span>
+            </div>
+
+            <div class="buttons">
+                <a href="/landing.html" class="btn btn-primary">Explorar Projeto</a>
+                <a href="/arena.html" class="btn btn-secondary">Testar Servidor</a>
+            </div>
+
+            <div class="scroll-hint">
+                <span>WWW</span>
+                <span>Clica para explorar</span>
+                <div class="scroll-arrow">↓</div>
+            </div>
         </div>
+    </section>
 
-        <div class="buttons">
-            <a href="/landing.html" class="btn btn-primary">Explorar Projeto</a>
-            <a href="/arena.html" class="btn btn-secondary">Testar Servidor</a>
-        </div>
-
-        <div class="scroll-hint">
-            <span>WWW</span>
-            <span>Clica para explorar</span>
-            <div class="scroll-arrow">↓</div>
-        </div>
-    </div>
-</section>
-
-<!-- Particles JS -->
-<script>
-    const container = document.getElementById('particles');
-    for (let i = 0; i < 30; i++) {
-        const dot = document.createElement('div');
-        dot.classList.add('particle');
-        dot.style.left = Math.random() * 100 + '%';
-        dot.style.top = Math.random() * 100 + '%';
-        dot.style.animationDelay = Math.random() * 5 + 's';
-        dot.style.animationDuration = (3 + Math.random() * 4) + 's';
-        container.appendChild(dot);
-    }
-</script>
+    <script src="./assets/js/index.js"></script>
 
 </body>
+
 </html>
