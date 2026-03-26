@@ -134,6 +134,7 @@ private:
     bool                checkBodyComplete();
     void                parseHeaders();
     void                updateLastActivity();
+    bool                validateServerName(const ServerConfig& server_config);
 };
 
 #endif // CLIENT_HPP
