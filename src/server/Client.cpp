@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 14:28:49 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 15:31:17 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -883,7 +883,7 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
     if (!is_cgi_active)
         return;
 
-    std::cout << "[CLIENT " << fd << "] CGI stdout readable" << std::endl;
+    // std::cout << "[CLIENT " << fd << "] CGI stdout readable" << std::endl;
 
     char buf[8192];
     // Fazer UM read() apenas
@@ -895,7 +895,7 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
     if (r > 0)
     {
         // Sucesso: armazenar dados e retornar
-        std::cout << "[CLIENT " << fd << "] CGI read " << r << " bytes" << std::endl;
+        // std::cout << "[CLIENT " << fd << "] CGI read " << r << " bytes" << std::endl;
         cgi.output.append(buf, r);
         return;
     }
@@ -911,7 +911,6 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
         return;
     }
 
-    // r < 0: erro ou EAGAIN
     if (saved_errno == EAGAIN || saved_errno == EWOULDBLOCK)
     {
         // Sem dados disponíveis, epoll chamará novamente
