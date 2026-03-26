@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 15:09:30 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 10:50:59 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -42,6 +42,8 @@ class Server
         std::map<int, Client*>   cgi_fd_map;   // fd pipe CGI -> Client*
         int                      TIMEOUT_SECONDS;
         int                      CGI_TIMEOUT_SECONDS;
+        bool                     shutdown_requested;
+        bool                     cleaned_up;
 
     public:
         Server(const ConfigParser& config);
@@ -50,6 +52,7 @@ class Server
         void cleanup();
         void start();
         void stop();
+        void requestStop();
 
     private:
         int  createServerSocket(const std::string& interface, int port);
