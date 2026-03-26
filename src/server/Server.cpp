@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 12:11:56 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 15:25:56 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -88,6 +88,8 @@ void Server::cleanup()
          it != clients.end(); ++it)
     {
         Client *client = it->second;
+        if (client->isCgiActive())
+            client->cleanupCgiIfActive(epoll_fd);
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, it->first, NULL);
         close(it->first);
         delete client;
