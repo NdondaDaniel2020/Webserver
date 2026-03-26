@@ -25,6 +25,8 @@ SRCDIR		= src
 # Arquivos existentes atualmente
 SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/server/Server.cpp \
+			  $(SRCDIR)/server/ServerConnections.cpp \
+			  $(SRCDIR)/server/ServerEventLoop.cpp \
 			  $(SRCDIR)/utils/FileUtils.cpp \
 			  $(SRCDIR)/config/ConfigParser.cpp \
 			  $(SRCDIR)/config/ConfigHelper.cpp \
