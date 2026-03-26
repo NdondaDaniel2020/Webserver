@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 12:25:03 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 14:28:49 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -348,7 +348,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 
         // Criar resposta 413 diretamente
         std::string response_str;
-        StatusCodes::http413PayloadTooLarge(response_str, server_config);
+        StatusCodes::http413PayloadTooLarge(response_str, server_config, this->request);
 
         send_buffer = response_str;
         send_offset = 0;

@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 14:50:49 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 14:28:41 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -52,10 +52,10 @@ void StatusCodes::http200Ok(std::string& response_str, const std::string& messag
 }
 
 void StatusCodes::http200FileFound(std::string& response_str, const HttpRequest& request, 
-                                   const std::string& content, const std::string& file_path)
+                                   const std::string& content, const std::string& file_path, const ServerConfig& config)
 {
     std::cout << "[200] Arquivo encontrado: " << file_path << " (" << content.size() << " bytes)" << std::endl;
-
+    
     std::string mime_type = getMimeType(file_path);
     std::string filename = getFileName(file_path);
     
@@ -79,7 +79,7 @@ void StatusCodes::http200FileFound(std::string& response_str, const HttpRequest&
     std::ostringstream oss;
     oss << "HTTP/1.1 200 OK\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     // Adicionar charset para tipos de texto
     if (mime_type.find("text/") == 0)
         mime_type += "; charset=UTF-8";
@@ -119,14 +119,15 @@ void StatusCodes::http200CgiResponse(std::string& response_str, const std::strin
 }
 
 void StatusCodes::http201Created(std::string& response_str, const std::string& location, 
-                                 const std::string& message)
+                                 const std::string& message, const HttpRequest& request, const ServerConfig& config)
 {
+    (void)request;
     std::cout << "[201] Recurso criado: " << location << std::endl;
     
     std::ostringstream oss;
     oss << "HTTP/1.1 201 Created\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Location: " << location << "\r\n";
     oss << "Content-Type: application/json; charset=UTF-8\r\n";
     oss << "Content-Length: " << message.size() << "\r\n";
@@ -153,8 +154,9 @@ void StatusCodes::http204NoContent(std::string& response_str)
 // RESPOSTAS DE REDIRECIONAMENTO (3xx)
 // ============================================================================
 
-void StatusCodes::http301MovedPermanently(std::string& response_str, const std::string& location)
+void StatusCodes::http301MovedPermanently(std::string& response_str, const std::string& location, const HttpRequest& request, const ServerConfig& config)
 {
+    (void)request;
     std::cout << "[301] Moved Permanently: " << location << std::endl;
     
     std::string content = "<html><body><h1>301 Moved Permanently</h1><p>The resource has been moved to <a href='" + location + "'>" + location + "</a>.</p></body></html>";
@@ -162,7 +164,7 @@ void StatusCodes::http301MovedPermanently(std::string& response_str, const std::
     std::ostringstream oss;
     oss << "HTTP/1.1 301 Moved Permanently\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Location: " << location << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
@@ -172,8 +174,9 @@ void StatusCodes::http301MovedPermanently(std::string& response_str, const std::
     response_str = oss.str();
 }
 
-void StatusCodes::http302Found(std::string& response_str, const std::string& location)
+void StatusCodes::http302Found(std::string& response_str, const std::string& location, const HttpRequest& request, const ServerConfig& config)
 {
+    (void)request;
     std::cout << "[302] Found: " << location << std::endl;
     
     std::string content = "<html><body><h1>302 Found</h1><p>The resource is temporarily located at <a href='" + location + "'>" + location + "</a>.</p></body></html>";
@@ -181,7 +184,7 @@ void StatusCodes::http302Found(std::string& response_str, const std::string& loc
     std::ostringstream oss;
     oss << "HTTP/1.1 302 Found\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Location: " << location << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
@@ -191,14 +194,15 @@ void StatusCodes::http302Found(std::string& response_str, const std::string& loc
     response_str = oss.str();
 }
 
-void StatusCodes::http304NotModified(std::string& response_str)
+void StatusCodes::http304NotModified(std::string& response_str, const HttpRequest& request, const ServerConfig& config)
 {
+    (void)request;
     std::cout << "[304] Not Modified" << std::endl;
     
     std::ostringstream oss;
     oss << "HTTP/1.1 304 Not Modified\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Connection: close\r\n";
     oss << "\r\n";
     response_str = oss.str();
@@ -209,8 +213,9 @@ void StatusCodes::http304NotModified(std::string& response_str)
 // ============================================================================
 
 void StatusCodes::http400BadRequest(std::string& response_str, const std::string& message,
-                                    const ServerConfig& config)
+                                    const ServerConfig& config, const HttpRequest& request)
 {
+    (void)request;
     std::cout << "[400] Bad Request: " << message << std::endl;
 
     // Buscar página de erro 400 personalizada
@@ -233,7 +238,7 @@ void StatusCodes::http400BadRequest(std::string& response_str, const std::string
     std::ostringstream oss;
     oss << "HTTP/1.1 400 Bad Request\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: application/json; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
@@ -263,7 +268,7 @@ void StatusCodes::http401Unauthorized(std::string& response_str, const HttpReque
     std::ostringstream oss;
     oss << "HTTP/1.1 401 Unauthorized\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "WWW-Authenticate: Basic realm=\"Access to webserv\"\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
@@ -301,7 +306,7 @@ void StatusCodes::http403Forbidden(std::string& response_str, const HttpRequest&
     std::ostringstream oss;
     oss << "HTTP/1.1 403 Forbidden\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     
@@ -336,7 +341,7 @@ void StatusCodes::http404NotFound(std::string& response_str, const HttpRequest& 
     std::ostringstream oss;
     oss << "HTTP/1.1 404 Not Found\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
 
@@ -373,7 +378,7 @@ void StatusCodes::http405MethodNotAllowed(std::string& response_str, const HttpR
     std::ostringstream oss;
     oss << "HTTP/1.1 405 Method Not Allowed\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
 
@@ -389,8 +394,9 @@ void StatusCodes::http405MethodNotAllowed(std::string& response_str, const HttpR
     response_str = oss.str();
 }
 
-void StatusCodes::http408RequestTimeout(std::string& response_str, const ServerConfig& config)
+void StatusCodes::http408RequestTimeout(std::string& response_str, const ServerConfig& config, const HttpRequest& request)
 {
+    (void)request;
     std::cout << "[408] Request Timeout" << std::endl;
 
     // Buscar página de erro 408 personalizada
@@ -409,7 +415,7 @@ void StatusCodes::http408RequestTimeout(std::string& response_str, const ServerC
     std::ostringstream oss;
     oss << "HTTP/1.1 408 Request Timeout\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
@@ -439,7 +445,7 @@ void StatusCodes::http409Conflict(std::string& response_str, const HttpRequest& 
     std::ostringstream oss;
     oss << "HTTP/1.1 409 Conflict\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
 
@@ -455,8 +461,9 @@ void StatusCodes::http409Conflict(std::string& response_str, const HttpRequest& 
     response_str = oss.str();
 }
 
-void StatusCodes::http411LengthRequired(std::string& response_str, const ServerConfig& config)
+void StatusCodes::http411LengthRequired(std::string& response_str, const ServerConfig& config, const HttpRequest& request)
 {
+    (void)request;
     std::cout << "[411] Length Required" << std::endl;
 
     // Buscar página de erro 411 personalizada
@@ -475,7 +482,7 @@ void StatusCodes::http411LengthRequired(std::string& response_str, const ServerC
     std::ostringstream oss;
     oss << "HTTP/1.1 411 Length Required\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
@@ -484,8 +491,9 @@ void StatusCodes::http411LengthRequired(std::string& response_str, const ServerC
     response_str = oss.str();
 }
 
-void StatusCodes::http413PayloadTooLarge(std::string& response_str, const ServerConfig& config)
+void StatusCodes::http413PayloadTooLarge(std::string& response_str, const ServerConfig& config, const HttpRequest& request)
 {
+    (void)request;
     std::cout << "[413] Payload Too Large" << std::endl;
 
     // Buscar página de erro 413 personalizada
@@ -504,7 +512,7 @@ void StatusCodes::http413PayloadTooLarge(std::string& response_str, const Server
     std::ostringstream oss;
     oss << "HTTP/1.1 413 Payload Too Large\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
@@ -513,8 +521,9 @@ void StatusCodes::http413PayloadTooLarge(std::string& response_str, const Server
     response_str = oss.str();
 }
 
-void StatusCodes::http414UriTooLong(std::string& response_str, const ServerConfig& config)
+void StatusCodes::http414UriTooLong(std::string& response_str, const ServerConfig& config, const HttpRequest& request)
 {
+    (void)request;
     std::cout << "[414] URI Too Long" << std::endl;
 
     // Buscar página de erro 414 personalizada
@@ -533,7 +542,7 @@ void StatusCodes::http414UriTooLong(std::string& response_str, const ServerConfi
     std::ostringstream oss;
     oss << "HTTP/1.1 414 URI Too Long\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
@@ -561,7 +570,7 @@ void StatusCodes::http415UnsupportedMediaType(std::string& response_str, const H
     std::ostringstream oss;
     oss << "HTTP/1.1 415 Unsupported Media Type\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
 
@@ -597,7 +606,7 @@ void StatusCodes::http429TooManyRequests(std::string& response_str, const HttpRe
     std::ostringstream oss;
     oss << "HTTP/1.1 429 Too Many Requests\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Retry-After: 60\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
@@ -639,7 +648,7 @@ void StatusCodes::http500InternalServerError(std::string& response_str, const Ht
     std::ostringstream oss;
     oss << "HTTP/1.1 500 Internal Server Error\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
@@ -674,7 +683,7 @@ void StatusCodes::http501NotImplemented(std::string& response_str, const HttpReq
     std::ostringstream oss;
     oss << "HTTP/1.1 501 Not Implemented\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
@@ -709,7 +718,7 @@ void StatusCodes::http502BadGateway(std::string& response_str, const HttpRequest
     std::ostringstream oss;
     oss << "HTTP/1.1 502 Bad Gateway\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
@@ -743,7 +752,7 @@ void StatusCodes::http503ServiceUnavailable(std::string& response_str, const Htt
     std::ostringstream oss;
     oss << "HTTP/1.1 503 Service Unavailable\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Retry-After: 120\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
@@ -778,7 +787,7 @@ void StatusCodes::http504GatewayTimeout(std::string& response_str, const HttpReq
     std::ostringstream oss;
     oss << "HTTP/1.1 504 Gateway Timeout\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
@@ -792,8 +801,9 @@ void StatusCodes::http504GatewayTimeout(std::string& response_str, const HttpReq
     response_str = oss.str();
 }
 
-void StatusCodes::http505VersionNotSupported(std::string& response_str, const ServerConfig& config)
+void StatusCodes::http505VersionNotSupported(std::string& response_str, const ServerConfig& config, const HttpRequest& request)
 {
+    (void)request;
     std::cout << "[505] HTTP Version Not Supported" << std::endl;
 
     // Buscar página de erro 505 personalizada
@@ -812,7 +822,7 @@ void StatusCodes::http505VersionNotSupported(std::string& response_str, const Se
     std::ostringstream oss;
     oss << "HTTP/1.1 505 HTTP Version Not Supported\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
-    oss << "Server: webserv/1.0\r\n";
+    oss << "Server: " << config.server_name << "\r\n";
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";

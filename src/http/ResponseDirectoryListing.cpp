@@ -240,7 +240,7 @@ void Response::generateDirectoryListing(const HttpRequest &request, const std::s
         html << "</body>\n</html>\n";
 
         closedir(dir);
-        StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path);
+        StatusCodes::http200FileFound(this->response_str, request, html.str(), dir_path, this->config);
     }
     catch (...)
     {
