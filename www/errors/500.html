@@ -1,11 +1,14 @@
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
     <meta charset="UTF-8">
     <title>500 - Web Ninjas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
 
     <style>
         * {
@@ -35,7 +38,7 @@
             font-family: 'Orbitron', sans-serif;
             font-size: 120px;
             color: #EF4444;
-            text-shadow: 0 0 20px rgba(239,68,68,0.7);
+            text-shadow: 0 0 20px rgba(239, 68, 68, 0.7);
         }
 
         h1 {
@@ -67,33 +70,38 @@
             position: absolute;
             width: 200%;
             height: 200%;
-            background: repeating-linear-gradient(
-                45deg,
-                rgba(239,68,68,0.03),
-                rgba(239,68,68,0.03) 1px,
-                transparent 1px,
-                transparent 60px
-            );
+            background: repeating-linear-gradient(45deg,
+                    rgba(239, 68, 68, 0.03),
+                    rgba(239, 68, 68, 0.03) 1px,
+                    transparent 1px,
+                    transparent 60px);
             animation: move 20s linear infinite;
         }
 
         @keyframes move {
-            from { transform: translate(0,0); }
-            to { transform: translate(-50px,-50px); }
+            from {
+                transform: translate(0, 0);
+            }
+
+            to {
+                transform: translate(-50px, -50px);
+            }
         }
     </style>
 </head>
+
 <body>
 
-<div class="background-lines"></div>
+    <div class="background-lines"></div>
 
-<div class="container">
-    <div class="code">500</div>
-    <h1>Internal Server Error</h1>
-    <p>The ninja encountered an unexpected issue.<br>
-       Our server is recalibrating its strategy.</p>
-    <a href="/index.html" class="btn">Return to Base</a>
-</div>
+    <div class="container">
+        <div class="code">500</div>
+        <h1>Internal Server Error</h1>
+        <p>The ninja encountered an unexpected issue.<br>
+            Our server is recalibrating its strategy.</p>
+        <a href="/index.html" class="btn">Return to Base</a>
+    </div>
 
 </body>
+
 </html>

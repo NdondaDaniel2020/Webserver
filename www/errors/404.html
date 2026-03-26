@@ -1,99 +1,29 @@
 <!DOCTYPE html>
 <html lang="pt">
+
 <head>
     <meta charset="UTF-8">
     <title>404 - Web Ninjas</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
-
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            height: 100vh;
-            background: radial-gradient(circle at center, #111827, #0D0F14 70%);
-            color: #E5E7EB;
-            font-family: 'Inter', sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            overflow: hidden;
-        }
-
-        .container {
-            max-width: 700px;
-            padding: 20px;
-        }
-
-        .code {
-            font-family: 'Orbitron', sans-serif;
-            font-size: 120px;
-            color: #00FF9C;
-            text-shadow: 0 0 20px rgba(0,255,156,0.7);
-        }
-
-        h1 {
-            font-size: 28px;
-            margin-bottom: 15px;
-        }
-
-        p {
-            color: #9CA3AF;
-            margin-bottom: 40px;
-        }
-
-        .btn {
-            padding: 12px 28px;
-            border: 1px solid #00FF9C;
-            color: #00FF9C;
-            text-decoration: none;
-            border-radius: 6px;
-            transition: 0.3s ease;
-        }
-
-        .btn:hover {
-            background: #00FF9C;
-            color: #0D0F14;
-            box-shadow: 0 0 15px #00FF9C;
-        }
-
-        .background-lines {
-            position: absolute;
-            width: 200%;
-            height: 200%;
-            background: repeating-linear-gradient(
-                45deg,
-                rgba(0,255,156,0.03),
-                rgba(0,255,156,0.03) 1px,
-                transparent 1px,
-                transparent 60px
-            );
-            animation: move 20s linear infinite;
-        }
-
-        @keyframes move {
-            from { transform: translate(0,0); }
-            to { transform: translate(-50px,-50px); }
-        }
-    </style>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700&family=Inter:wght@300;400;600&display=swap"
+        rel="stylesheet">
+    <link href="../assets/css/error-pages.css" rel="stylesheet">
 </head>
+
 <body>
 
-<div class="background-lines"></div>
+    <div class="background-lines"></div>
 
-<div class="container">
-    <div class="code">404</div>
-    <h1>Resource Not Found</h1>
-    <p>This resource vanished into the shadows.<br>
-       The ninja could not locate your target.</p>
-    <a href="/index.html" class="btn">Return to Base</a>
-</div>
+    <div class="container">
+        <div class="code">404</div>
+        <h1>Resource Not Found</h1>
+        <p>This resource vanished into the shadows.<br>
+            The ninja could not locate your target.</p>
+        <a href="/index.html" class="btn">Return to Base</a>
+    </div>
 
 </body>
+
 </html>
