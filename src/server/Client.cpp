@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/25 12:01:04 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 12:25:03 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -453,6 +453,21 @@ bool Client::sendData()
     }
 
     return false;
+}
+
+
+void Client::sendTimeoutResponse()
+{
+    std::string body;
+    StatusCodes::http504GatewayTimeout(body, request, config->getServerConfig(server_index));
+    std::ostringstream oss;
+    oss << body;
+    send_buffer = oss.str();
+    send_offset = 0;
+    keep_alive = false;
+    state = SENDING_RESPONSE;
+    // Envia directamente — não espera pelo epoll
+    write(fd, send_buffer.c_str(), send_buffer.size());
 }
 
 // ========== Reset para keep-alive ==========

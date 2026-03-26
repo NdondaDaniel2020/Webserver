@@ -1,4 +1,4 @@
-# include "../include/ResponseHelpers.hpp"
+# include "ResponseHelpers.hpp"
 
 // Find the most specific matching location for a given URI
 const LocationConfig *findMatchingLocation(const ServerConfig &config, const std::string &uri)

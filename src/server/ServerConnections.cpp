@@ -1,4 +1,4 @@
-# include "../../include/Server.hpp"
+# include "Server.hpp"
 
 int Server::createServerSocket(const std::string &interface, int port)
 {
@@ -181,27 +181,4 @@ void Server::checkTimeout()
 
     for (size_t i = 0; i < to_close.size(); i++)
         closeClient(to_close[i]);
-}
-
-void Client::sendTimeoutResponse()
-{
-    std::string body =
-        "<html><body><h1>504 Gateway Timeout</h1>"
-        "<p>O processo CGI demorou demasiado tempo.</p></body></html>";
-
-    std::ostringstream oss;
-    oss << "HTTP/1.1 504 Gateway Timeout\r\n"
-        << "Content-Type: text/html\r\n"
-        << "Content-Length: " << body.size() << "\r\n"
-        << "Connection: close\r\n"
-        << "\r\n"
-        << body;
-
-    send_buffer = oss.str();
-    send_offset = 0;
-    keep_alive = false;
-    state = SENDING_RESPONSE;
-
-    // Envia directamente — não espera pelo epoll
-    write(fd, send_buffer.c_str(), send_buffer.size());
 }

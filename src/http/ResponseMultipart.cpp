@@ -1,43 +1,31 @@
-#include "../../include/Response.hpp"
-#include "../../include/ResponseHelpers.hpp"
+#include "Response.hpp"
+#include "ResponseHelpers.hpp"
 
 void Response::multipartFormData(const HttpRequest &request, const std::string &content_type)
 {
     std::string boundary = extractBoundary(content_type);
     if (boundary.empty())
-    {
-        std::cout << "[400] Boundary não encontrado no Content-Type" << std::endl;
         return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
-    }
 
     std::vector<MultipartFile> files;
     if (!parseMultipartData(request.getBody(), boundary, files))
-    {
-        std::cout << "[400] Erro ao parsear multipart data" << std::endl;
         return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
-    }
 
     std::string upload_dir = getUploadDir(this->config, request);
     if (upload_dir.empty())
         return StatusCodes::http413PayloadTooLarge(this->response_str, this->config);
 
     if (!createDirectory(upload_dir))
-    {
-        std::cout << "[500] Erro ao criar diretório de upload: " << upload_dir << std::endl;
         return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to create upload directory: " + upload_dir, this->config);
-    }
 
     if (!hasWritePermission(upload_dir))
-    {
-        std::cout << "[403] Sem permissão de escrita em: " << upload_dir << std::endl;
         return StatusCodes::http403Forbidden(this->response_str, request, upload_dir, this->config);
-    }
 
     std::ostringstream json_response;
     json_response << "{\"files\":[";
     std::vector<std::string> saved_files;
     size_t success_count = 0;
-
+    const LocationConfig *location_config = findMatchingLocation(this->config, request.getUri());
     for (size_t i = 0; i < files.size(); ++i)
     {
         if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
@@ -47,7 +35,8 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
             return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename), this->config);
         }
 
-        if (files[i].content.size() > 10 * 1024 * 1024)
+        if ((this->config.client_max_body_size > 0 && files[i].content.size() > this->config.client_max_body_size)
+            || (location_config && location_config->client_max_body_size > 0 && files[i].content.size() > location_config->client_max_body_size))
         {
             std::cout << "[413] Arquivo muito grande: " << files[i].filename
                       << " (" << files[i].content.size() << " bytes)" << std::endl;
@@ -60,15 +49,14 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         std::string unique_filename = generateUniqueFilename(safe_filename);
         std::string full_path = upload_dir + "/" + unique_filename;
 
-        // Validação adicional de segurança: verificar que o arquivo está dentro do upload_dir
-        std::string real_path = getRealPath(full_path);
-        if (!isPathSafe(real_path, upload_dir))
+        // Validação lógica de segurança: verificar tentativas de path traversal
+        if (full_path.find("..") != std::string::npos || unique_filename.find("..") != std::string::npos)
         {
             std::cerr << "[403] Attempted path traversal: " << files[i].filename << std::endl;
             cleanupFiles(saved_files);
             return StatusCodes::http403Forbidden(this->response_str, request, "", this->config);
         }
-
+        
         if (writeFileToDisk(full_path, files[i].content))
         {
             saved_files.push_back(full_path);
