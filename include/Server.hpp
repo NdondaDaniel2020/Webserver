@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 10:50:59 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 11:11:34 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,6 +58,8 @@ class Server
         int  createServerSocket(const std::string& interface, int port);
         void newConnection(int fd);
         void handleClientData(int fd);
+        void handleClientSendReady(int fd, Client *client);
+        void handleCgiPipeEvent(Client *c, int events_mask);
         void closeClient(int fd);
         bool isServerSocket(int fd) const;
         void checkTimeout();
