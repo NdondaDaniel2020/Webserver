@@ -167,16 +167,13 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     }
 
     size_t file_size = getFileSize(file_path);
-    std::cout << "[DELETE] Arquivo: " << file_path << std::endl;
-    std::cout << "[DELETE] Tamanho: " << file_size << " bytes" << std::endl;
-    std::cout << "[DELETE] URI: " << request.getUri() << std::endl;
-
+    
     if (remove(file_path.c_str()) != 0)
     {
         std::cout << "[500] Erro ao deletar arquivo: " << strerror(errno) << std::endl;
         return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to delete file: " + std::string(strerror(errno)), this->config);
     }
 
-    std::cout << "[DELETE] ✓ Arquivo deletado com sucesso" << std::endl;
+    std::cout << "[DELETE] Arquivo: " << file_path << " Tamanho: " << file_size << " bytes" << " URI: " << request.getUri() << std::endl;
     return StatusCodes::http204NoContent(this->response_str);
 }

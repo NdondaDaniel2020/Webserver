@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/25 09:50:13 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/26 10:50:51 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,9 @@ Server::Server(const ConfigParser &config)
       interface(NULL),
       config(config),
       TIMEOUT_SECONDS(120),
-      CGI_TIMEOUT_SECONDS(60)
+      CGI_TIMEOUT_SECONDS(60),
+      shutdown_requested(false),
+      cleaned_up(false)
 {
     this->ports = new int[this->port_count];
     this->interface = new std::string[this->port_count];
@@ -73,6 +75,14 @@ Server::~Server()
 
 void Server::cleanup()
 {
+    // Prevent double cleanup which can cause segmentation faults
+    if (cleaned_up)
+    {
+        std::cout << "[SERVER] cleanup() already called, skipping..." << std::endl;
+        return;
+    }
+    cleaned_up = true;
+    
     std::cout << "[SERVER] Shutting down..." << std::endl;
 
     for (std::map<int, Client *>::iterator it = clients.begin();
@@ -124,11 +134,22 @@ void Server::cleanup()
     interface = NULL;
 }
 
+void Server::requestStop()
+{
+    std::cout << "[SERVER] Stop requested. Graceful shutdown in progress..." << std::endl;
+    shutdown_requested = true;
+}
+
+void Server::stop()
+{
+    requestStop();
+}
+
 void Server::start()
 {
     std::cout << "Servidor iniciado. Aguardando conexões..." << std::endl;
 
-    while (true)
+    while (!shutdown_requested)
     {
         checkTimeout();
 
@@ -222,6 +243,9 @@ void Server::start()
             }
         }
     }
+    
+    std::cout << "[SERVER] Main loop exited. Cleaning up all resources..." << std::endl;
+    this->cleanup();
 }
 
 
