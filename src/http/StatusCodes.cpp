@@ -221,11 +221,17 @@ void StatusCodes::http400BadRequest(std::string& response_str, const std::string
     // Buscar página de erro 400 personalizada
     std::string error_page_path = StatusCodes::findErrorPage(config.error_pages, "400");
     std::string content;
+    std::string content_type = "application/json; charset=UTF-8";
 
     if (!error_page_path.empty())
     {
         std::string error_page_full = config.root + error_page_path;
         content = readFile(error_page_full);
+        if (!content.empty())
+        {
+            content_type = "text/html; charset=UTF-8";
+            std::cout << "[400] Carregada página de erro: " << error_page_full << std::endl;
+        }
     }
 
     if (content.empty())
@@ -233,13 +239,15 @@ void StatusCodes::http400BadRequest(std::string& response_str, const std::string
         std::ostringstream json_response;
         json_response << "{\"error\":\"Bad Request\",\"message\":\"" << message << "\"}";
         content = json_response.str();
+        content_type = "application/json; charset=UTF-8";
+        std::cout << "[400] Usando resposta JSON padrão" << std::endl;
     }
 
     std::ostringstream oss;
     oss << "HTTP/1.1 400 Bad Request\r\n";
     oss << "Date: " << getCurrentHttpDate() << "\r\n";
     oss << "Server: " << config.server_name << "\r\n";
-    oss << "Content-Type: application/json; charset=UTF-8\r\n";
+    oss << "Content-Type: " << content_type << "\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     oss << "Connection: close\r\n";
     oss << "\r\n";
