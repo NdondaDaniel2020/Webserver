@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:44:38 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 17:00:12 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -361,20 +361,6 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 
     if (state != PROCESSING)
         return;
-
-    // ========== Validar server_name baseado no header Host ==========
-    if (!validateServerName(server_config))
-    {
-        std::string response_str;
-        StatusCodes::http400BadRequest(response_str, 
-                                      "Host header does not match server_name configuration",
-                                      server_config, this->request);
-        send_buffer = response_str;
-        send_offset = 0;
-        state = SENDING_RESPONSE;
-        keep_alive = false;
-        return;
-    }
 
     if (!is_chunked && content_length > 0 && headers_end_pos > 0)
     {
@@ -1058,46 +1044,4 @@ void Client::finishCgiAndGenerateResponse()
                                     cgi_body, keep_alive);
     send_offset = 0;
     state       = SENDING_RESPONSE;
-}
-
-// ========== Validação de Server Name ==========
-bool Client::validateServerName(const ServerConfig& server_config)
-{
-    // Obter o header Host da requisição
-    std::string host_header = request.getHeader("Host");
-    
-    // Se não houver header Host, permitir (compatibilidade com HTTP/1.0)
-    if (host_header.empty())
-    {
-        std::cout << "[CLIENT " << fd << "] Nenhum header Host - permitindo por compatibilidade" << std::endl;
-        return true;
-    }
-
-    // O header Host pode conter "hostname:port" - extrair apenas o hostname
-    std::string host_only = host_header;
-    size_t colon_pos = host_only.find(':');
-    if (colon_pos != std::string::npos)
-    {
-        host_only = host_only.substr(0, colon_pos);
-    }
-
-    // Normalizar para lowercase para comparação case-insensitive
-    std::transform(host_only.begin(), host_only.end(), host_only.begin(), ::tolower);
-    std::string server_name_lower = server_config.server_name;
-    std::transform(server_name_lower.begin(), server_name_lower.end(), 
-                   server_name_lower.begin(), ::tolower);
-
-    // Se o server_name contém wildcard ou regex, fazer matching simples
-    // Por enquanto, fazemos apenas matching exato
-    if (host_only == server_name_lower)
-    {
-        std::cout << "[CLIENT " << fd << "] Host válido: " << host_header 
-                  << " corresponde a " << server_config.server_name << std::endl;
-        return true;
-    }
-
-    // Server name não corresponde - erro 400
-    std::cout << "[CLIENT " << fd << "] Host inválido: " << host_header 
-              << " não corresponde a " << server_config.server_name << std::endl;
-    return false;
 }

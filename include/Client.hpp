@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:43:48 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 17:00:32 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -136,7 +136,6 @@ private:
     bool                checkBodyComplete();
     void                parseHeaders();
     void                updateLastActivity();
-    bool                validateServerName(const ServerConfig& server_config);
 };
 
 #endif // CLIENT_HPP

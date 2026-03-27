@@ -44,14 +44,17 @@ namespace ConfigValidator
         server_name = StringUtils::trim(server_name);
         if (server_name.empty())
             return (false);
-        
+
+        bool has_alnum = false;
         for (size_t i = 0; i < server_name.size(); i++)
         {
-            char c = server_name[i];
-            if (!isalnum(c) && c != '-' && c != '.' && c != '_')
-                return (false);
+            if (isalnum(server_name[i]))
+            {
+                has_alnum = true;
+                break;
+            }
         }
-        return (true);
+        return has_alnum;
     }
 
     bool validateReturn(std::string value)

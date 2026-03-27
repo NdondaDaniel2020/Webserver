@@ -131,10 +131,9 @@ void ConfigParser::parseServerBlock(std::ifstream& file, ServerConfig& server)
         }
         else if (key == "server_name")
         {
-            if (ConfigValidator::validateServerName(value))
-                server.server_name = StringUtils::trim(value);
-            else 
-                throw std::runtime_error("invalid server name " + line);
+            server.server_name = StringUtils::trim(value);
+            if (!ConfigValidator::validateServerName(server.server_name))
+                throw std::runtime_error("Invalid server_name: must contain at least one alphanumeric character");
         }
         else if (key == "error_page")
         {
