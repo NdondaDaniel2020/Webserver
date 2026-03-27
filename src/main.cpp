@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 10:56:17 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:02:43 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -15,6 +15,18 @@
 
 static Server* g_server_instance = NULL;
 static volatile bool g_shutdown_requested = false;
+
+void sigpipe_handler(int sig)
+{
+    (void)sig;
+}
+
+void sigchld_handler(int sig)
+{
+    (void)sig;
+    pid_t pid;
+    while ((pid = waitpid(-1, NULL, WNOHANG)) > 0);
+}
 
 void signal_handler(int sig)
 {
@@ -33,6 +45,8 @@ int main(int argc, char **argv)
     try
     {
         std::signal(SIGINT, signal_handler);
+        std::signal(SIGPIPE, sigpipe_handler);
+        std::signal(SIGCHLD, sigchld_handler);
         
         if (argc != 2)
             throw std::runtime_error("Usage: " + std::string(argv[0]) + " <config_file>");
