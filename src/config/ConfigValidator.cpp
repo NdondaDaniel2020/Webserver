@@ -42,18 +42,16 @@ namespace ConfigValidator
     bool validateServerName(std::string &server_name)
     {
         server_name = StringUtils::trim(server_name);
-        struct addrinfo hints;
-        struct addrinfo *res = NULL;
-        std::memset(&hints, 0, sizeof(hints));
-
-        hints.ai_family = AF_UNSPEC;
-        hints.ai_socktype = SOCK_STREAM;
-        hints.ai_flags = AI_CANONNAME;
-        int status = getaddrinfo(server_name.c_str(), NULL, &hints, &res);
-        if (status != 0)
-            return false;
-        freeaddrinfo(res);
-        return true;
+        if (server_name.empty())
+            return (false);
+        
+        for (size_t i = 0; i < server_name.size(); i++)
+        {
+            char c = server_name[i];
+            if (!isalnum(c) && c != '-' && c != '.' && c != '_')
+                return (false);
+        }
+        return (true);
     }
 
     bool validateReturn(std::string value)
