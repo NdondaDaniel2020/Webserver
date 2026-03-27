@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:21:57 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:29:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -467,16 +467,16 @@ bool Client::sendData()
 
 void Client::sendTimeoutResponse()
 {
-    std::string body;
-    StatusCodes::http504GatewayTimeout(body, request, config->getServerConfig(server_index));
-    std::ostringstream oss;
-    oss << body;
-    send_buffer = oss.str();
+    std::string response_str;
+    StatusCodes::http504GatewayTimeout(response_str, request, config->getServerConfig(server_index));
+    
+    send_buffer = response_str;
     send_offset = 0;
-    keep_alive = false;
     state = SENDING_RESPONSE;
-    // Envia directamente — não espera pelo epoll
-    write(fd, send_buffer.c_str(), send_buffer.size());
+    keep_alive = false;
+
+    std::cout << "[CLIENT " << fd << "] Timeout response queued for sending (" 
+              << send_buffer.size() << " bytes)" << std::endl;
 }
 
 // ========== Reset para keep-alive ==========
