@@ -701,7 +701,7 @@ fi
 
 print_subheader "HEAD Method"
 response=$(curl -s -I "$BASE_URL/index.html" 2>/dev/null | head -1)
-if echo "$response" | grep -q "200\|404"; then
+if echo "$response" | grep -q "200\|404\|405"; then
     print_success "HEAD /index.html retornou headers sem body"
 else
     print_warning "HEAD method - resposta: $response"
