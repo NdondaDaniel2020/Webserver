@@ -153,6 +153,7 @@ void Server::checkTimeout()
                       << " inactivo por "
                       << (now - client->getLastActivity())
                       << "s" << std::endl;
+            client->sendTimeoutResponse();
             to_close.push_back(client_fd);
         }
     }
@@ -165,17 +166,8 @@ void Server::checkTimeout()
             continue;
         Client *client = it->second;
 
-        // Mata o CGI
-        client->cleanupCgiIfActive(this->epoll_fd);
-
-        // Remove pipes do mapa
-        if (client->getCgiOutFd() >= 0)
-            cgi_fd_map.erase(client->getCgiOutFd());
-        if (client->getCgiInFd() >= 0)
-            cgi_fd_map.erase(client->getCgiInFd());
-
-        // Envia 504 e fecha
-        client->sendTimeoutResponse();
+        // Mata o CGI e envia timeout response
+        client->finishCgiAndGenerateResponse();
         to_close.push_back(cgi_timeout[i]);
     }
 

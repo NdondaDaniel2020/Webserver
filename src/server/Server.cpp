@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 17:49:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 18:30:04 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -192,7 +192,20 @@ void Server::start()
                 if (cit != cgi_fd_map.end())
                 {
                     Client *c = cit->second;
-                    handleCgiPipeEvent(c, events[i].events);
+                    // ✅ Validar que o Client* ainda é válido (existe no clients map)
+                    std::map<int, Client*>::iterator client_check = clients.find(c->getFd());
+                    if (client_check != clients.end() && client_check->second == c)
+                    {
+                        // Client é válido, processar evento
+                        handleCgiPipeEvent(c, events[i].events);
+                    }
+                    else
+                    {
+                        // Client foi deletado, remover do cgi_fd_map e ignorar evento
+                        std::cout << "[EPOLLHUP] Ignorando evento para pipe fd=" << fd 
+                                  << " (Client foi deletado)" << std::endl;
+                        cgi_fd_map.erase(fd);
+                    }
                 }
             }
         }
@@ -230,8 +243,7 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
     if (events_mask & EPOLLHUP)
     {
         std::cout << "[EPOLLHUP] CGI pipe closed for client fd=" << c->getFd() << std::endl;
-        
-        // Tentar recolher status do processo
+
         Client::CgiState& cgi_state = c->getCgiState();
         int status;
         pid_t result = waitpid(cgi_state.pid, &status, WNOHANG);
