@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 14:57:29 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:15:52 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -438,35 +438,30 @@ bool Client::sendData()
     if (state != SENDING_RESPONSE || !hasDataToSend())
         return false;
 
-    // Enviar chunk do buffer
-    size_t remaining = send_buffer.size() - send_offset;
-    size_t to_send = remaining; // Pode limitar aqui (ex: 8192 bytes por vez)
-
-    ssize_t sent = write(fd, send_buffer.c_str() + send_offset, to_send);
+    ssize_t sent = write(fd, send_buffer.c_str() + send_offset, 
+                        send_buffer.size() - send_offset);
+    
+    if (sent > 0) {
+        send_offset += sent;
+        updateLastActivity();
+        
+        if (send_offset >= send_buffer.size())
+        {
+            std::cout << "[CLIENT " << fd << "] Resposta enviada completamente" << std::endl;
+            state = DONE;
+            return true;
+        }
+        return false;  // Mais dados para enviar, retry via epoll
+    }
 
     if (sent == 0)
     {
         std::cout << "[CLIENT " << fd << "] Conexão fechada pelo cliente durante envio" << std::endl;
         return false;
     }
-
-    if (sent < 0)
-    {
-        std::cerr << "[CLIENT " << fd << "] Erro ao enviar dados" << std::endl;
-        return false;
-    }
-
-    send_offset += sent;
-    updateLastActivity();
-
-    // Verificar se terminou de enviar
-    if (send_offset >= send_buffer.size())
-    {
-        std::cout << "[CLIENT " << fd << "] Resposta enviada completamente" << std::endl;
-        state = DONE;
-        return true;
-    }
-
+    
+    // sent < 0 - EAGAIN ou erro real
+    // Retornar false deixa epoll retentar depois
     return false;
 }
 
