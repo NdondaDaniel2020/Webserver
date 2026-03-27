@@ -46,6 +46,8 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
     if (!isReadable(_file_path))
         return StatusCodes::http403Forbidden(this->response_str, request, _file_path, this->config);
     std::string content = readFile(_file_path);
+    if (content.empty())
+        return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to read file: " + std::string(strerror(errno)), this->config);
     StatusCodes::http200FileFound(this->response_str, request, content, _file_path, this->config);
 }
 
