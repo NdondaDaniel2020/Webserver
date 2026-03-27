@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 15:25:56 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 17:49:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -222,7 +222,7 @@ void Server::handleClientSendReady(int fd, Client *client)
 void Server::handleCgiPipeEvent(Client *c, int events_mask)
 {
     if (events_mask & (EPOLLIN | EPOLLERR | EPOLLHUP))
-        c->handleCgiStdoutReadable(epoll_fd);
+        c->handleCgiStdoutReadable(epoll_fd, cgi_fd_map);
     else if (events_mask & EPOLLOUT)
         c->handleCgiStdinWritable(epoll_fd);
 

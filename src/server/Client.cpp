@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 17:00:12 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 17:49:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -164,6 +164,14 @@ bool Client::hasDataToSend() const
 
 void Client::appendRecvData(const char *data, size_t len)
 {
+    if (recv_buffer.size() + len > MAX_RECV_BUFFER_SIZE)
+    {
+        std::cerr << "[CLIENT " << fd << "] recv_buffer excedeu limite ("
+                  << recv_buffer.size() << " + " << len << " > "
+                  << MAX_RECV_BUFFER_SIZE << ")" << std::endl;
+        // Close client due to buffer overflow - don't append this data
+        return;
+    }
     recv_buffer.append(data, len);
     updateLastActivity();
 }
@@ -874,7 +882,7 @@ void Client::handleCgiStdinWritable(int epoll_fd)
     return;
 }
 
-void Client::handleCgiStdoutReadable(int epoll_fd)
+void Client::handleCgiStdoutReadable(int epoll_fd, std::map<int, Client*>& cgi_fd_map)
 {
     if (!is_cgi_active)
         return;
@@ -902,9 +910,13 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
             cgi.output.clear();
             cgi.finished = true;
             
-            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
-            close(cgi.pipe_out[0]);
-            cgi.pipe_out[0] = -1;
+            // ✅ Check se FD é válido antes de fechar E remove do mapa
+            if (cgi.pipe_out[0] >= 0) {
+                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+                cgi_fd_map.erase(cgi.pipe_out[0]);
+                close(cgi.pipe_out[0]);
+                cgi.pipe_out[0] = -1;
+            }
             
             return;
         }
@@ -917,9 +929,13 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
     {
         // EOF: stdout fechado
         std::cout << "[CLIENT " << fd << "] CGI stdout EOF" << std::endl;
-        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
-        close(cgi.pipe_out[0]);
-        cgi.pipe_out[0] = -1;
+        // ✅ Check se FD é válido antes de fechar E remove do mapa
+        if (cgi.pipe_out[0] >= 0) {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+            cgi_fd_map.erase(cgi.pipe_out[0]);
+            close(cgi.pipe_out[0]);
+            cgi.pipe_out[0] = -1;
+        }
         // Não finalizar aqui - esperar EPOLLHUP/EPOLLERR que sinalizará término do CGI
         return;
     }
@@ -932,9 +948,13 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
 
     // Erro real
     std::cerr << "[CLIENT " << fd << "] CGI read error: " << strerror(saved_errno) << std::endl;
-    epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
-    close(cgi.pipe_out[0]);
-    cgi.pipe_out[0] = -1;
+    // ✅ Check se FD é válido antes de fechar E remove do mapa
+    if (cgi.pipe_out[0] >= 0) {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+        cgi_fd_map.erase(cgi.pipe_out[0]);
+        close(cgi.pipe_out[0]);
+        cgi.pipe_out[0] = -1;
+    }
     // Não finalizar aqui - esperar término do CGI via EPOLLHUP
     return;
 }

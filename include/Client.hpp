@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 17:00:32 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 17:49:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -34,6 +34,7 @@
 #include "FileUtils.hpp"
 
 #define MAX_CGI_OUTPUT_SIZE (10 * 1024 * 1024)
+#define MAX_RECV_BUFFER_SIZE (10 * 1024 * 1024)
 
 class Client
 {
@@ -101,6 +102,7 @@ public:
     time_t              getCgiStartTime() const;
     bool                hasDataToSend() const;
     bool                isCgiActive() const { return is_cgi_active; }
+    const std::string&  getRecvBuffer() const { return recv_buffer; }
     void                cleanupCgiIfActive(int epoll_fd);
     int                 getServerIndex();
 
@@ -126,7 +128,7 @@ public:
     // CGI non-blocking
     void                startCgi(const HttpRequest& req, const LocationConfig& loc,
                                  const ServerConfig& server_config, int epoll_fd);
-    void                handleCgiStdoutReadable(int epoll_fd);
+    void                handleCgiStdoutReadable(int epoll_fd, std::map<int, Client*>& cgi_fd_map);
     void                handleCgiStdinWritable(int epoll_fd);
     void                finishCgiAndGenerateResponse();
     bool                unchunkBody(std::string& out);
