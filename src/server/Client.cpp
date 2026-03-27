@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:29:00 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:44:38 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -904,7 +904,24 @@ void Client::handleCgiStdoutReadable(int epoll_fd)
 
     if (r > 0)
     {
-        // Sucesso: armazenar dados e retornar
+        if (cgi.output.size() + static_cast<size_t>(r) > MAX_CGI_OUTPUT_SIZE) {
+            std::cout << "[CLIENT " << fd << "] CGI output excedeu limite (" 
+                      << cgi.output.size() << " + " << r << " > " 
+                      << MAX_CGI_OUTPUT_SIZE << ")" << std::endl;
+            
+            kill(cgi.pid, SIGKILL);
+            waitpid(cgi.pid, NULL, WNOHANG);
+            cgi.pid = -1;
+            
+            cgi.output.clear();
+            cgi.finished = true;
+            
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+            close(cgi.pipe_out[0]);
+            cgi.pipe_out[0] = -1;
+            
+            return;
+        }
         // std::cout << "[CLIENT " << fd << "] CGI read " << r << " bytes" << std::endl;
         cgi.output.append(buf, r);
         return;

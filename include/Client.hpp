@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/24 11:03:32 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:43:48 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,7 +18,7 @@
 #include <vector>
 #include <ctime>
 #include <cstring>
-#include <map>           // se usares map em algum lugar, senão remove
+#include <map> 
 
 #include <sys/socket.h>
 #include <sys/epoll.h>
@@ -32,6 +32,8 @@
 #include "Response.hpp"
 #include "ConfigParser.hpp"
 #include "FileUtils.hpp"
+
+#define MAX_CGI_OUTPUT_SIZE (10 * 1024 * 1024)
 
 class Client
 {
