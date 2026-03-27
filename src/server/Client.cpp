@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:15:52 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/27 16:21:57 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -451,7 +451,7 @@ bool Client::sendData()
             state = DONE;
             return true;
         }
-        return false;  // Mais dados para enviar, retry via epoll
+        return false;
     }
 
     if (sent == 0)
@@ -460,8 +460,7 @@ bool Client::sendData()
         return false;
     }
     
-    // sent < 0 - EAGAIN ou erro real
-    // Retornar false deixa epoll retentar depois
+    std::cerr << "[CLIENT " << fd << "] Erro real ao enviar dados " << std::endl;
     return false;
 }
 
