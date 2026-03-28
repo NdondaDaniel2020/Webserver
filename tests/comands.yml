@@ -1,19 +1,19 @@
 
 comands:
   curl -I -X GET http://127.0.0.1:8080/uploads
+  curl -X POST -H "Content-Type: plain/text" --data "abc"
   curl -X POST -F "file=@/path/to/file" http://127.0.0.1:8080/upload
-  curl -X PUT -d "name=John&age=30" http://127.0.0.1:8080/update
+  curl -X POST -H "Content-Type: application/octet-stream" --data-binary "@./tests/file.mp4" "http://127.0.0.1:8080/uploads/"
   curl -X DELETE http://127.0.0.1:8080/delete/123
-
+  
+  
   wrk -t4 -c100 -d20s http://127.0.0.1:8080/index.html
   siege -c50 -r100 http://127.0.0.1:8080/index.html
-
-  curl -X POST -H "Content-Type: plain/text" --data "abc"
 
 cgi:
   curl -s -X POST http://127.0.0.1:8080/cgi-bin/form_save.py \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "name=Test User&email=test@example.com&message=Teste" | jq .
+  -d "name=Test User&email=test@example.com&message=Teste"
 
   curl -s -X GET http://127.0.0.1:8080/cgi-bin/form_list.php
 
@@ -34,6 +34,8 @@ valgrind:
 wrk_siege:
   wrk -t4 -c50 -d10s http://127.0.0.1:8080/index.html
 
-  siege -c50 -t10S http://127.0.0.1:8080/index.html
+  siege -c50 -t10S -b http://127.0.0.1:8080/index.html
 
-  siege -c50 -t10S http://127.0.0.1:8080/cgi-bin/hello.php
+  siege -c50 -t10S -b http://127.0.0.1:8080/tests/index.html
+
+  siege -c50 -t10S -b http://127.0.0.1:8080/cgi-bin/hello.php
