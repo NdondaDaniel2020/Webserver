@@ -71,6 +71,8 @@ void Response::methodPost(const HttpRequest &request)
 
     if (content_type.find("multipart/form-data") != std::string::npos)
         return multipartFormData(request, content_type);
+    else if (content_type.find("application/octet-stream") != std::string::npos)
+        return applicationOctetStream(request);
     else if (content_type.find("text/plain") != std::string::npos)
     {
         std::ostringstream json_response;

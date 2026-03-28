@@ -5,7 +5,10 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
 {
     std::string boundary = extractBoundary(content_type);
     if (boundary.empty())
+    {
+        std::cout << "\n\n[415] Content-Type inválido ou boundary ausente: [[" << content_type << "]]\n\n" << std::endl;
         return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
+    }
 
     std::vector<MultipartFile> files;
     if (!parseMultipartData(request.getBody(), boundary, files))
@@ -97,4 +100,35 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
     }
 
     StatusCodes::http201Created(this->response_str, location, json_response.str(), request, this->config);
+}
+
+void Response::applicationOctetStream(const HttpRequest &request)
+{
+    std::string filename = generateUniqueFilename("file.bin");
+    std::string upload_dir = getUploadDir(this->config, request);
+    if (upload_dir.empty())
+        return StatusCodes::http413PayloadTooLarge(this->response_str, this->config, request);
+
+    if (!createDirectory(upload_dir))
+        return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to create upload directory: " + upload_dir, this->config);
+
+    if (!hasWritePermission(upload_dir))
+        return StatusCodes::http403Forbidden(this->response_str, request, upload_dir, this->config);
+
+    std::string full_path = upload_dir + "/" + filename;
+    if (writeFileToDisk(full_path, request.getBody()))
+    {
+        std::cout << "[201] Arquivo salvo: " << full_path
+                << " (" << request.getBody().size() << " bytes)" << std::endl;
+
+        std::ostringstream json_response;
+        json_response << "{\"filename\":\"" << filename << "\",";
+        json_response << "\"path\":\"" << full_path << "\",";
+        json_response << "\"size\":" << request.getBody().size() << ",";
+        json_response << "\"mime_type\":\"" << getMimeType(filename) << "\"}";
+
+        return StatusCodes::http201Created(this->response_str, "/" + filename, json_response.str(), request, this->config);
+    }
+    else
+        return StatusCodes::http400BadRequest(this->response_str, "Failed to save file", this->config, request);
 }
