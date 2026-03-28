@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/22 17:37:44 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/28 19:19:05 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,6 +31,7 @@ Response::Response(const HttpRequest &request, const ServerConfig &config) : con
     this->allowed_extensions.push_back(".zip");
     this->allowed_extensions.push_back(".mp4");
     this->allowed_extensions.push_back(".mp3");
+    this->allowed_extensions.push_back(".log");
 
     this->protected_files.push_back("index.html");
 

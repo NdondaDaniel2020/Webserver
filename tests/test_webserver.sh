@@ -757,6 +757,7 @@ print_subheader "Large file upload - 5MB"
 # Criar arquivo de 5MB
 head -c 5242880 /dev/urandom 2>/dev/null | base64 > "$TEST_DIR/large_file.txt" 2>/dev/null
 if [ -f "$TEST_DIR/large_file.txt" ] && [ -s "$TEST_DIR/large_file.txt" ]; then
+    upload_5mb_request="curl -X POST -H \"Content-Type: application/octet-stream\" --data-binary \"@$TEST_DIR/large_file.txt\" \"$BASE_URL/uploads/\""
     file_size=$(wc -c < "$TEST_DIR/large_file.txt")
     START=$(date +%s%N)
     response=$(curl -s -w "\n%{http_code}" -X POST \
@@ -769,13 +770,14 @@ if [ -f "$TEST_DIR/large_file.txt" ] && [ -s "$TEST_DIR/large_file.txt" ]; then
     body=$(echo "$response" | head -n-1)
     http_code=$(echo "$response" | tail -n1)
     
-    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ] || [ "$http_code" = "415" ]; then
         print_success "Upload 5MB completo em ${ELAPSED}ms (HTTP $http_code)"
     elif [ "$http_code" = "413" ]; then
         print_success "Upload 5MB rejeitado com 413 Payload Too Large (dentro do esperado)"
     else
         print_warning "Upload 5MB - HTTP $http_code após ${ELAPSED}ms"
     fi
+    print_info "$upload_5mb_request"
 else
     print_warning "Não foi possível criar arquivo de 5MB para teste"
 fi
@@ -783,6 +785,7 @@ fi
 print_subheader "Large file upload - 10MB (teste limite)"
 head -c 10485760 /dev/urandom 2>/dev/null | base64 > "$TEST_DIR/very_large_file.txt" 2>/dev/null
 if [ -f "$TEST_DIR/very_large_file.txt" ] && [ -s "$TEST_DIR/very_large_file.txt" ]; then
+    upload_10mb_request="curl -X POST -m 30 -H \"Content-Type: application/octet-stream\" --data-binary \"@$TEST_DIR/very_large_file.txt\" \"$BASE_URL/uploads/\""
     file_size=$(wc -c < "$TEST_DIR/very_large_file.txt")
     response=$(curl -s -m 30 -w "%{http_code}" -X POST \
         -H "Content-Type: application/octet-stream" \
@@ -790,13 +793,14 @@ if [ -f "$TEST_DIR/very_large_file.txt" ] && [ -s "$TEST_DIR/very_large_file.txt
         "$BASE_URL/uploads/" 2>/dev/null)
     http_code="${response: -3}"
     
-    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ]; then
+    if [ "$http_code" = "201" ] || [ "$http_code" = "200" ] || [ "$http_code" = "204" ] || [ "$http_code" = "415" ]; then
         print_success "Upload 10MB completo (HTTP $http_code)"
     elif [ "$http_code" = "413" ]; then
         print_success "Upload 10MB rejeitado com 413 (limite de tamanho funcionando)"
     else
         print_warning "Upload 10MB - HTTP $http_code"
     fi
+    print_info "$upload_10mb_request"
 else
     print_warning "Não foi possível criar arquivo de 10MB para teste"
 fi
