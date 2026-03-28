@@ -30,3 +30,10 @@ cgi_cook:
 
 valgrind:
    valgrind --leak-check=full  --track-fds=yes  --show-leak-kinds=all  ./webserv config/default.conf
+
+wrk_siege:
+  wrk -t4 -c50 -d10s http://127.0.0.1:8080/index.html
+
+  siege -c50 -t10S http://127.0.0.1:8080/index.html
+
+  siege -c50 -t10S http://127.0.0.1:8080/cgi-bin/hello.php
