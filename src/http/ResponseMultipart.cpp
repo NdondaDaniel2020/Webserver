@@ -5,10 +5,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
 {
     std::string boundary = extractBoundary(content_type);
     if (boundary.empty())
-    {
-        std::cout << "\n\n[415] Content-Type inválido ou boundary ausente: [[" << content_type << "]]\n\n" << std::endl;
         return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
-    }
 
     std::vector<MultipartFile> files;
     if (!parseMultipartData(request.getBody(), boundary, files))
@@ -19,7 +16,7 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         return StatusCodes::http413PayloadTooLarge(this->response_str, this->config, request);
 
     if (!createDirectory(upload_dir))
-        return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to create upload directory: " + upload_dir, this->config);
+        return StatusCodes::http500InternalServerError(this->response_str, request, "Falha ao criar o diretório: " + upload_dir, this->config);
 
     if (!hasWritePermission(upload_dir))
         return StatusCodes::http403Forbidden(this->response_str, request, upload_dir, this->config);
@@ -33,16 +30,13 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
     {
         if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
         {
-            std::cout << "[400] Extensão de arquivo não permitida: " << files[i].filename << std::endl;
-            cleanupFiles(saved_files); // Limpar arquivos já salvos
-            return StatusCodes::http400BadRequest(this->response_str, "File extension not allowed: " + getFileExtension(files[i].filename), this->config, request);
+            cleanupFiles(saved_files);
+            return StatusCodes::http400BadRequest(this->response_str, "Extensão de arquivo não permitida: " + getFileExtension(files[i].filename), this->config, request);
         }
 
         if ((this->config.client_max_body_size > 0 && files[i].content.size() > this->config.client_max_body_size)
             || (location_config && location_config->client_max_body_size > 0 && files[i].content.size() > location_config->client_max_body_size))
         {
-            std::cout << "[413] Arquivo muito grande: " << files[i].filename
-                      << " (" << files[i].content.size() << " bytes)" << std::endl;
             cleanupFiles(saved_files);
             return StatusCodes::http413PayloadTooLarge(this->response_str, this->config, request);
         }
@@ -55,7 +49,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         // Validação lógica de segurança: verificar tentativas de path traversal
         if (full_path.find("..") != std::string::npos || unique_filename.find("..") != std::string::npos)
         {
-            std::cerr << "[403] Attempted path traversal: " << files[i].filename << std::endl;
             cleanupFiles(saved_files);
             return StatusCodes::http403Forbidden(this->response_str, request, "", this->config);
         }
@@ -80,12 +73,10 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         }
         else
         {
-            std::cout << "[500] Erro ao salvar arquivo: " << full_path << std::endl;
-            cleanupFiles(saved_files); // Limpar todos em caso de erro
-            return StatusCodes::http400BadRequest(this->response_str, "Failed to save file: " + files[i].filename, this->config, request);
+            cleanupFiles(saved_files);
+            return StatusCodes::http400BadRequest(this->response_str, "Falha ao salvar arquivo: " + files[i].filename, this->config, request);
         }
     }
-
     json_response << "],\"success\":true,\"count\":" << success_count << "}";
 
     std::string location = "";
@@ -98,7 +89,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         else
             location = request.getUri() + "/" + getFileName(first_file);
     }
-
     StatusCodes::http201Created(this->response_str, location, json_response.str(), request, this->config);
 }
 
@@ -110,7 +100,7 @@ void Response::applicationOctetStream(const HttpRequest &request)
         return StatusCodes::http413PayloadTooLarge(this->response_str, this->config, request);
 
     if (!createDirectory(upload_dir))
-        return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to create upload directory: " + upload_dir, this->config);
+        return StatusCodes::http500InternalServerError(this->response_str, request, "Falha ao criar diretório de upload: " + upload_dir, this->config);
 
     if (!hasWritePermission(upload_dir))
         return StatusCodes::http403Forbidden(this->response_str, request, upload_dir, this->config);
@@ -130,5 +120,5 @@ void Response::applicationOctetStream(const HttpRequest &request)
         return StatusCodes::http201Created(this->response_str, "/" + filename, json_response.str(), request, this->config);
     }
     else
-        return StatusCodes::http400BadRequest(this->response_str, "Failed to save file", this->config, request);
+        return StatusCodes::http400BadRequest(this->response_str, "Falha ao salvar arquivo", this->config, request);
 }
