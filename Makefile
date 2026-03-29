@@ -6,7 +6,7 @@
 #    By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 10:11:23 by nmatondo          #+#    #+#              #
-#    Updated: 2026/02/19 11:55:40 by nmatondo         ###   ########.fr        #
+#    Updated: 2026/03/29 02:01:12 by nmatondo         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
 
@@ -40,6 +40,9 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/http/ResponseMultipart.cpp \
 			  $(SRCDIR)/http/ResponseHelpers.cpp \
 			  $(SRCDIR)/server/Client.cpp \
+			  $(SRCDIR)/server/ClientRequest.cpp \
+			  $(SRCDIR)/server/ClientProcessing.cpp \
+			  $(SRCDIR)/server/ClientCgi.cpp \
 			  $(SRCDIR)/cgi/EnvBuilder.cpp \
 
 # Arquivos futuros (descomente conforme forem sendo criados)
