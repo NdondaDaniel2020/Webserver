@@ -8,7 +8,7 @@
 
 ---
 
-## 📋 TABELA RESUMIDA - PROBLEMAS VIOLANDO O SUBJECT
+## 📋 TABELA RESUMIDA - PROBLEMAS VIOLANDO O SUBJECT 🟢
 
 | # | Problema | Arquivo | Severity | Status | Fix Time | Dificuldade | Violação do Subject |
 |---|----------|---------|----------|--------|----------|-------------|---------------------|
