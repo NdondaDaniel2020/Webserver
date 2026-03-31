@@ -19,17 +19,8 @@ cgi:
 
   curl -s -X DELETE "http://127.0.0.1:8080/cgi-bin/form_list.php?id=1"
 
-cgi_cook:
-  # Como Usar (Ninja Arena)
-  # 1. Criar nova sessão:
-      curl -v -X POST -d "action=new_game&name=MeuNinja&class=shadow" \
-      http://127.0.0.1:8080/cgi-bin/arena_action.py
-  # 2. Usar cookie em requisições subsequentes:
-      curl -b "NAGSID=e5c74d64038d5035c02e63640f571e9e" \
-      http://127.0.0.1:8080/cgi-bin/arena_action.py?action=state
-
 valgrind:
-   valgrind --leak-check=full  --track-fds=yes  --show-leak-kinds=all  ./webserv config/default.conf
+   valgrind --leak-check=full --track-fds=yes --show-leak-kinds=all ./webserv config/default.conf
 
 wrk_siege:
   wrk -t4 -c50 -d10s http://127.0.0.1:8080/index.html
