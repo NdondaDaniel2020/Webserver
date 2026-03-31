@@ -110,13 +110,13 @@ void Server::closeClient(int fd)
     }
 
     client->cleanupCgiIfActive(this->epoll_fd);
+    epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
 
     if (cgi_out >= 0)
         cgi_fd_map.erase(cgi_out);
     if (cgi_in >= 0)
         cgi_fd_map.erase(cgi_in);
 
-    epoll_ctl(this->epoll_fd, EPOLL_CTL_DEL, fd, NULL);
     this->clients.erase(it);
     close(fd);
     delete client;
