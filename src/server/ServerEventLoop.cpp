@@ -49,8 +49,7 @@ void Server::handleClientData(int fd)
             }
         }
     }
-
-    if (client->getState() == Client::SENDING_RESPONSE)
+    else if (client->getState() == Client::SENDING_RESPONSE)
     {
         if (client->hasDataToSend())
         {
