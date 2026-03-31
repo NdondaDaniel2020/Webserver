@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 14:28:41 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/03/31 14:03:32 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -86,11 +86,8 @@ void StatusCodes::http200FileFound(std::string& response_str, const HttpRequest&
     
     oss << "Content-Type: " << mime_type << "\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
-    // oss << "Content-Disposition: attachment; filename=\"" << filename << "\"\r\n";
     oss << "Last-Modified: " << getFileModifiedDate(file_path) << "\r\n";
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
@@ -283,8 +280,6 @@ void StatusCodes::http401Unauthorized(std::string& response_str, const HttpReque
     
     if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
-        oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
         
@@ -320,8 +315,6 @@ void StatusCodes::http403Forbidden(std::string& response_str, const HttpRequest&
     
     if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
-        oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
 
@@ -354,8 +347,6 @@ void StatusCodes::http404NotFound(std::string& response_str, const HttpRequest& 
     oss << "Content-Length: " << content.size() << "\r\n";
 
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
@@ -391,8 +382,6 @@ void StatusCodes::http405MethodNotAllowed(std::string& response_str, const HttpR
     oss << "Content-Length: " << content.size() << "\r\n";
 
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
@@ -458,8 +447,6 @@ void StatusCodes::http409Conflict(std::string& response_str, const HttpRequest& 
     oss << "Content-Length: " << content.size() << "\r\n";
 
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
@@ -584,8 +571,6 @@ void StatusCodes::http415UnsupportedMediaType(std::string& response_str, const H
 
     if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
-        oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
 
@@ -620,8 +605,6 @@ void StatusCodes::http429TooManyRequests(std::string& response_str, const HttpRe
     oss << "Content-Length: " << content.size() << "\r\n";
 
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
@@ -661,8 +644,6 @@ void StatusCodes::http500InternalServerError(std::string& response_str, const Ht
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
-        oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
     oss << "\r\n";
@@ -695,8 +676,6 @@ void StatusCodes::http501NotImplemented(std::string& response_str, const HttpReq
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
@@ -731,8 +710,6 @@ void StatusCodes::http502BadGateway(std::string& response_str, const HttpRequest
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
-        oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
     oss << "\r\n";
@@ -766,8 +743,6 @@ void StatusCodes::http503ServiceUnavailable(std::string& response_str, const Htt
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
         oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
-        oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
     oss << "\r\n";
@@ -799,8 +774,6 @@ void StatusCodes::http504GatewayTimeout(std::string& response_str, const HttpReq
     oss << "Content-Type: text/html; charset=UTF-8\r\n";
     oss << "Content-Length: " << content.size() << "\r\n";
     if (request.getHeader("Connection") == "close")
-        oss << "Connection: close\r\n";
-    else if (request.getVersion() == "HTTP/1.0")
         oss << "Connection: close\r\n";
     else
         oss << "Connection: keep-alive\r\n";
