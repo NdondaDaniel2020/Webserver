@@ -79,9 +79,6 @@ void HttpRequest::parseRequestLine(const std::string &line)
         this->query = "";
     }
 
-    // Default to /index.html if root path
-    if (this->uri == "/")
-        this->uri = "/index.html";
     std::cout << "[REQUEST] " << this->method << " " << this->uri << " " << this->version << std::endl;
     
 }
