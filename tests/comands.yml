@@ -2,7 +2,7 @@
 comands:
   curl -I -X GET http://127.0.0.1:8080/uploads
   curl -X POST -H "Content-Type: plain/text" --data "abc"
-  curl -X POST -F "file=@/path/to/file" http://127.0.0.1:8080/upload
+  curl -X POST -F "file=@/path/to/file" http://127.0.0.1:8080/uploads
   curl -X POST -H "Content-Type: application/octet-stream" --data-binary "@./tests/file.mp4" "http://127.0.0.1:8080/uploads/"
   curl -X DELETE http://127.0.0.1:8080/delete/123
   

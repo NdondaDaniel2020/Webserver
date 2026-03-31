@@ -249,8 +249,8 @@ namespace ConfigValidator
         if (server.root.empty())
             throw std::runtime_error("Missing required field: root");
 
-        if (server.client_max_body_size <= 0)
-            throw std::runtime_error("Invalid client_max_body_size: must be greater than 0");
+        // if (server.client_max_body_size <= 0)
+        //     throw std::runtime_error("Invalid client_max_body_size: must be greater than 0");
     }
 
     void validateLocationConfigDefault(const LocationConfig& location)
@@ -286,5 +286,4 @@ namespace ConfigValidator
                 throw std::runtime_error("Invalid location: upload_dir defined but POST not in allowed_methods");
         }
     }
-
 }
