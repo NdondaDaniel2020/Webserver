@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:34:51 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 12:24:29 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -35,7 +35,6 @@
 # define MAX_FILE_SIZE (10 * 1024 * 1024)
 
 std::string readFile(const std::string& filepath);
-std::string create_error_message(const std::string& error);
 void openFile(std::ifstream& file, const std::string& filename, std::string sms);
 
 uint32_t ipToHex(const std::string& ip);
@@ -65,7 +64,6 @@ bool hasWritePermission(const std::string& path);
 std::string sanitizeFilename(const std::string& filename);
 std::string generateUniqueFilename(const std::string& original_name);
 bool writeFileToDisk(const std::string& filepath, const std::string& content);
-std::string urlDecode(const std::string& str);
 std::string extractBoundary(const std::string& content_type);
 
 struct MultipartFile {

@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/28 21:21:36 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 12:22:14 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,7 +51,6 @@ class Response
         void applicationOctetStream(const HttpRequest& request);
         
         void generateDirectoryListing(const HttpRequest& request, const std::string& dir_path, const std::string& uri);
-        bool isCgiRequest(const std::string& file_path, const LocationConfig* location);
 };
 
 #endif

@@ -6,18 +6,11 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:35:14 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 12:24:24 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include "FileUtils.hpp"
-
-std::string create_error_message(const std::string& error)
-{
-    std::ostringstream oss;
-    oss << error << " - " << strerror(errno);
-    return oss.str();
-}
 
 std::string readFile(const std::string& filepath)
 {
@@ -332,32 +325,6 @@ bool writeFileToDisk(const std::string& filepath, const std::string& content)
     file.write(content.c_str(), content.size());
     file.close();
     return true;
-}
-
-std::string urlDecode(const std::string& str)
-{
-    std::string result;
-    for (size_t i = 0; i < str.size(); ++i)
-    {
-        if (str[i] == '%' && i + 2 < str.size())
-        {
-            // Converter hex para char
-            int value = 0;
-            std::istringstream iss(str.substr(i + 1, 2));
-            iss >> std::hex >> value;
-            result += static_cast<char>(value);
-            i += 2;
-        }
-        else if (str[i] == '+')
-        {
-            result += ' ';
-        }
-        else
-        {
-            result += str[i];
-        }
-    }
-    return result;
 }
 
 std::string extractBoundary(const std::string& content_type)
