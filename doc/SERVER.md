@@ -1,10 +1,10 @@
-# 🖥️ Documentação da Classe Server
+# � Documentação da Classe Server
 
-## 📅 Data de Criação
-**19 de Fevereiro de 2026**
-
-### 📝 Última Atualização
-**2 de Março de 2026** - Análise implementação com timeout, interface binding e copy semantics
+## 📅 Histórico de Revisão
+**19 de Fevereiro de 2026** - Data de Criação  
+**2 de Março de 2026** - Atualização Base  
+**27-31 de Março de 2026** - Revisão Crítica: 26 Problemas encontrados  
+**1º de Abril de 2026** - Revisão Final e Integração com Documentação
 
 ---
 
@@ -18,6 +18,8 @@ A classe **Server** é o **núcleo do webserver**, responsável por:
 - Coordenar leitura/escrita de dados HTTP
 
 É o **orquestrador** que conecta todos os componentes do sistema.
+
+> **👉 Navegação:** Veja [INDEX.md](INDEX.md) para índice centralizado de toda documentação
 
 ---
 
@@ -166,7 +168,7 @@ for (int i = 0; i < port_count; i++) {
 
 ---
 
-### **Copy Constructor** (🆕)
+### **Copy Constructor** (🔴 NÃO IMPLEMENTÁVEL - Por Design Arquitetural)
 
 ```cpp
 Server::Server(const Server& other);
@@ -973,9 +975,10 @@ A classe **Server** implementa um servidor HTTP **eficiente, escalável e robust
    - Safe iterator pattern com `erase(it++)`
    - Previne conexões zumbi consumindo recursos
 
-3. **Copy Semantics** - Copy constructor e `operator=` com deep copy de arrays
-   - `std::memcpy()` para arrays de primitivos (servers, ports, interface)
-   - Segurança contra shared resource issues
+3. **NON-COPYABLE Design** - Classe Server nunca deve ser copiada
+   - FDs (epoll_fd, servers[]) não podem ser compartilhados entre instances
+   - epoll_ctl comportamento undefined com múltiplos owners do mesmo epoll_fd
+   - Copy constructor e operator= intencionalmente NÃO implementados
 
 4. **Safe Iteration Pattern** - Deletando durante iteração via `erase(it++)`
    - Aplicado em `closeClient()` e `checkTimeout()`
@@ -1529,308 +1532,7 @@ closeClient(client_fd)
 | EPOLLOUT | cgi_fd (stdin) | start():124 | → clients[cgi_fd_map[fd]]->handleCgiStdinWritable() |
 | EPOLLIN | server_fd | start():80 | → newConnection() aceita cliente novo |
 
-### ⚠️ Race Condition Teórica
-
-```cpp
-// Em handleClientData() L205:
-if (client->isCgiActive()) {
-    int out_fd = client->getCgiOutFd();
-    cgi_fd_map[out_fd] = client;  // L207
-}
-
-// Janela de corrida:
-// Tempo 1: out_fd retornado (ex: 10)
-// Tempo 2: [JANELA] Outro thread poderia deletar este FD? 
-//          NÃO: servidor é single-threaded
-// Tempo 3: FD 10 inserido no mapa
-
-```
-
-✅ **Seguro:** Servidor é **single-threaded**, sem race conditions
-
----
-
-## ⚠️ IMPLEMENTAÇÕES FALTANTES E GAPS
-
-### ❌ Gap #1: Copy Constructor Não Implementado
-
-**Problema:**
-```cpp
-// Server.hpp linha 12 (declaração)
-Server(const Server &other);
-
-// Server.cpp: NÃO TEM IMPLEMENTAÇÃO ✗
-```
-
-**Risco:** Deep copy de `ports[]`, `servers[]`, `interface[]` não ocorre
-
-**Exemplo de Crash:**
-```cpp
-Server s1(config, 2, ports, interface);  // Aloca: ports[], servers[]
-Server s2 = s1;                          // Shallow copy!
-                                         // s2.ports = s1.ports (MESMO POINTER)
-
-// ...
-s1.~Server();                            // Deleta ports[], interface[]
-// s1.ports[0] agora é LIXO
-
-s2.start();  // Acessa s2.ports[0] ← SEGFAULT!
-```
-
-**Solução Recomendada:**
-```cpp
-Server::Server(const Server &other) 
-    : port_count(other.port_count), 
-      epoll_fd(-1),
-      config(other.config)
-{
-    // Deep copy arrays
-    this->ports = new int[port_count];
-    std::memcpy(this->ports, other.ports, sizeof(int) * port_count);
-    
-    this->servers = new int[port_count];
-    std::memcpy(this->servers, other.servers, sizeof(int) * port_count);
-    
-    this->interface = new std::string[port_count];
-    for (int i = 0; i < port_count; i++) {
-        this->interface[i] = other.interface[i];
-    }
-    
-    // Criar novo epoll (não compartilhar!)
-    this->epoll_fd = epoll_create(64);
-    
-    // ✗ NÃO copiar clients (são conexões ativas, não reutilizáveis)
-    // ✗ NÃO copiar cgi_fd_map (ID de mapas valem só para este epoll_fd)
-}
-```
-
----
-
-### ❌ Gap #2: Operator= Não Implementado
-
-**Problema:**
-```cpp
-// Server.hpp linha 13 (declaração)
-Server &operator=(const Server &other);
-
-// Server.cpp: NÃO TEM IMPLEMENTAÇÃO ✗
-```
-
-**Risco:** Mesmo que copy constructor
-
-**Exemplo:**
-```cpp
-Server s1(config, 2, ports1, interfaces1);
-Server s2(config, 1, ports2, interfaces2);
-
-s1 = s2;  // Shallow copy!
-          // s1.ports = s2.ports (MESMO POINTER)
-          // s1.ports original é perdido (memory leak!)
-          // Depois s1 aponta para s2.ports
-```
-
-**Solução Recomendada:**
-```cpp
-Server &Server::operator=(const Server &other) {
-    if (this == &other)
-        return *this;  // Self-assignment guard
-    
-    // Limpar recursos antigos
-    this->~Server();
-    
-    // Copiar (reusar copy constructor lógica)
-    new (this) Server(other);  // Placement new + copy constructor
-    
-    return *this;
-}
-```
-
----
-
-### ❌ Gap #3: Método stop() Não Implementado
-
-**Problema:**
-```cpp
-// Server.hpp linha 23 (declaração)
-void stop();
-
-// Server.cpp: DESAPARECEU (completamente) ✗
-```
-
-**Risco:** Linker error ao chamar `stop()`
-
-```cpp
-int main() {
-    Server server(config, ...);
-    server.start();  // OK
-    server.stop();   // ❌ LINKER ERROR: undefined reference to `Server::stop()'
-}
-```
-
-**Localização Esperada:** Server.cpp, após `start()` ([linha ~260](src/server/Server.cpp#L260))
-
-**Implementação Recomendada:**
-```cpp
-void Server::stop() {
-    std::cout << "[*] Parando servidor..." << std::endl;
-    
-    // FASE 1: Fechar todos os clientes
-    for (std::map<int, Client *>::iterator it = clients.begin();
-         it != clients.end(); ++it) {
-        closeClient(it->first);
-    }
-    
-    // FASE 2: Fechar todos os sockets servidor
-    for (int i = 0; i < port_count; i++) {
-        if (servers[i] >= 0) {
-            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, servers[i], NULL);
-            close(servers[i]);
-            servers[i] = -1;
-        }
-    }
-    
-    // FASE 3: Destruir epoll
-    if (epoll_fd >= 0) {
-        close(epoll_fd);
-        epoll_fd = -1;
-    }
-    
-    std::cout << "[*] Servidor parado" << std::endl;
-}
-```
-
----
-
-### ⚠️ Gap #4: epoll_wait Tempo Bloqueio
-
-**Situação Atual** (linha 71):
-```cpp
-int n = epoll_wait(this->epoll_fd, this->events, 64, 1000);
-```
-
-**Timeout Fixo:** 1000ms (1 segundo)
-
-**Implicações:**
-
-| Cenário | Impacto |
-|---------|---------|
-| Sem eventos por 10s | `checkTimeout()` roda a cada 1s (10x overhead) |
-| Milhares clientes | Loop continua 1000x/seg desnecessariamente |
-| High-latency network | Tempo mínimo resposta = 1s de round-trip |
-
-**Alternativa Dinâmica:**
-```cpp
-// Calcular tempo até próximo timeout
-int epoll_timeout = TIMEOUT_SECONDS * 1000;  // 120000ms
-std::map<int, Client *>::iterator it = clients.begin();
-if (it != clients.end()) {
-    time_t now = time(NULL);
-    time_t oldest = it->second->getLastActivity();
-    int wait_time = (TIMEOUT_SECONDS - (now - oldest)) * 1000;
-    epoll_timeout = (wait_time > 0) ? wait_time : 1;
-}
-
-int n = epoll_wait(this->epoll_fd, this->events, 64, epoll_timeout);
-```
-
-✅ **Benefício:** Recebe eventos prácticamente imediatamente + checkTimeout() ativa apenas quando necessário
-
----
-
-### ⚠️ Gap #5: Destrutor Não Chama stop()
-
-**Atual** (Destrutor, linhas 54-62):
-```cpp
-Server::~Server() {
-    // Limpar clientes (mas sem closeClient!)
-    for (std::map<int, Client *>::iterator it = clients.begin();
-         it != clients.end(); ++it)
-        delete it->second;
-    clients.clear();
-    
-    // Limpar arrays
-    delete [] this->ports;
-    delete [] this->servers;
-    delete [] this->interface;
-    
-    // ❌ NÃO fecha epoll_fd! ✗
-    // ❌ NÃO fecha servers[] ✗
-}
-```
-
-**Problema:** File descriptors vazam!
-
-**Solução Recomendada:**
-```cpp
-Server::~Server() {
-    this->stop();  // ← Chama stop() para limpeza completa
-}
-```
-
-Ou completo:
-```cpp
-Server::~Server() {
-    // Limpar clientes com ORDEM CORRETA
-    std::vector<int> to_close;
-    for (std::map<int, Client *>::iterator it = clients.begin();
-         it != clients.end(); ++it)
-        to_close.push_back(it->first);
-    
-    for (size_t i = 0; i < to_close.size(); i++)
-        closeClient(to_close[i]);  // Usa ordem correcta
-    
-    // Fechar sockets servidor
-    for (int i = 0; i < port_count; i++) {
-        if (servers[i] >= 0) {
-            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, servers[i], NULL);
-            close(servers[i]);
-        }
-    }
-    
-    // Fechar epoll
-    if (epoll_fd >= 0)
-        close(epoll_fd);
-    
-    // Limpar arrays
-    delete [] this->ports;
-    delete [] this->servers;
-    delete [] this->interface;
-}
-```
-
----
-
-### 📊 Resumo Gaps
-
-| Gap | Localização | Impacto | Prioridade |
-|-----|-------------|--------|-----------|
-| Copy constructor | Server.cpp (missing) | Crash ao copiar Server | 🔴 Alta |
-| operator= | Server.cpp (missing) | Crash ao atribuir | 🔴 Alta |
-| stop() | Server.cpp (missing) | Linker error | 🔴 Alta |
-| Destrutor stop() | [L54-62](src/server/Server.cpp#L54-L62) | FD leak | 🟠 Média |
-| epoll_wait fixo | [L71](src/server/Server.cpp#L71) | Performance | 🟡 Baixa |
-| Validação argv | main.cpp | Crash se errado | 🟠 Média |
-
----
-
 ## 🎯 RECOMENDAÇÕES FINAIS
-
-### Para Produção
-
-1. ✅ Implementar **copy constructor** e **operator=** com deep copy
-2. ✅ Implementar e testar método **stop()**
-3. ✅ Chamar `stop()` no destrutor automaticamente
-4. ✅ Considerar timeout dinâmico em epoll_wait()
-5. ✅ Adicionar validação de argumentos em main.cpp
-6. ✅ Logging de FDs abertos/fechados para auditoria
-
-### Para Debugging
-
-```cpp
-// Adicionar no start() após epoll_wait():
-std::cout << "[DEBUG] Eventos: " << n << ", Clientes: " << clients.size()
-          << ", CGI pipes: " << cgi_fd_map.size() << std::endl;
-```
 
 ### Testes Críticos
 
@@ -1842,4 +1544,3 @@ std::cout << "[DEBUG] Eventos: " << n << ", Clientes: " << clients.size()
 - [ ] Inatividade timeout funciona (120s)
 - [ ] Interface binding em 0.0.0.0 vs 127.0.0.1
 - [ ] epoll_wait recupera de EINTR (sinal)
-

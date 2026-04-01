@@ -1,4 +1,9 @@
-# Implementacao CGI Atual (Detalhada)
+# 🔴 Implementacao CGI Atual (Detalhada)
+
+**Última Atualização:** 31 de Março de 2026  
+**Revisão Crítica:** 27 de Março - 31 de Março de 2026  
+**Revisão Final:** 1º de Abril de 2026 - Fork/pipes/env documentados, 7 problemas listados  
+**Status:** ✅ DOCUMENTADO - Implementação completa, race conditions identificadas
 
 ## Escopo
 
@@ -15,6 +20,8 @@ Arquivos relevantes para entender o ciclo completo:
 - `include/EnvBuilder.hpp`
 - `src/config/ConfigHelper.cpp`
 - `src/http/Response.cpp` (para entender o que NAO e CGI)
+
+> **👉 Navegação:** Veja [INDEX.md](INDEX.md) para índice centralizado de toda documentação
 
 ---
 
@@ -1083,8 +1090,18 @@ print("B" * (500 * 1024 * 1024))  # 500MB
 GET /cgi-bin/test.py?id=123&name=john
 ```
 
-- **Problema**: `QUERY_STRING` pode estar vazzo
+- **Problema**: `QUERY_STRING` pode estar vazio
 - **Razão**: URI não é parseada para query/fragment (linhas ~150 HttpRequest)
 - **Script**: Não recebe parâmetros, `os.environ['QUERY_STRING']` = ""
+
+---
+
+## ✅ BOAS PRÁTICAS IMPLEMENTADAS
+
+1. ✅ Pipes não-bloqueantes com `O_NONBLOCK`
+2. ✅ Integração com `epoll` (multiplexação eficiente)
+3. ✅ Máquina de estados clara
+4. ✅ Registros em `cgi_fd_map` para routing
+5. ✅ Cleanup em destrutor (RAII)
 
 

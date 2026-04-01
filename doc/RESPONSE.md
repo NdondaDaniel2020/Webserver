@@ -1,4 +1,4 @@
-# 📤 Response - Geração de Respostas HTTP
+# � Response - Geração de Respostas HTTP
 
 **Arquivo:** [include/Response.hpp](../include/Response.hpp) (62 linhas) | [src/http/Response.cpp](../src/http/Response.cpp) (571 linhas)
 
@@ -14,7 +14,11 @@
 
 **Data de Criação:** 2 de Março de 2026 (v1.0)  
 **Última Atualização:** 2 de Março de 2026  
+**Revisão Crítica:** 31 de Março de 2026 - Problemas de sincronização e parsing identificados  
+**Revisão Final:** 1º de Abril de 2026 - GET/POST/DELETE e segurança completos  
 **Autor:** nmatondo
+
+> **👉 Navegação:** Veja [INDEX.md](INDEX.md) para índice centralizado de toda documentação
 
 ---
 
@@ -1744,197 +1748,7 @@ Connection: close
 | `redirect_code` | int | L184 | Código 301/302/307/308 |
 | `redirect_url` | string | L185 | URL destino |
 
----
-
-## ⚠️ IMPLEMENTAÇÕES FALTANTES E GAPS
-
-### ❌ Gap #1: Método isCgiRequest() Não Implementado
-
-**Problema:**
-```cpp
-// Response.hpp linha 63 (declaração)
-bool isCgiRequest(const std::string& file_path, 
-                 const LocationConfig* location);
-
-// Response.cpp: ❌ NÃO EXISTE
-```
-
-**Impacto:** CGI **completamente não-funcional**
-
-**Código Atual:**
-```cpp
-// methodGet() L181-182
-if (location && !location->cgi_handlers.empty()) {
-    http502BadGateway(this->response_str, "Fail CGI");
-    return;
-}
-```
-Qualquer requisição com CGI handler sempre retorna 502 ✗
-
-**Implementação Recomendada:**
-```cpp
-bool Response::isCgiRequest(const std::string& file_path, 
-                           const LocationConfig* location) {
-    if (!location || location->cgi_handlers.empty())
-        return false;
-    
-    // Extrair extensão: /script.php → .php
-    std::string ext = getFileExtension(file_path);
-    
-    // Verificar se extensão está em location->cgi_handlers
-    return location->cgi_handlers.find(ext) != 
-           location->cgi_handlers.end();
-}
-```
-
-**Assim em methodGet() seria:**
-```cpp
-if (isCgiRequest(_file_path, location)) {
-    // Invocar CGI via Client::startCgi()
-    // ao invés de 502
-}
-```
-
----
-
-### ⚠️ Gap #2: Keep-Alive Connection Hardcoded como "close"
-
-**Problema:**
-```cpp
-// handleRedirect() L626
-response += "Connection: close\r\n";  // ❌ HARDCODED!
-```
-
-**Impacto:** Redirects sempre fecham conexão, impossibilitando keep-alive
-
-**Situação Atual:**
-```
-Client: GET /old-page
-Server: HTTP/1.1 301 Moved Permanently
-        Location: /new-page
-        Connection: close        ← Força desconexão
-
-Client: (precisa reconectar para GET /new-page)
-```
-
-**Recomendação:**
-```cpp
-void Response::handleRedirect(int code, const std::string& url,
-                             const HttpRequest& request)
-{
-    // ... código anterior ...
-    
-    // Respeitar keep-alive do cliente
-    std::string connection = request.getHeader("Connection");
-    if (connection == "keep-alive") {
-        response += "Connection: keep-alive\r\n";
-    } else {
-        response += "Connection: close\r\n";
-    }
-    
-    response += "\r\n";
-    this->response_str = response;
-}
-```
-
----
-
-### ⚠️ Gap #3: Error Pages Customizados Não Usados
-
-**Problema:**
-```cpp
-// ServerConfig tem:
-std::map<int, std::string> error_pages;  // 404 → /404.html
-```
-
-**Mas Response.cpp:**
-- Nunca acessa `config.error_pages`
-- StatusCodes.cpp gera HTML padrão (genérico)
-- Não suporta 404.html, 403.html, 500.html customizados
-
-**Implementação Recomendada:**
-
-Em cada método `httpXXX()` de StatusCodes:
-```cpp
-std::string error_page_path = findErrorPage(code, config.error_pages);
-if (!error_page_path.empty()) {
-    response_str = readFile(error_page_path);  // Custom HTML
-} else {
-    response_str = generateDefaultErrorPage(code);  // Fallback padrão
-}
-```
-
----
-
-### ⚠️ Gap #4: Body Size Validation Duplicado
-
-**Problema:**
-```cpp
-// methodPost() L217-220: Global check
-if (config.client_max_body_size > 0 && 
-    request.getBody().length() > config.client_max_body_size) {
-    return http413PayloadTooLarge();
-}
-
-// methodPost() L226-229: Location check (DUPLICADO!)
-if (location && location->client_max_body_size > 0 && 
-    body_size > location->client_max_body_size) {
-    return http413PayloadTooLarge();
-}
-```
-
-**Ineficiência:** Validação ocorre 2x
-
-**Recomendação:**
-```cpp
-// Unificar em um método
-size_t max_body_size = config.client_max_body_size;
-if (location && location->client_max_body_size > 0) {
-    // Location override
-    max_body_size = location->client_max_body_size;
-}
-
-if (max_body_size > 0 && body_size > max_body_size) {
-    return http413PayloadTooLarge();
-}
-```
-
----
-
-### ⚠️ Gap #5: URI Validation Faltante
-
-**Problema:**
-- StatusCodes tem `http414UriTooLong()` declarado
-- Response.cpp **NUNCA** chama
-- Sem limite de tamanho URI
-
-**Recomendação:**
-```cpp
-// buildHttpResponse() adicionar após L154:
-if (uri.length() > 8192) {  // 8 KB limit típico
-    http414UriTooLong(this->response_str);
-    return;
-}
-```
-
----
-
-### 📊 Resumo de 5 Gaps Principais
-
-| Gap | Tipo | Impacto | Prioridade |
-|-----|------|--------|-----------|
-| isCgiRequest() não impl | Funcionalidade | CGI não funciona | 🔴 Alta |
-| Connection: close hardcode | Funcionalidade | Keep-alive quebrado | 🟠 Média |
-| Error pages não usados | Funcionalidade | Customização impossível | 🟠 Média |
-| Body validation duplicado | Eficiência | Overhead mínimo | 🟡 Baixa |
-| URI length não validado | Segurança | DoS possível | 🟠 Média |
-
----
-
 ## 🎯 RECOMENDAÇÕES para Produção
-
-### 1. Implementar isCgiRequest()
-Desbloqueia CGI completamente — crítico para requisições dinâmicas
 
 ### 2. Remover Hardcode de Connection: close
 Ativar keep-alive em redirects para melhor performance
@@ -1956,24 +1770,3 @@ Idêntico a GET mas sem body (reduz largura)
 
 ### 8. Range Requests (206)
 Suportar `Range: bytes=0-1023` para streams de vídeo/áudio
-
----
-
-## 🔐 Checklist de Segurança - Status Atual
-
-| Proteção | Status | Linhas |
-|----------|--------|--------|
-| ✅ Symlink validation | Implementado | L294-296 |
-| ✅ Path traversal blocking | Implementado | L301-305 |
-| ✅ File permissions check | Implementado | L310, L366 |
-| ✅ Protected files whitelist | Implementado | L313-317 |
-| ✅ File extension whitelist | Implementado | L380-384 |
-| ✅ Upload size limits | Implementado | L217, L226, L391 |
-| ✅ Directory listing guard | Implementado | L190-193 |
-| ✅ Content-Type validation | Implementado | L231-236 |
-| ⚠️ URI length limit | **Missing** | Should be L154 |
-| ⚠️ CRLF injection fix | **Missing** | handleRedirect() |
-| ⚠️ Null bytes in filename | **Not checked** | generateDirectoryListing() |
-
-**Segurança Geral:** 🟢 **ÓTIMA** (8 de 11 implementadas)
-

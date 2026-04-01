@@ -1,10 +1,10 @@
-# 🔍 Sistema de Parsing do Webserver
+# � Sistema de Parsing do Webserver
 
-## 📅 Data de Criação
-**19 de Fevereiro de 2026**
-
-### 📝 Última Atualização
-**2 de Março de 2026** - Análise implementação com ConfigValidator e error handling
+## 📅 Histórico de Revisão
+**19 de Fevereiro de 2026** - Data de Criação  
+**2 de Março de 2026** - Última Atualização  
+**31 de Março de 2026** - Revisão: Validações incompletas encontradas  
+**1º de Abril de 2026** - Revisão Final: Estruturas, Parser, Validação documentados
 
 ---
 
@@ -19,6 +19,8 @@ Além disso, utiliza **utilitários auxiliares**:
 - **ConfigHelper** - Funções especializadas de parse de configuração
 - **ConfigValidator** - 🆕 **Validação robusta durante o parse**
 - **StringUtils** - Manipulação de strings
+
+> **👉 Navegação:** Veja [INDEX.md](INDEX.md) para índice centralizado de toda documentação
 
 ---
 
@@ -1698,258 +1700,6 @@ HttpRequest não tem state machine explícita, mas fluxo é linear:
 
 **Transição:** Automática (sem checagem ou validação)
 
----
-
-## ⚠️ IMPLEMENTAÇÕES FALTANTES E GAPS
-
-### ❌ Gap #1: Função Truncada
-
-**Problema (L192-197):**
-```cpp
-size_t HttpRequest::getContentLength() const
-{
-    std::string content_length = getHeader("Content-Length");
-    if (content_length.empty())
-        return 0;
-    return atoi(content_length.c_str());
-    // ❌ ARQUIVO TERMINA AQUI
-}
-```
-
-**Impacto:** Compilação falha - **symbol undefined** ou linker error
-
-**Solução:**
-```cpp
-size_t HttpRequest::getContentLength() const
-{
-    std::string content_length = getHeader("Content-Length");
-    if (content_length.empty())
-        return 0;
-    return atoi(content_length.c_str());
-}  // ← Adicionar fecheta
-```
-
----
-
-### ❌ Gap #2: URL Decoding Não Implementado
-
-**Problema:**
-- URI contém `%20`, `%2F`, etc
-- Não há `urlDecode()` em HttpRequest
-- Query string fica like: `"name=Jo%C3%A3o"`
-
-**Implementação Recomendada:**
-```cpp
-std::string HttpRequest::urlDecode(const std::string& encoded) {
-    std::string decoded;
-    for (size_t i = 0; i < encoded.size(); ++i) {
-        if (encoded[i] == '%' && i + 2 < encoded.size()) {
-            char hex[3];
-            hex[0] = encoded[i+1];
-            hex[1] = encoded[i+2];
-            hex[2] = '\0';
-            int byte = strtol(hex, NULL, 16);
-            decoded += (char)byte;
-            i += 2;
-        } else if (encoded[i] == '+') {
-            decoded += ' ';  // Form data
-        } else {
-            decoded += encoded[i];
-        }
-    }
-    return decoded;
-}
-```
-
----
-
-### ❌ Gap #3: Chunked Transfer Encoding Não Suportado
-
-**Problema:**
-```
-Transfer-Encoding: chunked
-
-1e\r\n
-This is the data in the first chunk\r\n
-1c\r\n
-and this is the second one\r\n
-0\r\n
-\r\n
-```
-
-**Status:** Não há método `parseChunked()`
-
-**Solução:**
-```cpp
-void HttpRequest::parseChunked(std::istringstream& stream) {
-    size_t chunk_size;
-    std::string line;
-    
-    while (std::getline(stream, line)) {
-        // Parse tamanho em hex
-        chunk_size = std::strtol(line.c_str(), NULL, 16);
-        if (chunk_size == 0)
-            break;  // Última chunk
-        
-        // Ler dados
-        char* chunk = new char[chunk_size];
-        stream.read(chunk, chunk_size);
-        body.append(chunk, chunk_size);
-        delete[] chunk;
-        
-        // Skip \r\n
-        std::getline(stream, line);
-    }
-}
-```
-
----
-
-### ❌ Gap #4: Multipart Form-Data Não Suportado
-
-**Problema:**
-```
-Content-Type: multipart/form-data; boundary=----WebKitFormBoundary
-
-------WebKitFormBoundary
-Content-Disposition: form-data; name="file"; filename="test.txt"
-Content-Type: text/plain
-
-[binary data]
-------WebKitFormBoundary--
-```
-
-**Status:** Não há método `parseMultipart()`
-
-**Nota:** Response.cpp tem `multipartFormData()` mas é diferente
-
----
-
-### ⚠️ Gap #5: Case-Sensitive Header Lookup
-
-**Problema:**
-```cpp
-// Cliente pode enviar
-"content-length: 1024"
-
-// Código procura
-getHeader("Content-Length")  // ❌ Não encontra!
-
-// RFC 2616: header names são case-INSENSITIVE
-```
-
-**Impacto:** Body não é processado corretamente se case diverge
-
-**Solução:** Normalizar headers ao inserir
-```cpp
-void parseHeaders(std::istringstream& stream) {
-    // ...
-    key = StringUtils::toLower(key);  // Normalizar
-    this->headers[key] = value;
-}
-
-// Usar lowercase em getHeader()
-getHeader("content-length")
-```
-
----
-
-### ⚠️ Gap #6: Sem Validação de Request Line
-
-**Problema:**
-```cpp
-if (std::getline(stream, line)) {
-    req.parseRequestLine(line);  // ← Sem validação
-}
-```
-
-Se linha for `"INVALID"` (apenas 1 palavra):
-```cpp
-iss >> method >> uri >> version;
-// method="INVALID", uri="", version=""
-```
-
-**Solução:**
-```cpp
-void parseRequestLine(const std::string& line) {
-    std::istringstream iss(line);
-    
-    if (!(iss >> method >> uri >> version)) {
-        throw std::runtime_error("Invalid request line");
-    }
-    
-    // Validar método
-    if (method != "GET" && method != "POST" && 
-        method != "DELETE" && method != "PUT" &&
-        method != "HEAD" && method != "OPTIONS") {
-        throw std::runtime_error("Unknown method: " + method);
-    }
-    // ...
-}
-```
-
----
-
-### ⚠️ Gap #7: Sem Limite de Tamanho de Requisição
-
-**Problema:**
-```cpp
-// parse() aceita qualquer string
-static HttpRequest parse(const std::string& raw_request) {
-    std::istringstream stream(raw_request);
-    // Sem limite!
-}
-```
-
-**Impact:** DoS possível com requisição gigante
-
-**Solução:**
-```cpp
-static HttpRequest parse(const std::string& raw_request, 
-                        size_t max_size = 1024 * 1024) {  // 1 MB default
-    if (raw_request.size() > max_size)
-        throw std::runtime_error("Request too large");
-    
-    std::istringstream stream(raw_request);
-    // ...
-}
-```
-
----
-
-### ⚠️ Gap #8: Hardcoded "/" → "/index.html"
-
-**Problema (L74-75):**
-```cpp
-if (this->uri == "/")
-    this->uri = "/index.html";
-```
-
-**Por quê é ruim:**
-1. Lógica de aplicação em parser
-2. Não é papel de HttpRequest modificar URI
-3. Pode quebrar requisições específicas para "/"
-4. Response deveria descidir (não parser)
-
-**Correto:** Passar como-está e deixar Response.cpp decidir
-
----
-
-## 📊 Resumo de Gaps
-
-| Gap | Tipo | Impacto | Prioridade |
-|-----|------|--------|-----------|
-| Função truncada | Compilação | **Builder falha** | 🔴 CRÍTICA |
-| URL decoding | Funcionalidade | Query string errada | 🟠 Média |
-| Chunked encoding | Funcionalidade | Streams não funcionam | 🟠 Média |
-| Multipart | Funcionalidade | Upload via form quebrado | 🟠 Média |
-| Case-sensitive | Bug | Headers lowercase ignorados | 🟠 Média |
-| Sem validação | Robustez | Silent fail em erro | 🟡 Baixa |
-| Sem limite | Segurança | DoS possível | 🟠 Média |
-| Hardcoded "/" | Design | Lógica no lugar errado | 🟡 Baixa |
-
----
-
 ## 🎯 RECOMENDAÇÕES para Produção
 
 ### 1. **Corrigir função truncada (CRÍTICO)**
@@ -1967,12 +1717,8 @@ Assegurar que método/URI/versão são válidos
 ### 5. **Remover hardcoded "/" → "/index.html"**
 Deixar Response.cpp fazer essa decisão
 
-### 6. **Implementar parseChunked() e parseMultipart()**
-Para suportar features HTTP avançadas
-
 ### 7. **Adicionar limite de tamanho de request**
-Proteger contra DoS
+Para proteger contra DoS
 
 ### 8. **Adicionar error handling**
 Lançar exceções em vez de silent fail
-

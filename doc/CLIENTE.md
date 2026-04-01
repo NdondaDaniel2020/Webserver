@@ -1,10 +1,11 @@
-# 📝 Documentação de Implementação - Classe Client
+# � Documentação de Implementação - Classe Client
 
-## 📅 Data da Implementação
-**19 de Fevereiro de 2026**
-
-### 📝 Última Atualização
-**2 de Março de 2026** - Análise e atualização da documentação com implementação atual
+## 📅 Histórico
+**Criação:** 19 de Fevereiro de 2026  
+**Última Atualização:** 2 de Março de 2026  
+**Revisão Crítica:** 27-31 de Março de 2026  
+**Revisão Final:** 1º de Abril de 2026 - Integração com Documentação e Arquitetura  
+**Status:** ✅ DOCUMENTADO - Máquina de estados completa, 7 problemas identificados
 
 ---
 
@@ -16,54 +17,7 @@ Implementar uma **classe Client** robusta para gerenciar o ciclo de vida complet
 - Suporte a HTTP keep-alive
 - Envio de respostas em chunks
 
----
-
-## ⚠️ Problemas Identificados (Antes da Implementação)
-
-### 1. **Buffer Insuficiente**
-```cpp
-// ❌ CÓDIGO ANTIGO
-char buf[1024];
-int r = read(fd, buf, sizeof(buf)-1);
-```
-**Problema:** Requisições HTTP maiores que 1024 bytes perdiam dados
-
-### 2. **Requisições Incompletas**
-```cpp
-// ❌ CÓDIGO ANTIGO
-buf[r] = '\0';
-HttpRequest request = HttpRequest::parse(buf);  // Pode estar incompleto!
-```
-**Problema:** Processava requisição antes de receber todo o payload
-
-### 3. **Sem Keep-Alive**
-```cpp
-// ❌ CÓDIGO ANTIGO
-write(fd, response.c_str(), response.size());
-close(fd);  // Sempre fecha a conexão
-```
-**Problema:** Uma conexão por requisição = lento e ineficiente
-
-### 4. **Sem Gerenciamento de Estado**
-**Problema:** Não sabia se estava lendo headers, body, ou enviando resposta
-
----
-
-## ✅ Solução Implementada
-
-### 📁 Arquivos Criados/Modificados
-
-#### 1. **include/Client.hpp** (Novo)
-Definição da classe Client com máquina de estados.
-
-#### 2. **src/server/Client.cpp** (Novo)
-Implementação completa da lógica de gerenciamento de cliente.
-
-#### 3. **include/Server.hpp** (Modificado)
-Adicionado `std::map<int, Client*>` para gerenciar múltiplos clientes.
-
-#### 4. **src/server/Server.cpp** (Modificado)
-Refatorado para usar a classe Client.
+> **👉 Navegação:** Veja [INDEX.md](INDEX.md) para índice centralizado de toda documentação
 
 ---
 
@@ -1327,4 +1281,25 @@ A implementação do Client é **robusta e funcional** para:
 2. Timeout de CGI
 3. Limit de output
 4. Exit code validation
+
+---
+
+## ✅ BOAS PRÁTICAS IMPLEMENTADAS
+
+1. ✅ Máquina de estados clara e linear
+2. ✅ Operações não-bloqueantes com epoll
+3. ✅ Buffering incremental (recv + send)
+4. ✅ Timeout por last_activity
+5. ✅ Keep-alive suportado
+6. ✅ Validação de tamanho (ERROR_413)
+7. ✅ Cleanup em destrutor
+
+---
+
+## ⚠️ WARNINGS CRÍTICOS
+
+- **SIGPIPE:** Registre handler global antes de criar clientes
+- **FDs:** Valide estado de epoll antes de operações
+- **Keep-Alive:** Limpe recv_buffer e reinicialize em READING_HEADERS
+- **CGI Zombies:** Implemente SIGCHLD handler para recolher status
 
