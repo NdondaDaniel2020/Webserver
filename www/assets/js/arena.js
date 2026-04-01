@@ -322,7 +322,7 @@ async function saveToDB() {
 async function loadFromDB() {
     const start = performance.now();
     try {
-        const resp = await fetch('/cgi-bin/form_list.php', {
+        const resp = await fetch('/cgi-bin/form_list.py', {
             method: 'GET'
         });
         const elapsed = Math.round(performance.now() - start);
@@ -378,7 +378,7 @@ async function deleteFromDB(id) {
 
     const start = performance.now();
     try {
-        const resp = await fetch('/cgi-bin/form_list.php?id=' + encodeURIComponent(String(safeId)), {
+        const resp = await fetch('/cgi-bin/form_list.py?id=' + encodeURIComponent(String(safeId)), {
             method: 'DELETE'
         });
         const elapsed = Math.round(performance.now() - start);

@@ -15,9 +15,9 @@ cgi:
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "name=Test User&email=test@example.com&message=Teste"
 
-  curl -s -X GET http://127.0.0.1:8080/cgi-bin/form_list.php
+  curl -s -X GET http://127.0.0.1:8080/cgi-bin/form_list.py
 
-  curl -s -X DELETE "http://127.0.0.1:8080/cgi-bin/form_list.php?id=1"
+  curl -s -X DELETE "http://127.0.0.1:8080/cgi-bin/form_list.py?id=1"
 
 valgrind:
    valgrind --leak-check=full --track-fds=yes --show-leak-kinds=all ./webserv config/default.conf

@@ -603,7 +603,7 @@ else
     print_error "GET /cgi-bin/hello.py com query múltiplos - HTTP $http_code"
 fi
 
-print_subheader "DELETE em CGI - form_list.php"
+print_subheader "DELETE em CGI - form_list.py"
 # Primeiro fazer um POST para ter um ID para deletar
 POST_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
     -H "Content-Type: application/x-www-form-urlencoded" \
@@ -613,7 +613,7 @@ POST_CODE=$(echo "$POST_RESPONSE" | tail -n1)
 
 if [ "$POST_CODE" = "201" ] || [ "$POST_CODE" = "200" ]; then
     # Obter lista para pegar um ID
-    LIST_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/cgi-bin/form_list.php" 2>/dev/null)
+    LIST_RESPONSE=$(curl -s -w "\n%{http_code}" "$BASE_URL/cgi-bin/form_list.py" 2>/dev/null)
     LIST_CODE=$(echo "$LIST_RESPONSE" | tail -n1)
     LIST_BODY=$(echo "$LIST_RESPONSE" | head -n-1)
     
@@ -621,18 +621,18 @@ if [ "$POST_CODE" = "201" ] || [ "$POST_CODE" = "200" ]; then
     FIRST_ID=$(echo "$LIST_BODY" | grep -oP '"id":\K[0-9]+' | head -1)
     
     if [ ! -z "$FIRST_ID" ]; then
-        DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL/cgi-bin/form_list.php?id=$FIRST_ID" 2>/dev/null)
+        DELETE_RESPONSE=$(curl -s -w "\n%{http_code}" -X DELETE "$BASE_URL/cgi-bin/form_list.py?id=$FIRST_ID" 2>/dev/null)
         DELETE_CODE=$(echo "$DELETE_RESPONSE" | tail -n1)
         DELETE_BODY=$(echo "$DELETE_RESPONSE" | head -n-1)
         
         if [ "$DELETE_CODE" = "200" ]; then
             if echo "$DELETE_BODY" | grep -qi "deletad\|success\|ok"; then
-                print_success "DELETE /cgi-bin/form_list.php?id=$FIRST_ID (HTTP 200)"
+                print_success "DELETE /cgi-bin/form_list.py?id=$FIRST_ID (HTTP 200)"
             else
                 print_warning "DELETE respondeu 200 mas resposta inesperada"
             fi
         else
-            print_warning "DELETE /cgi-bin/form_list.php?id=$FIRST_ID - HTTP $DELETE_CODE"
+            print_warning "DELETE /cgi-bin/form_list.py?id=$FIRST_ID - HTTP $DELETE_CODE"
         fi
     else
         print_info "Nenhum ID disponível para teste DELETE"
