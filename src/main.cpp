@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 16:02:43 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 11:20:55 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -36,7 +36,7 @@ void signal_handler(int sig)
     
     if (g_server_instance != NULL)
     {
-        g_server_instance->requestStop();
+        g_server_instance->stop();
     }
 }
 

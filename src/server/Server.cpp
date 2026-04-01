@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 18:30:04 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 11:20:44 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -129,15 +129,10 @@ void Server::cleanup()
     interface = NULL;
 }
 
-void Server::requestStop()
+void Server::stop()
 {
     std::cout << "[SERVER] Stop requested. Graceful shutdown in progress..." << std::endl;
     shutdown_requested = true;
-}
-
-void Server::stop()
-{
-    requestStop();
 }
 
 void Server::start()
