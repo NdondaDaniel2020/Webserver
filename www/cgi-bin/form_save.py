@@ -29,9 +29,9 @@ def init_db():
 
 def main():
     method = os.environ.get("REQUEST_METHOD", "GET").upper()
-    
+
     init_db()
-    
+
     # Apenas POST é aceito
     if method != "POST":
         result = {"ok": False, "error": "Use POST para salvar dados"}
