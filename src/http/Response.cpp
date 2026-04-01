@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/28 19:23:46 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 20:56:41 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -69,17 +69,16 @@ void Response::buildHttpResponse(const HttpRequest &request)
     std::string uri = sanitizePath(request.getUri());
     std::string root = this->config.root;
     const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
+       
+    if (!location)
+        return StatusCodes::http404NotFound(this->response_str, request, root + uri, this->config);
 
     if (location && !location->root.empty())
         root = location->root;
 
     std::string file_path = root + removeLocationInUri(uri, location);
-
     if (!validateAllowedMethod(this->config, request))
-    {
-        std::cout << "[405] Método " << request.getMethod() << " não permitido para: " << request.getUri() << std::endl;
         return StatusCodes::http405MethodNotAllowed(this->response_str, request, file_path, this->config);
-    }
 
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
