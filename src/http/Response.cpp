@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/01 20:56:41 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/01 21:35:15 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -69,16 +69,19 @@ void Response::buildHttpResponse(const HttpRequest &request)
     std::string uri = sanitizePath(request.getUri());
     std::string root = this->config.root;
     const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
-       
+
+    if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
+        return StatusCodes::http501NotImplemented(this->response_str, request, request.getMethod(), this->config);
+        
     if (!location)
-        return StatusCodes::http404NotFound(this->response_str, request, root + uri, this->config);
+        return StatusCodes::http404NotFound(this->response_str, request, request.getUri(), this->config);
 
     if (location && !location->root.empty())
         root = location->root;
 
     std::string file_path = root + removeLocationInUri(uri, location);
     if (!validateAllowedMethod(this->config, request))
-        return StatusCodes::http405MethodNotAllowed(this->response_str, request, file_path, this->config);
+        return StatusCodes::http405MethodNotAllowed(this->response_str, request, request.getUri(), this->config);
 
     if (request.getMethod() == "GET")
         methodGet(request, file_path);
@@ -87,7 +90,5 @@ void Response::buildHttpResponse(const HttpRequest &request)
     else if (request.getMethod() == "DELETE")
         methodDelete(request, file_path);
     else
-        StatusCodes::http405MethodNotAllowed(this->response_str, request, file_path, this->config);
+        StatusCodes::http405MethodNotAllowed(this->response_str, request, request.getUri(), this->config);
 }
-
-
