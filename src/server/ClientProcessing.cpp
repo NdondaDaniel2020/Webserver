@@ -88,6 +88,7 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 
         std::cout << "[CLIENT " << fd << "] Iniciando CGI para " << request.getUri() << std::endl;
         state = CGI_RUNNING;
+        updateLastActivity();
         startCgi(request, *location, server_config, epoll_fd);
         return;
     }
