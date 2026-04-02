@@ -32,7 +32,7 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
             if (location && location->autoindex)
                 return generateDirectoryListing(request, file_path, request.getUri());
             else
-                return StatusCodes::http403Forbidden(this->response_str, request, _file_path, this->config);
+                return StatusCodes::http404NotFound(this->response_str, request, file_path, this->config);
         }
     }
     if (!fileExists(_file_path))

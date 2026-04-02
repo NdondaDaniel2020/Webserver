@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/01 21:35:15 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/02 07:28:35 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -71,8 +71,11 @@ void Response::buildHttpResponse(const HttpRequest &request)
     const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
 
     if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
-        return StatusCodes::http501NotImplemented(this->response_str, request, request.getMethod(), this->config);
-        
+        return StatusCodes::http405MethodNotAllowed(this->response_str, request, request.getUri(), this->config);
+
+    std::cout << "\n\nURI: " << uri << std::endl;
+    std::cout << "Location: " << (location ? location->path : "None") << std::endl << std::endl;
+
     if (!location)
         return StatusCodes::http404NotFound(this->response_str, request, request.getUri(), this->config);
 

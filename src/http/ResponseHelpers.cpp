@@ -29,7 +29,7 @@ bool validateAllowedMethod(const ServerConfig &config, const HttpRequest &reques
     const LocationConfig *location = findMatchingLocation(config, request.getUri());
 
     if (!location)
-        return request.getMethod() == "GET";
+        return false;
 
     if (location && !location->allowed_methods.empty())
     {
