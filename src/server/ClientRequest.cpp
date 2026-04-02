@@ -14,13 +14,6 @@
 
 void Client::appendRecvData(const char *data, size_t len)
 {
-    if (recv_buffer.size() + len > MAX_RECV_BUFFER_SIZE)
-    {
-        std::cerr << "[CLIENT " << fd << "] recv_buffer excedeu limite ("
-                  << recv_buffer.size() << " + " << len << " > "
-                  << MAX_RECV_BUFFER_SIZE << ")" << std::endl;
-        return;
-    }
     recv_buffer.append(data, len);
     updateLastActivity();
 }

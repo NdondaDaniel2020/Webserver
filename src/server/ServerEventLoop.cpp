@@ -24,20 +24,11 @@ void Server::handleClientData(int fd)
             return;
         }
 
-        // Check if adding this data would exceed the limit
-        if (client->getRecvBuffer().size() + static_cast<size_t>(r) > MAX_RECV_BUFFER_SIZE)
-        {
-            std::cout << "[413] recv_buffer limit exceeded for client fd=" << fd << std::endl;
-            closeClient(fd);
-            return;
-        }
-
         client->appendRecvData(buf, r);
 
         if (client->isRequestComplete())
         {
             client->processRequest(this->config.getServerConfig(client->getServerIndex()), this->epoll_fd);
-            // Registar pipes CGI no mapa separado, nunca em clients
             if (client->isCgiActive())
             {
                 int out_fd = client->getCgiOutFd();
