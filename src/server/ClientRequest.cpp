@@ -59,8 +59,6 @@ bool Client::isRequestComplete()
     {
         if (findHeadersEnd())
         {
-            parseHeaders();
-
             if (state == ERROR_413)
                 return true;
             if (is_chunked)
@@ -182,15 +180,7 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
 
     if (request.getMethod().empty())
         parseHeaders();
-
-    std::cout << "\n\n Método: " << request.getMethod() 
-              << ",\n URI: " << request.getUri() 
-              << ",\n Version: " << request.getVersion() 
-              << ",\n Content-Length: " << content_length 
-              << ",\n is_chunked: " << (is_chunked ? "true" : "false") 
-              << ",\n Content-Type: " << request.getHeader("Content-Type")
-              << std::endl << std::endl;
-
+    
     if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
     {
         StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
@@ -224,21 +214,22 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         return;
     }
 
-    if (request.getMethod() == "POST" && server_config.client_max_body_size > 0
-        && request.getBody().size() > server_config.client_max_body_size)
+    if (request.getMethod() == "POST" && !is_chunked)
     {
-        StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
-        this->send_offset = 0;
-        this->state = SENDING_RESPONSE;
-        return;
-    }
-
-    if (request.getMethod() == "POST" && location && location->client_max_body_size > 0 && request.getBody().size() > location->client_max_body_size)
-    {
-        StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
-        this->send_offset = 0;
-        this->state = SENDING_RESPONSE;
-        return;
+        size_t max_size = 0;
+        
+        if (location && location->client_max_body_size > 0)
+            max_size = location->client_max_body_size;
+        else if (server_config.client_max_body_size > 0)
+            max_size = server_config.client_max_body_size;
+        
+        if (max_size > 0 && request.getBody().size() > max_size)
+        {
+            StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
+            this->send_offset = 0;
+            this->state = SENDING_RESPONSE;
+            return;
+        }
     }
 
     if (request.getMethod() == "POST" && request.getHeader("Content-Type").empty())
@@ -256,6 +247,7 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
             content_type.find("multipart/form-data") == 0 ||
             content_type.find("application/octet-stream") == 0 ||
             content_type.find("text/plain") == 0 ||
+            content_type.find("test/file") == 0 ||
             content_type.find("application/x-www-form-urlencoded") == 0;
         
         if (!valid_type)

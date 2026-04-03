@@ -24,7 +24,6 @@ void Server::handleClientData(int fd)
             return;
         }
 
-        std::cout << "[CLIENT " << fd << "] " << client->getRecvBuffer().size() << " + " << r << " bytes recebidos" << std::endl;
         client->appendRecvData(buf, r);
 
         if (client->IsHeaderRequestComplete() && !client->isHeaderValidated())

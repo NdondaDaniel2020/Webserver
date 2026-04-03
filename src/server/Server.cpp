@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 15:14:51 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 16:31:09 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -172,7 +172,6 @@ void Server::start()
                 if (events[i].events & EPOLLIN)
                     handleClientData(fd);
 
-                // Revalidar iterador após handleClientData (pode ter fechado o cliente)
                 it = clients.find(fd);
                 if (it == clients.end())
                     continue;
