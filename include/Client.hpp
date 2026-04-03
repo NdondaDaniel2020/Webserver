@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 00:30:21 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 13:06:39 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -51,7 +51,6 @@ public:
         ERROR_413           // Payload Too Large detectado cedo
     };
 
-    // Estrutura para gerir o estado do CGI (non-blocking)
     struct CgiState
     {
         pid_t           pid;
@@ -72,14 +71,14 @@ public:
 private:
     int                 fd;
     State               state;
-    time_t              last_activity;          // ← posição 3
+    time_t              last_activity;
     std::string         recv_buffer;
     std::string         send_buffer;
     size_t              send_offset;
     HttpRequest         request;
     Response*           response;
     bool                keep_alive;
-    size_t              content_length;         // ← posição 10
+    size_t              content_length;
     size_t              headers_end_pos;
     const ConfigParser* config;
     CgiState            cgi;
@@ -102,32 +101,22 @@ public:
     time_t              getLastActivity() const;
     time_t              getCgiStartTime() const;
     bool                hasDataToSend() const;
-    bool                isCgiActive() const { return is_cgi_active; }
-    const std::string&  getRecvBuffer() const { return recv_buffer; }
+    bool                isCgiActive() const;
+    const std::string&  getRecvBuffer() const;
     void                cleanupCgiIfActive(int epoll_fd);
     int                 getServerIndex();
 
-    // Estado do CGI (acesso público para Server processar EPOLLHUP)
     CgiState&           getCgiState();
 
-    // FDs do CGI (para epoll no Server)
-    void sendTimeoutResponse();
-    // Recepção de dados
+    void                sendTimeoutResponse();
     void                appendRecvData(const char* data, size_t len);
     bool                isRequestComplete();
     bool                IsHeaderRequestComplete();
     bool                isHeaderValidated() const { return check_valid_header; }
 
-    // Validação e Processamento de header
     void                processHeaderRequest(const ServerConfig& server_config);
-
-    // Processamento da requisição
     void                processRequest(const ServerConfig& server_config, int epoll_fd);
-
-    // Envio de dados
     bool                sendData();
-
-    // Reset para keep-alive
     void                reset();
     void                setState(State s);
 
@@ -138,12 +127,12 @@ public:
     void                handleCgiStdinWritable(int epoll_fd);
     void                finishCgiAndGenerateResponse();
     bool                unchunkBody(std::string& out);
+
 private:
-    // Helpers internos
     bool                findHeadersEnd();
     bool                checkBodyComplete();
     void                parseHeaders();
     void                updateLastActivity();
 };
 
-#endif // CLIENT_HPP
+#endif
