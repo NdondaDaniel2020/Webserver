@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:40:22 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/01 12:24:29 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 21:02:40 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,7 +32,6 @@
 # include "ConfigParser.hpp"
 
 # define ERROR_OPENING_FILE "Error: Could not open file"
-# define MAX_FILE_SIZE (10 * 1024 * 1024)
 
 std::string readFile(const std::string& filepath);
 void openFile(std::ifstream& file, const std::string& filename, std::string sms);
