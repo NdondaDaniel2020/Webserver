@@ -44,21 +44,14 @@ HttpRequest HttpRequest::parse(const std::string &raw_request)
     std::istringstream stream(raw_request);
     std::string line;
 
-    // Parse request line
     if (std::getline(stream, line))
     {
-        // Remove \r if present
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
         req.parseRequestLine(line);
     }
-
-    // Parse headers
     req.parseHeaders(stream);
-
-    // Parse body
     req.parseBody(stream);
-
     return req;
 }
 
@@ -78,9 +71,7 @@ void HttpRequest::parseRequestLine(const std::string &line)
         this->path = this->uri;
         this->query = "";
     }
-
     std::cout << "[REQUEST] " << this->method << " " << this->uri << " " << this->version << std::endl;
-    
 }
 
 void HttpRequest::parseHeaders(std::istringstream &stream)
@@ -89,25 +80,17 @@ void HttpRequest::parseHeaders(std::istringstream &stream)
 
     while (std::getline(stream, line))
     {
-        // Remove \r if present
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
-
-        // Empty line indicates end of headers
         if (line.empty())
             break;
-
-        // Parse header: "Key: Value"
         size_t colon_pos = line.find(':');
         if (colon_pos != std::string::npos)
         {
             std::string key = line.substr(0, colon_pos);
             std::string value = line.substr(colon_pos + 1);
-
-            // Trim whitespace
             key = StringUtils::trim(key);
             value = StringUtils::trim(value);
-
             this->headers[key] = value;
         }
     }

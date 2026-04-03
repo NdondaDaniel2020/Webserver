@@ -51,6 +51,7 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
 void Response::methodPost(const HttpRequest &request)
 {
+    std::string content_type = request.getHeader("Content-Type");
     if (content_type.find("multipart/form-data") != std::string::npos)
         return multipartFormData(request, content_type);
     else if (content_type.find("application/octet-stream") != std::string::npos)

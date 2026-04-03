@@ -1,6 +1,5 @@
 # include "ResponseHelpers.hpp"
 
-// Find the most specific matching location for a given URI
 const LocationConfig *findMatchingLocation(const ServerConfig &config, const std::string &uri)
 {
     const LocationConfig *best_match = NULL;
@@ -23,7 +22,6 @@ const LocationConfig *findMatchingLocation(const ServerConfig &config, const std
     return best_match;
 }
 
-// Validate if the HTTP method is allowed for the request
 bool validateAllowedMethod(const ServerConfig &config, const HttpRequest &request)
 {
     const LocationConfig *location = findMatchingLocation(config, request.getUri());
@@ -44,7 +42,6 @@ bool validateAllowedMethod(const ServerConfig &config, const HttpRequest &reques
     return true;
 }
 
-// Remove the location prefix from a URI
 std::string removeLocationInUri(const std::string &uri, const LocationConfig *location)
 {
     std::string uri_without_location = uri;
@@ -60,7 +57,6 @@ std::string removeLocationInUri(const std::string &uri, const LocationConfig *lo
     return uri_without_location;
 }
 
-// Check if a file is in the protected files list
 bool isProtectedFile(const std::vector<std::string> &protected_files, const std::string &filename)
 {
     for (size_t i = 0; i < protected_files.size(); ++i)
@@ -71,7 +67,6 @@ bool isProtectedFile(const std::vector<std::string> &protected_files, const std:
     return false;
 }
 
-// Get the upload directory for the current request
 std::string getUploadDir(const ServerConfig &config, const HttpRequest &request)
 {
     const LocationConfig *location = findMatchingLocation(config, request.getUri());
@@ -98,7 +93,6 @@ std::string getUploadDir(const ServerConfig &config, const HttpRequest &request)
     return upload_dir;
 }
 
-// Handle HTTP redirect responses
 void handleRedirect(std::string &response_str, int code, const std::string &url)
 {
     std::ostringstream oss;

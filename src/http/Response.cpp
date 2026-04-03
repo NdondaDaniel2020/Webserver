@@ -6,12 +6,12 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 10:22:30 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 13:27:13 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "../../include/Response.hpp"
-#include "../../include/ResponseHelpers.hpp"
+#include "Response.hpp"
+#include "ResponseHelpers.hpp"
 #include <algorithm>
 #include <cctype>
 #include <ctime>
