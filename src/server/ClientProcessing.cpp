@@ -12,24 +12,7 @@
 
 #include "Client.hpp"
 #include "StatusCodes.hpp"
-
-static const LocationConfig *findMatchingLocation(const ServerConfig &config, const std::string &uri)
-{
-    const LocationConfig *best_match = NULL;
-    size_t best_match_length = 0;
-
-    for (size_t i = 0; i < config.locations.size(); i++)
-    {
-        const std::string &location_path = config.locations[i].path;
-        if (uri.find(location_path) == 0 && location_path.size() > best_match_length)
-        {
-            best_match = &config.locations[i];
-            best_match_length = location_path.size();
-        }
-    }
-
-    return best_match;
-}
+#include "ResponseHelpers.hpp"
 
 void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
 {

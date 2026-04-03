@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 00:40:06 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 14:31:22 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -140,6 +140,11 @@ bool Client::isDone() const
     return state == DONE;
 }
 
+bool Client::isCgiActive() const
+{
+    return state == CGI_RUNNING && cgi.pid > 0;
+}
+
 time_t Client::getLastActivity() const
 {
     return last_activity;
@@ -148,6 +153,11 @@ time_t Client::getLastActivity() const
 time_t    Client::getCgiStartTime() const
 {
     return cgi.start_time;
+}
+
+const std::string& Client::getRecvBuffer() const
+{
+    return recv_buffer;
 }
 
 bool Client::hasDataToSend() const
