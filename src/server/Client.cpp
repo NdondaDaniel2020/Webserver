@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/29 02:01:15 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 00:40:06 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,6 +30,7 @@ Client::Client(int fd, const ConfigParser *config, int server_index)
       cgi(),
       is_cgi_active(false),
       is_chunked(false),
+      check_valid_header(false),
       server_index(server_index)
 {
     updateLastActivity();
@@ -39,9 +40,6 @@ Client::~Client()
 {
     if (response)
         delete response;
-
-    // ✅ RAII: Cliente limpa SEUS recursos (não depende de Server)
-    // Defensive programming: Se Server esquecer cleanupCgiIfActive(), não vaza
     
     if (cgi.pid > 0)
     {
@@ -52,7 +50,6 @@ Client::~Client()
         cgi.pid = -1;
     }
 
-    // Fechar pipes (kernel remove do epoll automaticamente ao fechar FD)
     if (cgi.pipe_in[1] >= 0)
     {
         close(cgi.pipe_in[1]);
@@ -65,7 +62,6 @@ Client::~Client()
         cgi.pipe_out[0] = -1;
     }
 
-    // Zerar flags
     is_cgi_active = false;
     is_chunked = false;
 }
@@ -226,6 +222,7 @@ void Client::reset()
 
     is_chunked = false;
     is_cgi_active = false;
+    check_valid_header = false;
     cgi = CgiState();
     
     state = READING_HEADERS;

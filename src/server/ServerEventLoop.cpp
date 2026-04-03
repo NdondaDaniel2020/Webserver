@@ -26,6 +26,11 @@ void Server::handleClientData(int fd)
 
         client->appendRecvData(buf, r);
 
+        if (client->IsHeaderRequestComplete() && !client->isHeaderValidated())
+        {
+            client->processHeaderRequest(this->config.getServerConfig(client->getServerIndex()));
+        }
+
         if (client->isRequestComplete())
         {
             client->processRequest(this->config.getServerConfig(client->getServerIndex()), this->epoll_fd);

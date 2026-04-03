@@ -11,11 +11,21 @@
 /* ************************************************************************** */
 
 #include "Client.hpp"
+#include "ResponseHelpers.hpp"
 
 void Client::appendRecvData(const char *data, size_t len)
 {
     recv_buffer.append(data, len);
     updateLastActivity();
+}
+
+bool Client::IsHeaderRequestComplete()
+{
+    if (headers_end_pos == 0 && state == READING_HEADERS)
+    {
+        findHeadersEnd();
+    }
+    return headers_end_pos > 0;
 }
 
 bool Client::unchunkBody(std::string &out)
@@ -161,3 +171,45 @@ bool Client::checkBodyComplete()
     size_t body_received = recv_buffer.size() - headers_end_pos;
     return body_received >= content_length;
 }
+
+void Client::processHeaderRequest(const ServerConfig& server_config)
+{
+    if (check_valid_header)
+        return;
+
+    if (!IsHeaderRequestComplete())
+        return;
+
+    if (request.getMethod().empty())
+    {
+        parseHeaders();
+    }
+
+    if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
+    {
+        StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
+    if (!location)
+    {
+        StatusCodes::http404NotFound(this->send_buffer, request, request.getUri(), server_config);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (!validateAllowedMethod(server_config, request))
+    {
+        StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    check_valid_header = true;
+}
+

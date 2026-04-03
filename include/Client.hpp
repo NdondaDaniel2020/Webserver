@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/27 18:25:53 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 00:30:21 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -85,6 +85,7 @@ private:
     CgiState            cgi;
     bool                is_cgi_active;
     bool                is_chunked;
+    bool                check_valid_header;
     int                 server_index;
 
 public:
@@ -114,6 +115,11 @@ public:
     // Recepção de dados
     void                appendRecvData(const char* data, size_t len);
     bool                isRequestComplete();
+    bool                IsHeaderRequestComplete();
+    bool                isHeaderValidated() const { return check_valid_header; }
+
+    // Validação e Processamento de header
+    void                processHeaderRequest(const ServerConfig& server_config);
 
     // Processamento da requisição
     void                processRequest(const ServerConfig& server_config, int epoll_fd);
