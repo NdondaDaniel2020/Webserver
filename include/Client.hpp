@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 13:06:39 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 21:00:46 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -32,9 +32,6 @@
 #include "Response.hpp"
 #include "ConfigParser.hpp"
 #include "FileUtils.hpp"
-
-#define MAX_CGI_OUTPUT_SIZE (10 * 1024 * 1024)
-#define MAX_RECV_BUFFER_SIZE (10 * 1024 * 1024)
 
 class Client
 {

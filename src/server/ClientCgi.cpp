@@ -398,30 +398,6 @@ void Client::handleCgiStdoutReadable(int epoll_fd, std::map<int, Client *> &cgi_
 
     if (r > 0)
     {
-        if (cgi.output.size() + static_cast<size_t>(r) > MAX_CGI_OUTPUT_SIZE)
-        {
-            std::cout << "[CLIENT " << fd << "] CGI output excedeu limite ("
-                      << cgi.output.size() << " + " << r << " > "
-                      << MAX_CGI_OUTPUT_SIZE << ")" << std::endl;
-
-            kill(cgi.pid, SIGKILL);
-            waitpid(cgi.pid, NULL, WNOHANG);
-            cgi.pid = -1;
-
-            cgi.output.clear();
-            cgi.finished = true;
-
-            if (cgi.pipe_out[0] >= 0)
-            {
-                epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
-                cgi_fd_map.erase(cgi.pipe_out[0]);
-                close(cgi.pipe_out[0]);
-                cgi.pipe_out[0] = -1;
-            }
-
-            return;
-        }
-
         cgi.output.append(buf, r);
         return;
     }

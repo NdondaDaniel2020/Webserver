@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/01 12:24:24 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/03 21:02:23 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,18 +17,6 @@ std::string readFile(const std::string& filepath)
     std::ifstream file(filepath.c_str());
     if (!file.is_open())
         return "";
-    
-    file.seekg(0, std::ios::end);
-    std::streampos file_size = file.tellg();
-    
-    if (file_size > static_cast<std::streampos>(MAX_FILE_SIZE)) {
-        std::cout << "[FILE] Arquivo muito grande: " << filepath << " (" 
-                  << file_size << " bytes, limite: " << MAX_FILE_SIZE << ")" << std::endl;
-        file.close();
-        return "";
-    }
-    
-    file.seekg(0);
     std::ostringstream buffer;
     buffer << file.rdbuf();
     file.close();
