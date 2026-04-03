@@ -2,23 +2,31 @@
 
 const LocationConfig *findMatchingLocation(const ServerConfig &config, const std::string &uri)
 {
-    const LocationConfig *best_match = NULL;
+    std::string ext = "";
+    size_t last_dot = uri.find_last_of('.');
+    if (last_dot != std::string::npos && last_dot < uri.length() - 1)
+        ext = uri.substr(last_dot);
+    if (!ext.empty())
+    {
+        for (size_t i = 0; i < config.locations.size(); i++)
+        {
+            const LocationConfig &loc = config.locations[i];
+            std::map<std::string, std::string>::const_iterator it = loc.cgi_handlers.find(ext);
+            if (it != loc.cgi_handlers.end())
+                return &loc;
+        }
+    }
     size_t best_match_length = 0;
-
+    const LocationConfig *best_match = NULL;
     for (size_t i = 0; i < config.locations.size(); i++)
     {
         const std::string &location_path = config.locations[i].path;
-
-        if (uri.find(location_path) == 0)
+        if (uri.find(location_path) == 0 && location_path.size() > best_match_length)
         {
-            if (location_path.size() > best_match_length)
-            {
-                best_match = &config.locations[i];
-                best_match_length = location_path.size();
-            }
+            best_match = &config.locations[i];
+            best_match_length = location_path.size();
         }
     }
-
     return best_match;
 }
 
