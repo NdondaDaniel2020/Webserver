@@ -51,22 +51,6 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
 void Response::methodPost(const HttpRequest &request)
 {
-    size_t body_size = request.getBody().size();
-
-    if (this->config.client_max_body_size > 0 && body_size > this->config.client_max_body_size)
-        return StatusCodes::http413PayloadTooLarge(this->response_str, this->config, request);
-
-    const LocationConfig *location = findMatchingLocation(this->config, request.getUri());
-    if (location && !location->cgi_handlers.empty())
-        return StatusCodes::http502BadGateway(this->response_str, request, "Fail CGI", this->config);
-
-    if (location && location->client_max_body_size > 0 && body_size > location->client_max_body_size)
-        return StatusCodes::http413PayloadTooLarge(this->response_str, this->config, request);
-
-    std::string content_type = request.getHeader("Content-Type");
-    if (content_type.empty())
-        return StatusCodes::http400BadRequest(this->response_str, "Content-Type header is required", this->config, request);
-
     if (content_type.find("multipart/form-data") != std::string::npos)
         return multipartFormData(request, content_type);
     else if (content_type.find("application/octet-stream") != std::string::npos)
