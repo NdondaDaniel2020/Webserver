@@ -14,7 +14,7 @@ void Server::handleClientData(int fd)
     if (client->getState() == Client::READING_HEADERS ||
         client->getState() == Client::READING_BODY)
     {
-        char buf[4096];
+        char buf[16384];
         int r = read(fd, buf, sizeof(buf));
 
         if (r <= 0)
@@ -24,13 +24,11 @@ void Server::handleClientData(int fd)
             return;
         }
 
+        std::cout << "[CLIENT " << fd << "] " << client->getRecvBuffer().size() << " + " << r << " bytes recebidos" << std::endl;
         client->appendRecvData(buf, r);
 
         if (client->IsHeaderRequestComplete() && !client->isHeaderValidated())
-        {
             client->processHeaderRequest(this->config.getServerConfig(client->getServerIndex()));
-        }
-
         if (client->isRequestComplete())
         {
             client->processRequest(this->config.getServerConfig(client->getServerIndex()), this->epoll_fd);

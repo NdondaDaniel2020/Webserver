@@ -185,6 +185,14 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         parseHeaders();
     }
 
+    std::cout << "[CLIENT " << fd << "] Headers completos. Método: " << request.getMethod() 
+              << ",\n URI: " << request.getUri() 
+              << ",\n Version: " << request.getVersion() 
+              << ",\n Content-Length: " << content_length 
+              << ",\n is_chunked: " << (is_chunked ? "true" : "false") 
+              << ",\n Content-Type: " << request.getHeader("Content-Type")
+              << std::endl << std::endl;
+
     if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
     {
         StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
@@ -205,6 +213,57 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
     if (!validateAllowedMethod(server_config, request))
     {
         StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (request.getMethod() == "POST" && !request.hasHeader("Content-Length") && !is_chunked)
+    {
+        StatusCodes::http411LengthRequired(this->send_buffer, server_config, request);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+       
+    if (request.getMethod() == "POST" && server_config.client_max_body_size > 0 && request.getBody().size() > server_config.client_max_body_size)
+    {
+        StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (request.getMethod() == "POST" && location && !location->cgi_handlers.empty())
+    {
+        StatusCodes::http502BadGateway(this->send_buffer, request, "Fail CGI", server_config);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (request.getMethod() == "POST" && location && location->client_max_body_size > 0 && request.getBody().size() > location->client_max_body_size)
+    {
+        StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (request.getMethod() == "POST" && request.getHeader("Content-Type").empty())
+    {
+        StatusCodes::http400BadRequest(this->send_buffer, "Content-Type header is required", server_config, request);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (request.getMethod() == "POST" && request.getHeader("Content-Type") != "multipart/form-data"
+        && request.getHeader("Content-Type") != "application/octet-stream"
+        && request.getHeader("Content-Type") != "text/plain"
+        && request.getHeader("Content-Type") != "test/file")
+    {
+        StatusCodes::http415UnsupportedMediaType(this->send_buffer, request, server_config);
         this->send_offset = 0;
         this->state = SENDING_RESPONSE;
         return;

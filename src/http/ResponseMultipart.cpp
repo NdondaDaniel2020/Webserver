@@ -56,9 +56,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
         if (writeFileToDisk(full_path, files[i].content))
         {
             saved_files.push_back(full_path);
-            std::cout << "[201] Arquivo salvo: " << full_path
-                      << " (" << files[i].content.size() << " bytes)" << std::endl;
-
             if (success_count > 0)
                 json_response << ",";
 
@@ -108,9 +105,6 @@ void Response::applicationOctetStream(const HttpRequest &request)
     std::string full_path = upload_dir + "/" + filename;
     if (writeFileToDisk(full_path, request.getBody()))
     {
-        std::cout << "[201] Arquivo salvo: " << full_path
-                << " (" << request.getBody().size() << " bytes)" << std::endl;
-
         std::ostringstream json_response;
         json_response << "{\"filename\":\"" << filename << "\",";
         json_response << "\"path\":\"" << full_path << "\",";
