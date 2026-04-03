@@ -181,11 +181,9 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         return;
 
     if (request.getMethod().empty())
-    {
         parseHeaders();
-    }
 
-    std::cout << "[CLIENT " << fd << "] Headers completos. Método: " << request.getMethod() 
+    std::cout << "\n\n Método: " << request.getMethod() 
               << ",\n URI: " << request.getUri() 
               << ",\n Version: " << request.getVersion() 
               << ",\n Content-Length: " << content_length 
@@ -225,18 +223,11 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         this->state = SENDING_RESPONSE;
         return;
     }
-       
-    if (request.getMethod() == "POST" && server_config.client_max_body_size > 0 && request.getBody().size() > server_config.client_max_body_size)
+
+    if (request.getMethod() == "POST" && server_config.client_max_body_size > 0
+        && request.getBody().size() > server_config.client_max_body_size)
     {
         StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
-        this->send_offset = 0;
-        this->state = SENDING_RESPONSE;
-        return;
-    }
-
-    if (request.getMethod() == "POST" && location && !location->cgi_handlers.empty())
-    {
-        StatusCodes::http502BadGateway(this->send_buffer, request, "Fail CGI", server_config);
         this->send_offset = 0;
         this->state = SENDING_RESPONSE;
         return;
@@ -258,17 +249,23 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         return;
     }
 
-    if (request.getMethod() == "POST" && request.getHeader("Content-Type") != "multipart/form-data"
-        && request.getHeader("Content-Type") != "application/octet-stream"
-        && request.getHeader("Content-Type") != "text/plain"
-        && request.getHeader("Content-Type") != "test/file")
+    if (request.getMethod() == "POST")
     {
-        StatusCodes::http415UnsupportedMediaType(this->send_buffer, request, server_config);
-        this->send_offset = 0;
-        this->state = SENDING_RESPONSE;
-        return;
+        std::string content_type = request.getHeader("Content-Type");
+        bool valid_type = 
+            content_type.find("multipart/form-data") == 0 ||
+            content_type.find("application/octet-stream") == 0 ||
+            content_type.find("text/plain") == 0 ||
+            content_type.find("application/x-www-form-urlencoded") == 0;
+        
+        if (!valid_type)
+        {
+            StatusCodes::http415UnsupportedMediaType(this->send_buffer, request, server_config);
+            this->send_offset = 0;
+            this->state = SENDING_RESPONSE;
+            return;
+        }
     }
 
     check_valid_header = true;
 }
-
