@@ -310,8 +310,6 @@ void Client::handleCgiStdinWritable(int epoll_fd)
     if (!is_cgi_active)
         return;
 
-    std::cout << "[CLIENT " << fd << "] CGI stdin writable" << std::endl;
-
     const std::string &body = request.getBody();
     if (body.empty())
     {
