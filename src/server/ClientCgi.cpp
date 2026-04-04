@@ -39,7 +39,13 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
                       const ServerConfig &server_config, int epoll_fd)
 {
     std::string error_msg = "Fail CGI";
-    std::string script_path = loc.root + req.getPath().substr(loc.path.size());
+    
+    // Construir path: root + path completo (sem remover loc.path)
+    std::string file_path = req.getPath();
+    if (file_path[0] == '/')
+        file_path = file_path.substr(1);
+    
+    std::string script_path = loc.root + "/" + file_path;
     std::cout << "[CGI] Script path: " << script_path << std::endl;
     size_t pos = script_path.find('.');
     std::string ext;
