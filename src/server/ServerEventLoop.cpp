@@ -14,7 +14,7 @@ void Server::handleClientData(int fd)
     if (client->getState() == Client::READING_HEADERS ||
         client->getState() == Client::READING_BODY)
     {
-        char buf[8192];
+        char buf[24576]; // 8192 
         int r = read(fd, buf, sizeof(buf));
 
         if (r <= 0)
@@ -55,8 +55,7 @@ void Server::handleClientData(int fd)
                 else
                     closeClient(fd);
             }
-            else
-                closeClient(fd);
+            // Se não terminou (retornou false), deixa para próximo EPOLLOUT
         }
     }
 }

@@ -221,8 +221,7 @@ void Server::handleClientSendReady(int fd, Client *client)
             else
                 closeClient(fd);
         }
-        else
-            closeClient(fd);
+        // Se não terminou, aguarda próximo EPOLLOUT
     }
 }
 
@@ -238,6 +237,12 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
     {
         std::cout << "[EPOLLHUP] CGI pipe closed for client fd=" << c->getFd() << std::endl;
 
+        // Só processar se CGI ainda está ativo (não foi processado em handleCgiStdoutReadable)
+        if (!c->isCgiActive())
+        {
+            return;
+        }
+
         Client::CgiState& cgi_state = c->getCgiState();
         int status;
         pid_t result = waitpid(cgi_state.pid, &status, WNOHANG);
@@ -250,6 +255,20 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
         {
             std::cerr << "[CGI] waitpid error: " << strerror(errno) << std::endl;
             c->finishCgiAndGenerateResponse();
+        }
+        
+        // Tentar enviar resposta imediatamente (ao menos começar)
+        if (c->getState() == Client::SENDING_RESPONSE && c->hasDataToSend())
+        {
+            bool finished = c->sendData();
+            if (finished)
+            {
+                if (c->isKeepAlive())
+                    c->reset();
+                else
+                    closeClient(c->getFd());
+            }
+            // Se não terminou, o event loop continuará enviando gradualmente
         }
     }
 }

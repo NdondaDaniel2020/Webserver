@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 14:31:22 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/04 00:21:19 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -192,7 +192,15 @@ bool Client::sendData()
         return false;
     }
     
-    std::cerr << "[CLIENT " << fd << "] Erro real ao enviar dados " << std::endl;
+    // sent < 0: erro ao escrever
+    int err = errno;
+    if (err == EAGAIN || err == EWOULDBLOCK)
+    {
+        // Socket bloqueado, retry posteriormente
+        return false;
+    }
+    
+    std::cerr << "[CLIENT " << fd << "] Erro ao enviar dados: " << strerror(err) << std::endl;
     return false;
 }
 
