@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/26 10:00:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/03/26 10:00:00 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/05 00:25:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -21,7 +21,6 @@ bool validateAllowedMethod(const ServerConfig &config, const HttpRequest &reques
 std::string removeLocationInUri(const std::string &uri, const LocationConfig *location);
 
 // File/Directory helpers
-bool isProtectedFile(const std::vector<std::string> &protected_files, const std::string &filename);
 std::string getUploadDir(const ServerConfig &config, const HttpRequest &request);
 
 // Redirect helpers

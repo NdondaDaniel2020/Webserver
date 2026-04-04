@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 21:02:23 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/05 00:25:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -426,22 +426,6 @@ std::string getFileExtension(const std::string& filename)
     }
     
     return ext;
-}
-
-bool isAllowedFileExtension(const std::string& filename, const std::vector<std::string>& allowed_extensions)
-{
-    if (allowed_extensions.empty())
-        return true;  // Se não há lista, permite todos
-    
-    std::string file_ext = getFileExtension(filename);
-    
-    for (size_t i = 0; i < allowed_extensions.size(); ++i)
-    {
-        if (file_ext == allowed_extensions[i])
-            return true;
-    }
-    
-    return false;
 }
 
 void cleanupFiles(const std::vector<std::string>& file_paths)

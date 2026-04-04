@@ -65,16 +65,6 @@ std::string removeLocationInUri(const std::string &uri, const LocationConfig *lo
     return uri_without_location;
 }
 
-bool isProtectedFile(const std::vector<std::string> &protected_files, const std::string &filename)
-{
-    for (size_t i = 0; i < protected_files.size(); ++i)
-    {
-        if (filename == protected_files[i])
-            return true;
-    }
-    return false;
-}
-
 std::string getUploadDir(const ServerConfig &config, const HttpRequest &request)
 {
     const LocationConfig *location = findMatchingLocation(config, request.getUri());

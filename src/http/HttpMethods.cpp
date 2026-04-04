@@ -91,10 +91,6 @@ void Response::methodDelete(const HttpRequest &request, const std::string &file_
     if (!hasWritePermission(parent_dir))
         return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
 
-    std::string filename = getFileName(file_path);
-    if (isProtectedFile(this->protected_files, filename))
-        return StatusCodes::http403Forbidden(this->response_str, request, file_path, this->config);
-
     size_t file_size = getFileSize(file_path);
     if (remove(file_path.c_str()) != 0)
         return StatusCodes::http500InternalServerError(this->response_str, request, "Failed to delete file: " + std::string(strerror(errno)), this->config);

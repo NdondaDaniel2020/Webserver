@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 13:27:13 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/05 00:19:51 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,21 +20,6 @@
 
 Response::Response(const HttpRequest &request, const ServerConfig &config) : config(config)
 {
-    this->allowed_extensions.push_back(".jpg");
-    this->allowed_extensions.push_back(".png");
-    this->allowed_extensions.push_back(".gif");
-    this->allowed_extensions.push_back(".pdf");
-    this->allowed_extensions.push_back(".txt");
-    this->allowed_extensions.push_back(".doc");
-    this->allowed_extensions.push_back(".zip");
-    this->allowed_extensions.push_back(".mp4");
-    this->allowed_extensions.push_back(".mp3");
-    this->allowed_extensions.push_back(".log");
-    this->allowed_extensions.push_back(".docx");
-    this->allowed_extensions.push_back(".jpeg");
-
-    this->protected_files.push_back("index.html");
-
     buildHttpResponse(request);
 }
 
@@ -53,8 +38,6 @@ Response &Response::operator=(const Response &other)
     {
         this->response_str = other.response_str;
         this->config = other.config;
-        this->protected_files = other.protected_files;
-        this->allowed_extensions = other.allowed_extensions;
     }
     return *this;
 }

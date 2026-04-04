@@ -28,12 +28,6 @@ void Response::multipartFormData(const HttpRequest &request, const std::string &
     const LocationConfig *location_config = findMatchingLocation(this->config, request.getUri());
     for (size_t i = 0; i < files.size(); ++i)
     {
-        if (!isAllowedFileExtension(files[i].filename, this->allowed_extensions))
-        {
-            cleanupFiles(saved_files);
-            return StatusCodes::http400BadRequest(this->response_str, "Extensão de arquivo não permitida: " + getFileExtension(files[i].filename), this->config, request);
-        }
-
         if ((this->config.client_max_body_size > 0 && files[i].content.size() > this->config.client_max_body_size)
             || (location_config && location_config->client_max_body_size > 0 && files[i].content.size() > location_config->client_max_body_size))
         {

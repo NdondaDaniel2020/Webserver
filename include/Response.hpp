@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:23 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/01 12:22:14 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/05 00:25:00 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -29,8 +29,6 @@ class Response
     private:
         ServerConfig config;
         std::string response_str;
-        std::vector<std::string> protected_files;
-        std::vector<std::string> allowed_extensions;
 
     public:
         ~Response();
