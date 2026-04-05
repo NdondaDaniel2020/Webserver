@@ -44,12 +44,18 @@ HttpRequest HttpRequest::parse(const std::string &raw_request)
     std::istringstream stream(raw_request);
     std::string line;
 
-    if (std::getline(stream, line))
+    while (std::getline(stream, line))
     {
         if (!line.empty() && line[line.size() - 1] == '\r')
             line.erase(line.size() - 1);
-        req.parseRequestLine(line);
+        
+        if (!line.empty())
+        {
+            req.parseRequestLine(line);
+            break;
+        }
     }
+
     req.parseHeaders(stream);
     req.parseBody(stream);
     return req;

@@ -59,7 +59,6 @@ bool Client::isRequestComplete()
     {
         if (findHeadersEnd())
         {
-            parseHeaders();
             if (state == ERROR_413)
                 return true;
             if (is_chunked)
