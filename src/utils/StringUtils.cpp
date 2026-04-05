@@ -1,4 +1,5 @@
-#include "../../include/StringUtils.hpp"
+#include "StringUtils.hpp"
+#include <sstream>
 
 std::string StringUtils::trim(const std::string& str) 
 {
@@ -30,4 +31,37 @@ size_t StringUtils::parseSize(std::string size_str)
     }
     
     return std::atol(size_str.c_str()) * multiplier;
+}
+
+std::string StringUtils::parseUrlEncodedForm(const std::string &body)
+{
+    std::ostringstream result;
+    std::string current = body;
+    bool first = true;
+    
+    size_t pos = 0;
+    while (pos < current.length())
+    {
+        size_t amp_pos = current.find('&', pos);
+        if (amp_pos == std::string::npos)
+            amp_pos = current.length();
+        
+        std::string pair = current.substr(pos, amp_pos - pos);
+        
+        size_t eq_pos = pair.find('=');
+        if (eq_pos != std::string::npos)
+        {
+            std::string key = pair.substr(0, eq_pos);
+            std::string value = pair.substr(eq_pos + 1);
+            
+            if (!first)
+                result << ",";
+            result << "\"" << key << "\":\"" << value << "\"";
+            first = false;
+        }
+        
+        pos = amp_pos + 1;
+    }
+    
+    return result.str();
 }

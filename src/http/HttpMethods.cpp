@@ -51,12 +51,28 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
 
 void Response::methodPost(const HttpRequest &request)
 {
+    size_t body_size = request.getBody().size();
     std::string content_type = request.getHeader("Content-Type");
-    if (content_type.find("multipart/form-data") != std::string::npos)
+    if (body_size == 0)
+    {
+        std::ostringstream response;
+        response << "{\"message\":\"OK\",\"size\":0}";
+        return StatusCodes::http200Ok(this->response_str, response.str());
+    }
+    else if (content_type.find("multipart/form-data") != std::string::npos)
         return multipartFormData(request, content_type);
     else if (content_type.find("application/octet-stream") != std::string::npos)
         return applicationOctetStream(request);
-    else if (content_type.find("text/plain") != std::string::npos)
+    else if (content_type.find("application/x-www-form-urlencoded") != std::string::npos)
+    {
+        std::string body = request.getBody();
+        std::ostringstream json_response;
+        json_response << "{\"message\":\"Form data recebido\",\"parameters\":{" 
+                      << StringUtils::parseUrlEncodedForm(body) 
+                      << "}}";
+        return StatusCodes::http200Ok(this->response_str, json_response.str());
+    }
+    else
     {
         std::ostringstream json_response;
         json_response << "{\"message\":\"Text data recebido\",";
@@ -64,7 +80,6 @@ void Response::methodPost(const HttpRequest &request)
 
         return StatusCodes::http200Ok(this->response_str, json_response.str());
     }
-    return StatusCodes::http415UnsupportedMediaType(this->response_str, request, this->config);
 }
 
 void Response::methodDelete(const HttpRequest &request, const std::string &file_path)

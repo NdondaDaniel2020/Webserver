@@ -14,7 +14,7 @@ void Server::handleClientData(int fd)
     if (client->getState() == Client::READING_HEADERS ||
         client->getState() == Client::READING_BODY)
     {
-        char buf[24576]; // 8192 
+        char buf[40960]; // 8192 
         int r = read(fd, buf, sizeof(buf));
 
         if (r <= 0)
@@ -25,7 +25,6 @@ void Server::handleClientData(int fd)
         }
 
         client->appendRecvData(buf, r);
-        std::cout << "[CLIENT " << fd << "] " << client->getRecvBuffer().size() << " + " << r << " bytes recebidos" << std::endl;
 
         if (client->IsHeaderRequestComplete() && !client->isHeaderValidated())
             client->processHeaderRequest(this->config.getServerConfig(client->getServerIndex()));
@@ -55,7 +54,6 @@ void Server::handleClientData(int fd)
                 else
                     closeClient(fd);
             }
-            // Se não terminou (retornou false), deixa para próximo EPOLLOUT
         }
     }
 }
