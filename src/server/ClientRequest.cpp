@@ -55,6 +55,7 @@ bool Client::unchunkBody(std::string &out)
         std::stringstream iss(value_hex);
         iss >> std::hex >> chunk_size;
         pos = control_f + 2;
+        
         if (chunk_size == 0)
             return true;
         if (pos + chunk_size + 2 > buffer.size())
@@ -84,11 +85,14 @@ bool Client::isRequestComplete()
                 state = READING_BODY;
             else if ((request.getMethod() == "GET" ||
                       request.getMethod() == "POST" ||
-                      request.getMethod() == "DELETE") &&
-                     content_length == 0)
+                      request.getMethod() == "DELETE"))
             {
-                state = PROCESSING;
-                return true;
+                if (request.getMethod() == "GET")
+                {
+                    state = PROCESSING;
+                    return true;
+                }
+                state = READING_BODY;
             }
             else
                 state = READING_BODY;
@@ -103,11 +107,14 @@ bool Client::isRequestComplete()
 
             if (unchunkBody(unchunked_body))
             {
-                size_t max_size = config->getServerConfig(getServerIndex()).client_max_body_size;
-                if (max_size > 0 && unchunked_body.size() > max_size)
-                    state = ERROR_413;
-                else
-                    state = PROCESSING;
+                if (state != ERROR_413)
+                {
+                    size_t max_size = config->getServerConfig(getServerIndex()).client_max_body_size;
+                    if (max_size > 0 && unchunked_body.size() > max_size)
+                        state = ERROR_413;
+                    else
+                        state = PROCESSING;
+                }
                 request.setBody(unchunked_body);
                 return true;
             }
@@ -156,9 +163,6 @@ void Client::parseHeaders()
             
             if (max_size > 0 && content_length > max_size)
             {
-                std::cout << "[413] Content-Length (" << content_length
-                          << ") excede limite (" << max_size
-                          << ") - Rejeitando ANTES de receber body" << std::endl;
                 state = ERROR_413;
                 return;
             }
