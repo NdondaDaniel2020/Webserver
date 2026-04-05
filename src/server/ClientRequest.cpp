@@ -32,6 +32,18 @@ bool Client::unchunkBody(std::string &out)
 {
     const std::string &buffer = recv_buffer;
     size_t pos = headers_end_pos;
+    size_t max_size = 0;
+
+    if (config)
+    {
+        const ServerConfig &server_config = config->getServerConfig(getServerIndex());
+        const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
+        
+        if (location && location->client_max_body_size > 0)
+            max_size = location->client_max_body_size;
+        else if (server_config.client_max_body_size > 0)
+            max_size = server_config.client_max_body_size;
+    }
 
     while (pos < buffer.size())
     {
@@ -47,6 +59,13 @@ bool Client::unchunkBody(std::string &out)
             return true;
         if (pos + chunk_size + 2 > buffer.size())
             return false;
+
+        if (max_size > 0 && out.size() + chunk_size > max_size)
+        {
+            state = ERROR_413;
+            return true;
+        }
+        
         out += buffer.substr(pos, chunk_size);
         pos += chunk_size + 2;
     }
@@ -86,15 +105,10 @@ bool Client::isRequestComplete()
             {
                 size_t max_size = config->getServerConfig(getServerIndex()).client_max_body_size;
                 if (max_size > 0 && unchunked_body.size() > max_size)
-                {
-                    request.setBody(unchunked_body);
                     state = ERROR_413;
-                }
                 else
-                {
-                    request.setBody(unchunked_body);
                     state = PROCESSING;
-                }
+                request.setBody(unchunked_body);
                 return true;
             }
         }
@@ -131,7 +145,15 @@ void Client::parseHeaders()
 
         if (config)
         {
-            size_t max_size = config->getServerConfig(getServerIndex()).client_max_body_size;
+            const ServerConfig &server_config = config->getServerConfig(getServerIndex());
+            const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
+            
+            size_t max_size = 0;
+            if (location && location->client_max_body_size > 0)
+                max_size = location->client_max_body_size;
+            else if (server_config.client_max_body_size > 0)
+                max_size = server_config.client_max_body_size;
+            
             if (max_size > 0 && content_length > max_size)
             {
                 std::cout << "[413] Content-Length (" << content_length
@@ -178,8 +200,11 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
     if (!IsHeaderRequestComplete())
         return;
 
-    if (request.getMethod().empty())
-        parseHeaders();
+    // SEMPRE processar headers PRIMEIRO (antes de validações que dependem deles)
+    parseHeaders();
+    
+    if (state == ERROR_413)  // Content-Length ou Transfer-Encoding excedeu
+        return;
     
     if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
     {
@@ -214,7 +239,7 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         return;
     }
 
-    if (request.getMethod() == "POST" && !is_chunked)
+    if (request.getMethod() == "POST" && !is_chunked && request.hasHeader("Content-Length"))
     {
         size_t max_size = 0;
         
@@ -222,8 +247,8 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
             max_size = location->client_max_body_size;
         else if (server_config.client_max_body_size > 0)
             max_size = server_config.client_max_body_size;
-        
-        if (max_size > 0 && request.getBody().size() > max_size)
+
+        if (max_size > 0 && content_length > max_size)
         {
             StatusCodes::http413PayloadTooLarge(this->send_buffer, server_config, request);
             this->send_offset = 0;
