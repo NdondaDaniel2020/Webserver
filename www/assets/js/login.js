@@ -13,21 +13,24 @@ function checkExistingSession() {
             'Expires': '0'
         }
     })
-    .then(response => response.json())
+    .then(response => {
+        // Se não for 2xx, não é uma sessão válida
+        if (!response.ok) {
+            console.log('Sem sessão ativa (status ' + response.status + ')');
+            return null;
+        }
+        return response.json();
+    })
     .then(data => {
-        if (data.authenticated) {
+        if (data && data.authenticated) {
             console.log('✅ Sessão válida detectada, redirecionando para dashboard...');
             window.location.href = './dashboard.html';
         } else {
             console.log('❌ Sem sessão válida, permitindo login');
-            // Clear any stale session data
-            document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
         }
     })
     .catch(error => {
         console.log('Sem sessão válida, permitindo login:', error);
-        // Clear any stale session data
-        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
     });
 }
 

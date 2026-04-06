@@ -30,9 +30,13 @@ def get_session_token_from_cookie():
 def logout_user(session_token):
     """Remove sessão da base de dados"""
     if not session_token:
-        return {"ok": False, "error": "Nenhuma sessão ativa"}, "400 Bad Request", None
+        return {"ok": False, "error": "Nenhuma sessão ativa"}, "200 OK", None
     
     try:
+        # Verificar se a base de dados existe
+        if not os.path.exists(SESSIONS_PATH):
+            return {"ok": False, "error": "Base de dados não encontrada"}, "200 OK", None
+        
         conn = sqlite3.connect(SESSIONS_PATH)
         cursor = conn.cursor()
         cursor.execute("DELETE FROM sessions WHERE session_token = ?", (session_token,))
@@ -42,14 +46,17 @@ def logout_user(session_token):
         return {"ok": True, "message": "Logout realizado com sucesso"}, "200 OK", session_token
     
     except Exception as e:
-        return {"ok": False, "error": str(e)}, "500 Internal Server Error", None
+        # Retornar como sucesso mesmo com erro, para não bloquear logout
+        # O cookie será removido pelo navegador
+        sys.stderr.write(f"[logout.py] Erro na base de dados: {str(e)}\n")
+        return {"ok": True, "message": "Logout processado"}, "200 OK", session_token
 
 def main():
     method = os.environ.get("REQUEST_METHOD", "GET").upper()
     
     if method != "POST":
         result = {"ok": False, "error": "Use POST para fazer logout"}
-        status = "405 Method Not Allowed"
+        status = "200 OK"  # Retornar 200 OK para evitar que servidor retorne HTML de erro
         clear_cookie = False
     else:
         session_token = get_session_token_from_cookie()
@@ -78,4 +85,15 @@ def main():
     sys.stdout.write(json.dumps(result, ensure_ascii=False))
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        # Garantir que sempre retornamos JSON, mesmo em caso de erro crítico
+        sys.stdout.write("Status: 200 OK\r\n")
+        sys.stdout.write("Content-Type: application/json\r\n")
+        sys.stdout.write("\r\n")
+        sys.stdout.write(json.dumps({
+            "ok": False,
+            "error": f"Erro no servidor: {str(e)}"
+        }, ensure_ascii=False))
+        sys.stderr.write(f"[logout.py] Erro crítico: {str(e)}\n")

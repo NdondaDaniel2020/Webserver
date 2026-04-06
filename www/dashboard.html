@@ -38,7 +38,7 @@
 
     <!-- ===== MAIN CONTAINER ===== -->
     <main class="dashboard-container">
-        
+
         <!-- ===== HEADER ===== -->
         <section class="dashboard-header">
             <div class="header-content">
@@ -71,14 +71,16 @@
                 <!-- URL Input -->
                 <div class="test-section">
                     <label>URL:</label>
-                    <input type="text" id="testUrl" class="test-input" value="/index.html" placeholder="/caminho/do/recurso">
+                    <input type="text" id="testUrl" class="test-input" value="/index.html"
+                        placeholder="/caminho/do/recurso">
                 </div>
 
                 <!-- POST Content Type Selection -->
                 <div class="test-section" id="contentTypeSection" style="display: none;">
                     <label>Content-Type:</label>
                     <div class="content-type-buttons">
-                        <button class="content-btn active" data-type="application/x-www-form-urlencoded">Form URLEncoded</button>
+                        <button class="content-btn active" data-type="application/x-www-form-urlencoded">Form
+                            URLEncoded</button>
                         <button class="content-btn" data-type="multipart/form-data">Multipart Form</button>
                         <button class="content-btn" data-type="application/octet-stream">Binary</button>
                         <button class="content-btn" data-type="text/plain">Text</button>
@@ -96,9 +98,9 @@
                 <div class="test-section">
                     <label>Headers Automáticos:</label>
                     <pre class="headers-info">{
-    "Content-Type": "será definido automaticamente",
-    "Cookie": "session=<seu_token>"
-}</pre>
+                        "Content-Type": "será definido automaticamente",
+                        "Cookie": "session=<seu_token>"
+                    }</pre>
                 </div>
 
                 <!-- Send Button -->
@@ -113,7 +115,8 @@
                         <button class="response-tab" data-response="body">Body</button>
                     </div>
                     <pre id="responseStatus" class="response-output">Aguardando requisição...</pre>
-                    <pre id="responseHeaders" class="response-output" style="display: none;">Aguardando requisição...</pre>
+                    <pre id="responseHeaders" class="response-output"
+                        style="display: none;">Aguardando requisição...</pre>
                     <pre id="responseBody" class="response-output" style="display: none;">Aguardando requisição...</pre>
                 </div>
             </div>

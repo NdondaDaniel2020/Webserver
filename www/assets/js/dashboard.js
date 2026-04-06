@@ -369,18 +369,26 @@ function logout() {
 
     fetch('./cgi-bin/logout.py', {
         method: 'POST',
-        credentials: 'include'
+        credentials: 'include',
+        headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: ''
     })
-    .then(response => response.json())
+    .then(response => {
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            throw new Error(`Servidor respondeu com status ${response.status}. Resposta: não é JSON`);
+        }
+        return response.json();
+    })
     .then(data => {
-        // Limpar cookie manualmente no navegador
-        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax;';
-        document.cookie = 'session=; path=/; max-age=0;';
+        // Cookie é removido pelo servidor via Set-Cookie header
         
         if (data.ok) {
             showSuccess('Logout realizado! Redirecionando...');
             setTimeout(() => {
-                window.location.href = './landing.html';
+                window.location.href = './login.html';
             }, 1500);
         } else {
             showError(data.error || 'Erro ao fazer logout');
@@ -389,15 +397,10 @@ function logout() {
         }
     })
     .catch(error => {
-        console.error('Erro:', error);
-        // Limpar cookie manualmente mesmo com erro
-        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Lax;';
-        document.cookie = 'session=; path=/; max-age=0;';
-        
-        showError('Erro ao fazer logout, limpando sessão...');
-        setTimeout(() => {
-            window.location.href = './landing.html';
-        }, 1500);
+        console.error('Erro de logout:', error);
+        showError('Erro ao fazer logout: ' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = 'Logout';
     });
 }
 
