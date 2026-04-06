@@ -36,7 +36,7 @@ class Server
         int*                     servers;
         int                      port_count;
         std::string*             interface;
-        epoll_event              events[64];
+        epoll_event              events[EPOLL_MAX_EVENTS];
         const ConfigParser&      config;
         std::map<int, Client*>   clients;      // fd cliente -> Client*
         std::map<int, Client*>   cgi_fd_map;   // fd pipe CGI -> Client*

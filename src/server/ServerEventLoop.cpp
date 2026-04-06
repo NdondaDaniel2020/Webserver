@@ -14,7 +14,7 @@ void Server::handleClientData(int fd)
     if (client->getState() == Client::READING_HEADERS ||
         client->getState() == Client::READING_BODY)
     {
-        char buf[40960]; // 8192 
+        char buf[BUFFERSIZE];
         int r = read(fd, buf, sizeof(buf));
 
         if (r <= 0)

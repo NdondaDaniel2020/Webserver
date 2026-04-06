@@ -33,6 +33,9 @@
 #include "ConfigParser.hpp"
 #include "FileUtils.hpp"
 
+# define BUFFERSIZE (256 * 1024)
+# define EPOLL_MAX_EVENTS 1024
+
 class Client
 {
 public:

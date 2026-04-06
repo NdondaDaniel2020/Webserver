@@ -395,7 +395,7 @@ void Client::handleCgiStdoutReadable(int epoll_fd, std::map<int, Client *> &cgi_
     if (!is_cgi_active)
         return;
 
-    char buf[8192];
+    char buf[BUFFERSIZE];
     ssize_t r = read(cgi.pipe_out[0], buf, sizeof(buf));
 
     int saved_errno = errno;

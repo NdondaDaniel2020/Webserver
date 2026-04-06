@@ -142,7 +142,7 @@ void Server::start()
     {
         checkTimeout();
 
-        int n = epoll_wait(this->epoll_fd, this->events, 64, 1000);
+        int n = epoll_wait(this->epoll_fd, this->events, EPOLL_MAX_EVENTS, 100);
         if (n < 0 && errno != EINTR)
         {
             perror("epoll_wait");
