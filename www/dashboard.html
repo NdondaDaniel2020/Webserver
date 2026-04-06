@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Dashboard — Web Ninjas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- link css -->
+    <link rel="stylesheet" href="./assets/css/dashboard.css">
+</head>
+
+<body>
+
+    <!-- Background Lines -->
+    <div class="background-lines"></div>
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="/index.html" class="nav-logo">
+                <img src="https://img.icons8.com/ios-filled/50/00ff9c/ninja-head.png" alt="Ninja Logo">
+                <div class="nav-logo-text">
+                    <span class="web">WEB</span> <span class="ninjas">NINJAS</span>
+                </div>
+            </a>
+            <div class="nav-right">
+                <span class="user-info" id="userInfo">👤 Carregando...</span>
+                <button class="btn-logout" id="logoutBtn">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== MAIN CONTAINER ===== -->
+    <main class="dashboard-container">
+        
+        <!-- ===== HEADER ===== -->
+        <section class="dashboard-header">
+            <div class="header-content">
+                <h1>&lt; DASHBOARD /&gt;</h1>
+                <p>Painel de Testes e Gerenciamento</p>
+            </div>
+        </section>
+
+        <!-- ===== TABS ===== -->
+        <div class="tabs-container">
+            <button class="tab-btn active" data-tab="http-tester">⚡ Testador HTTP</button>
+            <button class="tab-btn" data-tab="form-database">📝 Formulário + BD</button>
+        </div>
+
+        <!-- ===== TAB 1: HTTP TESTER ===== -->
+        <section class="tab-content active" id="http-tester">
+            <div class="section-inner">
+                <h2>Testador de Métodos HTTP</h2>
+
+                <!-- Method Selection -->
+                <div class="test-section">
+                    <label>Seleciona o Método:</label>
+                    <div class="method-buttons">
+                        <button class="method-btn active" data-method="GET">GET</button>
+                        <button class="method-btn" data-method="POST">POST</button>
+                        <button class="method-btn" data-method="DELETE">DELETE</button>
+                    </div>
+                </div>
+
+                <!-- URL Input -->
+                <div class="test-section">
+                    <label>URL:</label>
+                    <input type="text" id="testUrl" class="test-input" value="/index.html" placeholder="/caminho/do/recurso">
+                </div>
+
+                <!-- POST Content Type Selection -->
+                <div class="test-section" id="contentTypeSection" style="display: none;">
+                    <label>Content-Type:</label>
+                    <div class="content-type-buttons">
+                        <button class="content-btn active" data-type="application/x-www-form-urlencoded">Form URLEncoded</button>
+                        <button class="content-btn" data-type="multipart/form-data">Multipart Form</button>
+                        <button class="content-btn" data-type="application/octet-stream">Binary</button>
+                        <button class="content-btn" data-type="text/plain">Text</button>
+                        <button class="content-btn" data-type="application/json">JSON</button>
+                    </div>
+                </div>
+
+                <!-- Body Input -->
+                <div class="test-section" id="bodySection" style="display: none;">
+                    <label>Body:</label>
+                    <textarea id="testBody" class="test-textarea" placeholder="Insere dados para enviar..."></textarea>
+                </div>
+
+                <!-- Headers Info -->
+                <div class="test-section">
+                    <label>Headers Automáticos:</label>
+                    <pre class="headers-info">{
+    "Content-Type": "será definido automaticamente",
+    "Cookie": "session=<seu_token>"
+}</pre>
+                </div>
+
+                <!-- Send Button -->
+                <button class="btn-send" id="sendBtn">Enviar Requisição 🚀</button>
+
+                <!-- Response Section -->
+                <div class="test-section response-section">
+                    <h3>Resposta do Servidor:</h3>
+                    <div class="response-tabs">
+                        <button class="response-tab active" data-response="status">Status</button>
+                        <button class="response-tab" data-response="headers">Headers</button>
+                        <button class="response-tab" data-response="body">Body</button>
+                    </div>
+                    <pre id="responseStatus" class="response-output">Aguardando requisição...</pre>
+                    <pre id="responseHeaders" class="response-output" style="display: none;">Aguardando requisição...</pre>
+                    <pre id="responseBody" class="response-output" style="display: none;">Aguardando requisição...</pre>
+                </div>
+            </div>
+        </section>
+
+        <!-- ===== TAB 2: FORM + DATABASE ===== -->
+        <section class="tab-content" id="form-database">
+            <div class="section-inner">
+                <h2>Formulário com Base de Dados</h2>
+
+                <!-- Save Form -->
+                <div class="form-container">
+                    <h3>Guardar Dados</h3>
+                    <form id="dataForm" class="data-form">
+                        <div class="form-group">
+                            <label for="dataName">Nome:</label>
+                            <input type="text" id="dataName" name="name" required placeholder="Teu nome">
+                        </div>
+                        <div class="form-group">
+                            <label for="dataEmail">Email:</label>
+                            <input type="email" id="dataEmail" name="email" required placeholder="teu@email.com">
+                        </div>
+                        <div class="form-group">
+                            <label for="dataMessage">Mensagem:</label>
+                            <textarea id="dataMessage" name="message" placeholder="Insere uma mensagem..."></textarea>
+                        </div>
+                        <button type="submit" class="btn-save">Guardar Dados 💾</button>
+                    </form>
+                </div>
+
+                <!-- Data List -->
+                <div class="list-container">
+                    <h3>Dados Guardados (Últimas 50 Entradas)</h3>
+                    <button class="btn-refresh" id="refreshBtn">Atualizar Lista 🔄</button>
+                    <div id="dataList" class="data-list">
+                        <p class="loading">Carregando dados...</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script src="./assets/js/dashboard.js"></script>
+
+</body>
+
+</html>

@@ -1,3 +1,36 @@
+// ===== CHECK SESSION ON PAGE LOAD =====
+document.addEventListener('DOMContentLoaded', function() {
+    checkExistingSession();
+});
+
+function checkExistingSession() {
+    fetch('./cgi-bin/verify_session.py?t=' + Date.now(), {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.authenticated) {
+            console.log('✅ Sessão válida detectada, redirecionando para dashboard...');
+            window.location.href = './dashboard.html';
+        } else {
+            console.log('❌ Sem sessão válida, permitindo login');
+            // Clear any stale session data
+            document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        }
+    })
+    .catch(error => {
+        console.log('Sem sessão válida, permitindo login:', error);
+        // Clear any stale session data
+        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+    });
+}
+
 // ===== FORM SUBMISSION =====
 document.getElementById('loginForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -27,16 +60,16 @@ function submitLogin(username, password) {
     btn.innerHTML = '<span class="spinner"></span> Autenticando...';
 
     // Send POST request to server
-    fetch('/api/login', {
+    fetch('./cgi-bin/login.py', {
         method: 'POST',
         credentials: 'include', // Include cookies in request
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: JSON.stringify({
+        body: new URLSearchParams({
             username: username,
             password: password
-        })
+        }).toString()
     })
     .then(response => {
         // Check if response is OK (status 200-299)
@@ -52,11 +85,11 @@ function submitLogin(username, password) {
         return response.json();
     })
     .then(data => {
-        if (data.success) {
+        if (data.ok) {
             console.log('✅ Login bem-sucedido! Dados recebidos:', data);
             console.log('📍 Verificando cookies após login...');
             console.log('🍪 Cookies disponíveis:', document.cookie);
-            showSuccess('✅ Login realizado! Redirecionando...');
+            showSuccess('Login realizado! Redirecionando...');
 
             // Redirect after delay
             setTimeout(() => {
@@ -65,7 +98,7 @@ function submitLogin(username, password) {
                 window.location.href = '/dashboard.html';
             }, 1500);
         } else {
-            showError('❌ ' + (data.message || 'Falha ao autenticar'));
+            showError(data.message || 'Falha ao autenticar');
             btn.disabled = false;
             btn.innerHTML = '<span class="btn-text">Entrar no Portal</span><span class="btn-icon">→</span>';
         }
@@ -76,11 +109,11 @@ function submitLogin(username, password) {
         
         // Parse error messages
         if (error.message.includes('Unauthorized')) {
-            errorMessage = '❌ Utilizador ou password inválidos';
+            errorMessage = 'Utilizador ou password inválidos';
         } else if (error.message.includes('Bad Request')) {
-            errorMessage = '❌ Dados inválidos';
+            errorMessage = 'Dados inválidos';
         } else if (error.message) {
-            errorMessage = '❌ ' + error.message;
+            errorMessage = error.message;
         }
         
         showError(errorMessage);

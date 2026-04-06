@@ -1,3 +1,36 @@
+// ===== CHECK SESSION ON PAGE LOAD =====
+document.addEventListener('DOMContentLoaded', function() {
+    checkExistingSession();
+});
+
+function checkExistingSession() {
+    fetch('./cgi-bin/verify_session.py?t=' + Date.now(), {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.authenticated) {
+            console.log('✅ Sessão válida detectada, redirecionando para dashboard...');
+            window.location.href = './dashboard.html';
+        } else {
+            console.log('❌ Sem sessão válida, permitindo signup');
+            // Clear any stale session data
+            document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+        }
+    })
+    .catch(error => {
+        console.log('Sem sessão válida, permitindo signup:', error);
+        // Clear any stale session data
+        document.cookie = 'session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;';
+    });
+}
+
 // ===== FORM SUBMISSION =====
 document.getElementById('signupForm').addEventListener('submit', function(e) {
     e.preventDefault();
@@ -61,17 +94,17 @@ function submitSignup(username, email, password) {
     btn.innerHTML = '<span class="spinner"></span> Criando conta...';
 
     // Send POST request to server
-    fetch('/api/signup', {
+    fetch('./cgi-bin/signup.py', {
         method: 'POST',
         credentials: 'include',
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/x-www-form-urlencoded'
         },
-        body: JSON.stringify({
+        body: new URLSearchParams({
             username: username,
             email: email,
             password: password
-        })
+        }).toString()
     })
     .then(response => {
         if (!response.ok) {
@@ -84,16 +117,16 @@ function submitSignup(username, email, password) {
         return response.json();
     })
     .then(data => {
-        if (data.success) {
+        if (data.ok) {
             console.log('✅ Conta criada com sucesso! Dados recebidos:', data);
-            showSuccess('✅ Conta criada com sucesso! Redirecionando para login...');
+            showSuccess('Conta criada com sucesso! Redirecionando para login...');
 
             // Redirect to login page after delay
             setTimeout(() => {
                 window.location.href = './login.html';
             }, 1500);
         } else {
-            showError('❌ ' + (data.message || 'Falha ao criar conta'));
+            showError(data.message || 'Falha ao criar conta');
             btn.disabled = false;
             btn.innerHTML = '<span class="btn-text">Criar Conta</span><span class="btn-icon">✓</span>';
         }
@@ -103,11 +136,11 @@ function submitSignup(username, email, password) {
         let errorMessage = 'Erro ao comunicar com servidor';
         
         if (error.message.includes('Conflict')) {
-            errorMessage = '❌ Este username ou email já está registado';
+            errorMessage = 'Este username ou email já está registado';
         } else if (error.message.includes('Bad Request')) {
-            errorMessage = '❌ Dados inválidos';
+            errorMessage = 'Dados inválidos';
         } else if (error.message) {
-            errorMessage = '❌ ' + error.message;
+            errorMessage = error.message;
         }
         
         showError(errorMessage);
@@ -141,8 +174,84 @@ function showSuccess(message) {
 // ===== CREATE NOTIFICATION ELEMENT =====
 function createNotification(message, type) {
     const notification = document.createElement('div');
-    notification.className = `notification ${type}`;
-    notification.textContent = message;
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <span class="notification-icon">${type === 'error' ? '❌' : '✅'}</span>
+        <span class="notification-message">${message}</span>
+    `;
+
+    if (!document.querySelector('style[data-notification]')) {
+        const style = document.createElement('style');
+        style.setAttribute('data-notification', 'true');
+        style.innerHTML = `
+            .notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                background: rgba(21, 26, 43, 0.95);
+                border: 1px solid rgba(0, 255, 156, 0.3);
+                border-radius: 8px;
+                padding: 14px 18px;
+                display: flex;
+                align-items: center;
+                gap: 10px;
+                font-size: 13px;
+                font-weight: 500;
+                z-index: 10000;
+                backdrop-filter: blur(10px);
+                animation: slideInRight 0.3s ease-out;
+            }
+
+            .notification-error {
+                border-color: rgba(255, 0, 110, 0.3);
+                color: #ff006e;
+            }
+
+            .notification-success {
+                border-color: rgba(0, 255, 156, 0.3);
+                color: #00FF9C;
+            }
+
+            .notification-icon {
+                font-size: 16px;
+            }
+
+            .fade-out {
+                animation: slideOutRight 0.3s ease-out !important;
+            }
+
+            @keyframes slideInRight {
+                from {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+                to {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+            }
+
+            @keyframes slideOutRight {
+                from {
+                    transform: translateX(0);
+                    opacity: 1;
+                }
+                to {
+                    transform: translateX(400px);
+                    opacity: 0;
+                }
+            }
+
+            @media (max-width: 480px) {
+                .notification {
+                    left: 10px;
+                    right: 10px;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     return notification;
 }
 
