@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Login — Web Ninjas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- link css -->
+    <link rel="stylesheet" href="./assets/css/login.css">
+</head>
+
+<body>
+
+    <!-- Background Lines -->
+    <div class="background-lines"></div>
+
+    <!-- ===== LOGIN SECTION ===== -->
+    <section class="login-container">
+        <div class="login-card">
+            <!-- Header -->
+            <div class="login-header">
+                <img class="hero-icon" src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png" alt="Ninja">
+                <div class="login-tag">&lt; LOGIN /&gt;</div>
+                <h1><span class="highlight">NINJAS</span></h1>
+            </div>
+
+            <!-- Form -->
+            <form class="login-form" id="loginForm">
+                <!-- Username Field -->
+                <div class="form-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">⚔️</span>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            class="form-input" 
+                            placeholder="Username"
+                            required
+                        >
+                        <div class="input-underline"></div>
+                    </div>
+                </div>
+
+                <!-- Password Field -->
+                <div class="form-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔐</span>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-input" 
+                            placeholder="Password"
+                            required
+                        >
+                        <div class="input-underline"></div>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-login">
+                    <span class="btn-text">Entrar no Portal</span>
+                    <span class="btn-icon">→</span>
+                </button>
+
+            </form>
+
+            <!-- Footer -->
+            <div class="login-footer">
+                <p class="footer-text">
+                    Não tens conta? <a href="./signup.html" class="footer-link">Criar conta</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Decorative Elements -->
+        <div class="decoration top-left"></div>
+        <div class="decoration bottom-right"></div>
+    </section>
+
+    <script src="./assets/js/login.js"></script>
+
+</body>
+
+</html>
