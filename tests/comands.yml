@@ -1,31 +1,314 @@
 
-comands:
-  curl -I -X GET http://127.0.0.1:8080/uploads
-  curl -X POST -H "Content-Type: plain/text" --data "abc"
-  curl -X POST -F "file=@/path/to/file" http://127.0.0.1:8080/uploads
-  curl -X POST -H "Content-Type: application/octet-stream" --data-binary "@./tests/file.mp4" "http://127.0.0.1:8080/uploads/"
-  curl -X DELETE http://127.0.0.1:8080/delete/123
-    
-  wrk -t4 -c100 -d20s http://127.0.0.1:8080/index.html
-  siege -c50 -r100 http://127.0.0.1:8080/index.html
+# ============================================================================
+# WEBSERVER TEST COMMANDS - Comprehensive Testing Suite
+# ============================================================================
+# Este arquivo contém TODOS os testes críticos do webserver
+# Organizado por categorias de funcionalidade
+# ============================================================================
 
-cgi:
-  curl -s -X POST http://127.0.0.1:8080/cgi-bin/form_save.py \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "name=Test User&email=test@example.com&message=Teste"
+# ============================================================================
+# 1. GET - TESTES BÁSICOS (Expected: 200 OK)
+# ============================================================================
+get_basic:
+  curl -v http://127.0.0.1:8080/ 
+  curl -v http://127.0.0.1:8080/index.html
+  curl -v http://127.0.0.1:8080/landing.html
+  curl -v http://127.0.0.1:8080/login.html
+  curl -v http://127.0.0.1:8080/assets/css/index.css
+  curl -v http://127.0.0.1:8080/assets/js/index.js
+  curl -I http://127.0.0.1:8080/index.html
 
-  curl -s -X GET http://127.0.0.1:8080/cgi-bin/form_list.py
+# ============================================================================
+# 2. GET - DIRECTORY LISTING (Expected: 200 OK com autoindex)
+# ============================================================================
+get_directory_listing:
+  curl -v http://127.0.0.1:8080/uploads
+  curl -v http://127.0.0.1:8080/www
 
-  curl -s -X DELETE "http://127.0.0.1:8080/cgi-bin/form_list.py?id=1"
+# ============================================================================
+# 3. GET - REDIRECIONAMENTOS (Expected: 301/302)
+# ============================================================================
+get_redirects:
+  curl -v http://127.0.0.1:8080/old-page
+  curl -v http://127.0.0.1:8080/redirect-external
+  curl -L http://127.0.0.1:8080/old-page
 
-valgrind:
-   valgrind --leak-check=full --track-fds=yes --show-leak-kinds=all ./webserv config/default.conf
+# ============================================================================
+# 4. GET - ERROR CASES (Expected: 404, 403, 400)
+# ============================================================================
+get_errors:
+  curl -v http://127.0.0.1:8080/nao-existe.html
+  curl -v http://127.0.0.1:8080/arquivo-protegido.html
+  curl -v "http://127.0.0.1:8080/../../etc/passwd"
+  curl -v "http://127.0.0.1:8080/arquivo%00.php"
 
-wrk_siege:
+# ============================================================================
+# 5. POST - BÁSICO (Expected: 201 Created ou 204 No Content)
+# ============================================================================
+post_basic:
+  curl -v -X POST -H "Content-Type: plain/text" --data "Hello, World!" http://127.0.0.1:8080/uploads
+  curl -v -X POST -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "name=Test&email=test@example.com" http://127.0.0.1:8080/uploads
+
+# ============================================================================
+# 6. POST - UPLOAD DE ARQUIVO (Expected: 201 Created)
+# ============================================================================
+post_upload:
+  curl -v -X POST -F "file=@/path/to/file.txt" http://127.0.0.1:8080/uploads
+  curl -v -X POST -H "Content-Type: application/octet-stream" --data-binary "@./tests/file.mp4" "http://127.0.0.1:8080/uploads/"
+
+# ============================================================================
+# 7. POST - MÉTODO NÃO PERMITIDO (Expected: 405 Method Not Allowed)
+# ============================================================================
+post_method_not_allowed:
+  curl -v -X POST http://127.0.0.1:8080/
+  curl -v -X POST http://127.0.0.1:8080/index.html
+
+# ============================================================================
+# 8. POST - BODY TOO LARGE (Expected: 413 Payload Too Large)
+# ============================================================================
+post_413:
+  dd if=/dev/zero bs=1M count=100 | curl -v -X POST -H "Content-Length: $(stat -f%z /dev/zero)" --data-binary @- http://127.0.0.1:8080/uploads
+  curl -v -X POST --data-binary "$(python3 -c 'print(\"A\"*100000000)')" http://127.0.0.1:8080/uploads
+
+# ============================================================================
+# 9. POST - CHUNKED TRANSFER (Expected: 200/201)
+# ============================================================================
+post_chunked:
+  curl -v -X POST -H "Transfer-Encoding: chunked" --data-binary @/path/to/large-file http://127.0.0.1:8080/uploads
+
+# ============================================================================
+# 10. POST - MISSING CONTENT-TYPE (Expected: 200/201, server define padrão)
+# ============================================================================
+post_missing_content_type:
+  curl -v -X POST --data "teste data" http://127.0.0.1:8080/uploads
+
+# ============================================================================
+# 11. DELETE - BASIC (Expected: 204 No Content)
+# ============================================================================
+delete_basic:
+  curl -v -X DELETE http://127.0.0.1:8080/uploads/arquivo-teste.txt
+  curl -v -X DELETE http://127.0.0.1:8080/delete/123
+
+# ============================================================================
+# 12. DELETE - MÉTODO NÃO PERMITIDO (Expected: 405)
+# ============================================================================
+delete_method_not_allowed:
+  curl -v -X DELETE http://127.0.0.1:8080/
+  curl -v -X DELETE http://127.0.0.1:8080/index.html
+
+# ============================================================================
+# 13. DELETE - ARQUIVO NÃO EXISTE (Expected: 404)
+# ============================================================================
+delete_not_found:
+  curl -v -X DELETE http://127.0.0.1:8080/uploads/nao-existe-12345.txt
+
+# ============================================================================
+# 14. DELETE - ARQUIVO PROTEGIDO (Expected: 403 Forbidden)
+# ============================================================================
+delete_forbidden:
+  curl -v -X DELETE http://127.0.0.1:8080/index.html
+
+# ============================================================================
+# 15. CGI - BASIC GET (Expected: 200)
+# ============================================================================
+cgi_get:
+  curl -s -v http://127.0.0.1:8080/cgi-bin/hello.py
+  curl -s -v http://127.0.0.1:8080/cgi-bin/hello.php
+  curl -s -v http://127.0.0.1:8080/cgi-bin/test.py
+
+# ============================================================================
+# 16. CGI - GET COM QUERY STRING (Expected: 200)
+# ============================================================================
+cgi_get_querystring:
+  curl -s -v "http://127.0.0.1:8080/cgi-bin/hello.py?name=World&greeting=Hi"
+  curl -s -v "http://127.0.0.1:8080/cgi-bin/test.php?id=123&action=list"
+
+# ============================================================================
+# 17. CGI - POST (Expected: 200/201)
+# ============================================================================
+cgi_post:
+  curl -s -v -X POST http://127.0.0.1:8080/cgi-bin/form_save.py \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "name=Test User&email=test@example.com&message=Teste"
+  curl -s -v -X POST http://127.0.0.1:8080/cgi-bin/form_list.py
+
+# ============================================================================
+# 18. CGI - LIST FORMS (Expected: 200)
+# ============================================================================
+cgi_list:
+  curl -s -v -X GET http://127.0.0.1:8080/cgi-bin/form_list.py
+
+# ============================================================================
+# 19. CGI - DELETE (Expected: 204)
+# ============================================================================
+cgi_delete:
+  curl -s -v -X DELETE "http://127.0.0.1:8080/cgi-bin/form_list.py?id=1"
+
+# ============================================================================
+# 20. CGI - TIMEOUT (Expected: 504 Gateway Timeout)
+# ============================================================================
+cgi_timeout:
+  curl -v --max-time 5 http://127.0.0.1:8080/cgi-bin/slow_client.py
+  curl -v --max-time 10 http://127.0.0.1:8080/cgi-bin/loop.py
+
+# ============================================================================
+# 21. CGI - SCRIPT NÃO ENCONTRADO (Expected: 502 Bad Gateway)
+# ============================================================================
+cgi_not_found:
+  curl -v http://127.0.0.1:8080/cgi-bin/nao-existe.py
+  curl -v http://127.0.0.1:8080/cgi-bin/inexistent.php
+
+# ============================================================================
+# 22. AUTENTICAÇÃO - LOGIN (Expected: 200 + Set-Cookie)
+# ============================================================================
+auth_login:
+  curl -v -X POST http://127.0.0.1:8080/cgi-bin/login.py \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "username=admin&password=admin123" \
+    -c /tmp/cookies.txt
+
+# ============================================================================
+# 23. AUTENTICAÇÃO - SIGNUP (Expected: 201 Created)
+# ============================================================================
+auth_signup:
+  curl -v -X POST http://127.0.0.1:8080/cgi-bin/signup.py \
+    -H "Content-Type: application/x-www-form-urlencoded" \
+    -d "username=newuser&email=new@example.com&password=pass123"
+
+# ============================================================================
+# 24. AUTENTICAÇÃO - VERIFY SESSION (Expected: 200)
+# ============================================================================
+auth_verify:
+  curl -v -X GET http://127.0.0.1:8080/cgi-bin/verify_session.py \
+    -b /tmp/cookies.txt
+
+# ============================================================================
+# 25. AUTENTICAÇÃO - LOGOUT (Expected: 200)
+# ============================================================================
+auth_logout:
+  curl -v -X POST http://127.0.0.1:8080/cgi-bin/logout.py \
+    -b /tmp/cookies.txt
+
+# ============================================================================
+# 26. HEADERS - KEEP-ALIVE (Expected: Connection: keep-alive)
+# ============================================================================
+headers_keep_alive:
+  curl -v -H "Connection: keep-alive" http://127.0.0.1:8080/index.html
+  curl -v -H "Connection: keep-alive" http://127.0.0.1:8080/landing.html
+
+# ============================================================================
+# 27. HEADERS - CLOSE (Expected: Connection: close)
+# ============================================================================
+headers_close:
+  curl -v -H "Connection: close" http://127.0.0.1:8080/index.html
+
+# ============================================================================
+# 28. HEADERS - CUSTOM HEADERS (Expected: 200)
+# ============================================================================
+headers_custom:
+  curl -v -H "X-Custom-Header: test-value" http://127.0.0.1:8080/index.html
+  curl -v -H "User-Agent: MyCustomAgent/1.0" http://127.0.0.1:8080/index.html
+
+# ============================================================================
+# 29. MALFORMED REQUESTS (Expected: 400 Bad Request)
+# ============================================================================
+malformed:
+  curl -v "http://127.0.0.1:8080/ \r\n\r\n"
+  echo -e "GET /index.html\r\n\r\n" | nc 127.0.0.1 8080
+
+# ============================================================================
+# 30. SEGURANÇA - PATH TRAVERSAL (Expected: 403 ou 400)
+# ============================================================================
+security_path_traversal:
+  curl -v "http://127.0.0.1:8080/../../etc/passwd"
+  curl -v "http://127.0.0.1:8080/..\\..\\windows\\system32\\config\\sam"
+  curl -v "http://127.0.0.1:8080/uploads/../../index.html"
+
+# ============================================================================
+# 31. SEGURANÇA - NULL BYTE (Expected: 403 ou 400)
+# ============================================================================
+security_null_byte:
+  curl -v "http://127.0.0.1:8080/index.html%00.php"
+  curl -v "http://127.0.0.1:8080/archivo%00.txt"
+
+# ============================================================================
+# 32. PERFORMANCE - 100MB SINGLE (Expected: 201 Created)
+# ============================================================================
+performance_100mb_single:
+  dd if=/dev/zero bs=1M count=100 | curl -v -X POST -H "Content-Length: 104857600" --data-binary @- http://127.0.0.1:8080/uploads
+  python3 -c "import sys; sys.stdout.buffer.write(b'A'*104857600)" | curl -v -X POST --data-binary @- http://127.0.0.1:8080/uploads
+
+# ============================================================================
+# 33. PERFORMANCE - 20 USUÁRIOS x 5 REQUISIÇÕES x 100MB (Stress Test)
+# ============================================================================
+performance_stress_20x5:
+  for i in {1..20}; do (for j in {1..5}; do (dd if=/dev/zero bs=1M count=100 | curl -s -X POST --data-binary @- http://127.0.0.1:8080/uploads) & done; wait) & done; wait
+  # Alternativa com GNU parallel (se instalado):
+  # parallel -j 20 'for i in {1..5}; do dd if=/dev/zero bs=1M count=100 | curl -s -X POST --data-binary @- http://127.0.0.1:8080/uploads; done' ::: {1..20}
+
+# ============================================================================
+# 34. LOAD TESTING - WRK (Requer wrk instalado)
+# ============================================================================
+wrk_tests:
   wrk -t4 -c50 -d10s http://127.0.0.1:8080/index.html
+  wrk -t8 -c100 -d30s http://127.0.0.1:8080/
+  wrk -t4 -c50 -d10s -s wrk-post.lua http://127.0.0.1:8080/uploads
 
+# ============================================================================
+# 35. LOAD TESTING - SIEGE (Requer siege instalado)
+# ============================================================================
+siege_tests:
   siege -c50 -t10S -b http://127.0.0.1:8080/index.html
-
-  siege -c50 -t10S -b http://127.0.0.1:8080/tests/index.html
-
+  siege -c50 -t10S -b http://127.0.0.1:8080/
   siege -c50 -t10S -b http://127.0.0.1:8080/cgi-bin/hello.php
+  siege -c100 -t30S -b http://127.0.0.1:8080/uploads
+
+# ============================================================================
+# 36. CONTINUIDADE - KEEP-ALIVE (5 requisições na mesma conexão)
+# ============================================================================
+keep_alive_sequential:
+  curl -v -H "Connection: keep-alive" \
+    http://127.0.0.1:8080/index.html \
+    http://127.0.0.1:8080/landing.html \
+    http://127.0.0.1:8080/login.html \
+    http://127.0.0.1:8080/assets/css/index.css \
+    http://127.0.0.1:8080/assets/js/index.js
+
+# ============================================================================
+# 37. CONFIGURAÇÕES DIFERENTES (Testar com múltiplos servers)
+# ============================================================================
+config_tests:
+  curl -v http://127.0.0.1:8080/
+  curl -v http://127.0.0.1:8081/
+  curl -v http://127.0.0.1:8082/
+
+# ============================================================================
+# 38. VALIDAÇÃO - RESPONSE HEADERS (Verificar headers obrigatórios)
+# ============================================================================
+validation_response_headers:
+  curl -i http://127.0.0.1:8080/index.html | grep -E "Content-Type|Content-Length|Date|Server"
+  curl -i http://127.0.0.1:8080/ | grep -E "HTTP/1.1|Connection|Date"
+
+# ============================================================================
+# 39. MEMORY LEAK TESTING - VALGRIND
+# ============================================================================
+valgrind:
+  valgrind --leak-check=full --track-fds=yes --show-leak-kinds=all ./webserv config/default.conf
+  valgrind --leak-check=full --track-fds=yes ./webserv config/complete.conf
+
+# ============================================================================
+# 40. ANTES vs DEPOIS - Performance Baseline (Fase 1 Optimization)
+# ============================================================================
+benchmark_before_after:
+  # Antes da otimização: /mnt/d/NdDaniel/Code/42/Webserver/webserv.before
+  time /mnt/d/NdDaniel/Code/42/Webserver/webserv.before config/default.conf &
+  sleep 2
+  dd if=/dev/zero bs=1M count=100 | curl -s -X POST --data-binary @- http://127.0.0.1:8080/uploads > /dev/null
+  pkill -f "webserv.before"
+  
+  # Depois da otimização: /mnt/d/NdDaniel/Code/42/Webserver/webserv
+  time /mnt/d/NdDaniel/Code/42/Webserver/webserv config/default.conf &
+  sleep 2
+  dd if=/dev/zero bs=1M count=100 | curl -s -X POST --data-binary @- http://127.0.0.1:8080/uploads > /dev/null
+  pkill -f "webserv"
