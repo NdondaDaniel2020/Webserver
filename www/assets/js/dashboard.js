@@ -75,6 +75,15 @@ function setupEventListeners() {
 
     document.getElementById('sendBtn').addEventListener('click', sendHttpRequest);
 
+    // File input change handler
+    const fileInput = document.getElementById('testFile');
+    if (fileInput) {
+        fileInput.addEventListener('change', function() {
+            const fileName = this.files.length > 0 ? this.files[0].name : 'nenhum';
+            document.getElementById('fileName').textContent = fileName;
+        });
+    }
+
     // Form Database
     document.getElementById('dataForm').addEventListener('submit', saveFormData);
     document.getElementById('refreshBtn').addEventListener('click', loadFormData);
@@ -154,12 +163,25 @@ function selectContentType(type) {
         btn.classList.remove('active');
     });
     document.querySelector(`[data-type="${type}"]`).classList.add('active');
+
+    // Show/hide file input based on content type
+    const fileSection = document.getElementById('fileSection');
+    const bodySection = document.getElementById('bodySection');
+    
+    if (type === 'multipart/form-data' || type === 'application/octet-stream') {
+        fileSection.style.display = 'block';
+        bodySection.style.display = 'none';
+    } else {
+        fileSection.style.display = 'none';
+        bodySection.style.display = 'block';
+    }
 }
 
 function sendHttpRequest() {
     const method = currentMethod;
     const url = document.getElementById('testUrl').value.trim();
     const body = document.getElementById('testBody').value.trim();
+    const fileInput = document.getElementById('testFile');
 
     if (!url) {
         showError('Por favor, insere uma URL');
@@ -175,11 +197,31 @@ function sendHttpRequest() {
         credentials: 'include'
     };
 
-    if (method === 'POST' && body) {
-        options.headers = {
-            'Content-Type': currentContentType
-        };
-        options.body = body;
+    if (method === 'POST') {
+        // Handle file uploads
+        if ((currentContentType === 'multipart/form-data' || currentContentType === 'application/octet-stream') && fileInput.files.length > 0) {
+            const file = fileInput.files[0];
+            
+            if (currentContentType === 'multipart/form-data') {
+                // Multipart Form Data
+                const formData = new FormData();
+                formData.append('file', file);
+                options.body = formData;
+                // Don't set Content-Type header, browser will set it automatically
+            } else if (currentContentType === 'application/octet-stream') {
+                // Binary data
+                options.headers = {
+                    'Content-Type': 'application/octet-stream'
+                };
+                options.body = file;
+            }
+        } else if (body) {
+            // Text-based body
+            options.headers = {
+                'Content-Type': currentContentType
+            };
+            options.body = body;
+        }
     }
 
     fetch(url, options)
