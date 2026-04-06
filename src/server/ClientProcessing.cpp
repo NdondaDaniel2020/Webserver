@@ -45,6 +45,15 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
     }
 
     const LocationConfig *location = findMatchingLocation(server_config, request.getUri());
+    
+    // Definir timeout: location > global (fallback)
+    if (location && location->timeout > 0)
+        timeout = location->timeout;
+    else if (server_config.timeout > 0)
+        timeout = server_config.timeout;
+    else
+        timeout = 0;
+
     if (location && !location->cgi_handlers.empty())
     {
         bool method_allowed = false;

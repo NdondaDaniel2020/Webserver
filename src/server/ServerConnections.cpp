@@ -139,6 +139,7 @@ void Server::checkTimeout()
         if (client->isCgiActive())
         {
             time_t cgi_timeout = client->getCgiTimeout();
+
             if (now - client->getCgiStartTime() > cgi_timeout)
             {
                 std::cout << "[TIMEOUT] CGI fd=" << client_fd
@@ -148,12 +149,16 @@ void Server::checkTimeout()
             }
         }
 
-        if (now - client->getLastActivity() > TIMEOUT_SECONDS)
+        time_t client_timeout = client->getTimeout();
+        if (client_timeout == 0)
+            client_timeout = TIMEOUT_SECONDS; // usar padrão se não configurado
+
+        if (now - client->getLastActivity() > client_timeout)
         {
             std::cout << "[TIMEOUT] Cliente fd=" << client_fd
                       << " inactivo por "
                       << (now - client->getLastActivity())
-                      << "s" << std::endl;
+                      << "s (limite: " << client_timeout << "s)" << std::endl;
             client->sendTimeoutResponse();
             to_close.push_back(client_fd);
         }

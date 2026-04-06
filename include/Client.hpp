@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:30:38 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/06 07:39:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/06 07:57:14 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -84,6 +84,7 @@ private:
     bool                check_valid_header;
     int                 server_index;
     time_t              cgi_timeout;
+    time_t              timeout;
 
 public:
     Client(int fd, const ConfigParser* config, int server_index);
@@ -99,6 +100,7 @@ public:
     time_t              getLastActivity() const;
     time_t              getCgiStartTime() const;
     time_t              getCgiTimeout() const;
+    time_t              getTimeout() const;
     bool                hasDataToSend() const;
     bool                isCgiActive() const;
     const std::string&  getRecvBuffer() const;

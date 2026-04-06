@@ -25,11 +25,13 @@ struct LocationConfig {
     size_t client_max_body_size;
     std::string upload_dir;
     time_t cgi_timeout;
+    time_t timeout;
 
     LocationConfig() : autoindex(false), 
                        redirect_code(0), 
                        client_max_body_size(0),
-                       cgi_timeout(0) {}
+                       cgi_timeout(0),
+                       timeout(0) {}
 };
 
 struct ServerConfig {
@@ -42,12 +44,14 @@ struct ServerConfig {
     size_t client_max_body_size;
     std::vector<LocationConfig> locations;
     time_t cgi_timeout;
+    time_t timeout;
     
     ServerConfig() : port(0), 
                      server_name(""),
                      root(""),
                      client_max_body_size(0),
-                     cgi_timeout(0) {}
+                     cgi_timeout(0),
+                     timeout(0) {}
 };
 
 class ConfigParser
