@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/06 07:36:06 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/06 13:45:32 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -236,27 +236,33 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
     {
         std::cout << "[EPOLLHUP] CGI pipe closed for client fd=" << c->getFd() << std::endl;
 
-        // Só processar se CGI ainda está ativo (não foi processado em handleCgiStdoutReadable)
         if (!c->isCgiActive())
-        {
             return;
-        }
 
         Client::CgiState& cgi_state = c->getCgiState();
-        int status;
+        if (cgi_state.pipe_out[0] >= 0)
+        {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi_state.pipe_out[0], NULL);
+            cgi_fd_map.erase(cgi_state.pipe_out[0]);
+            close(cgi_state.pipe_out[0]);
+            cgi_state.pipe_out[0] = -1;
+        }
+
+        int status = 0;
         pid_t result = waitpid(cgi_state.pid, &status, WNOHANG);
         if (result == cgi_state.pid)
         {
             std::cout << "[CGI] Processo terminou (status=" << WEXITSTATUS(status) << ")" << std::endl;
-            c->finishCgiAndGenerateResponse();
+        }
+        else if (result == 0)
+        {
+            std::cout << "[CGI] Processo ainda rodando, finalizando com dados parciais" << std::endl;
         }
         else if (result < 0)
         {
             std::cerr << "[CGI] waitpid error: " << strerror(errno) << std::endl;
-            c->finishCgiAndGenerateResponse();
         }
-        
-        // Tentar enviar resposta imediatamente (ao menos começar)
+        c->finishCgiAndGenerateResponse();
         if (c->getState() == Client::SENDING_RESPONSE && c->hasDataToSend())
         {
             bool finished = c->sendData();
@@ -267,7 +273,6 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
                 else
                     closeClient(c->getFd());
             }
-            // Se não terminou, o event loop continuará enviando gradualmente
         }
     }
 }
