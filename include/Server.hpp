@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:17 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/01 11:21:01 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/06 07:36:12 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -41,7 +41,6 @@ class Server
         std::map<int, Client*>   clients;      // fd cliente -> Client*
         std::map<int, Client*>   cgi_fd_map;   // fd pipe CGI -> Client*
         int                      TIMEOUT_SECONDS;
-        int                      CGI_TIMEOUT_SECONDS;
         bool                     shutdown_requested;
         bool                     cleaned_up;
 

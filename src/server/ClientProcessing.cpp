@@ -69,6 +69,13 @@ void Client::processRequest(const ServerConfig &server_config, int epoll_fd)
             return;
         }
 
+        if (location->cgi_timeout > 0)
+            cgi_timeout = location->cgi_timeout;
+        else if (server_config.cgi_timeout > 0)
+            cgi_timeout = server_config.cgi_timeout;
+        else
+            cgi_timeout = 0;
+
         std::cout << "[CLIENT " << fd << "] Iniciando CGI para " << request.getUri() << std::endl;
         state = CGI_RUNNING;
         updateLastActivity();

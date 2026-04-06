@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/04 00:21:19 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/06 07:39:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -31,7 +31,8 @@ Client::Client(int fd, const ConfigParser *config, int server_index)
       is_cgi_active(false),
       is_chunked(false),
       check_valid_header(false),
-      server_index(server_index)
+      server_index(server_index),
+      cgi_timeout(0)
 {
     updateLastActivity();
 }
@@ -155,6 +156,11 @@ time_t    Client::getCgiStartTime() const
     return cgi.start_time;
 }
 
+time_t              Client::getCgiTimeout() const
+{
+    return cgi_timeout;
+}
+
 const std::string& Client::getRecvBuffer() const
 {
     return recv_buffer;
@@ -242,6 +248,7 @@ void Client::reset()
     is_cgi_active = false;
     check_valid_header = false;
     cgi = CgiState();
+    cgi_timeout = 0;
     
     state = READING_HEADERS;
     updateLastActivity();

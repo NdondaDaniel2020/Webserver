@@ -13,6 +13,7 @@ namespace ConfigHelper
     void parseIndex(const std::string& value, std::vector<std::string>& index_files);
     void extractKeyValue(const std::string& line, std::string& key, std::string& value);
     void parseErrorPage(const std::string& value, std::map<std::string, std::string>& error_pages);
+    void parseCgiTimeout(const std::string& value, time_t& cgi_timeout);
     void parseCommonConfig(const std::string& key, const std::string& value, ServerConfig& server);
     void parseCommonConfig(const std::string& key, const std::string& value, LocationConfig& location);
 

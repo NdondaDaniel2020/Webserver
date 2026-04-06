@@ -50,6 +50,42 @@ namespace ConfigHelper
         code = atoi(code_str.c_str());
     }
 
+    void parseCgiTimeout(const std::string &value, time_t &cgi_timeout)
+    {
+        std::string trimmed = StringUtils::trim(value);
+        
+        if (trimmed.empty())
+        {
+            cgi_timeout = 0;
+            return;
+        }
+        
+        char unit = trimmed[trimmed.length() - 1];
+        std::string num_str;
+        
+        if (unit == 'h' || unit == 'H')
+        {
+            num_str = trimmed.substr(0, trimmed.length() - 1);
+            long val = std::atol(num_str.c_str());
+            cgi_timeout = val * 3600;
+        }
+        else if (unit == 'm' || unit == 'M')
+        {
+            num_str = trimmed.substr(0, trimmed.length() - 1);
+            long val = std::atol(num_str.c_str());
+            cgi_timeout = val * 60;
+        }
+        else if (unit == 's' || unit == 'S')
+        {
+            num_str = trimmed.substr(0, trimmed.length() - 1);
+            cgi_timeout = std::atol(num_str.c_str());
+        }
+        else
+        {
+            cgi_timeout = std::atol(trimmed.c_str());
+        }
+    }
+
     void parseCommonConfig(const std::string &key, const std::string &value, ServerConfig &server)
     {
         if (key == "root")
@@ -58,6 +94,8 @@ namespace ConfigHelper
             parseIndex(value, server.index_files);
         else if (key == "client_max_body_size")
             parseClientMaxBodySize(value, server.client_max_body_size);
+        else if (key == "cgi_timeout")
+            parseCgiTimeout(value, server.cgi_timeout);
         else
             throw std::runtime_error("invalid directive " + key);
     }
@@ -72,6 +110,8 @@ namespace ConfigHelper
             parseIndex(value, location.index_files);
         else if (key == "client_max_body_size")
             parseClientMaxBodySize(value, location.client_max_body_size);
+        else if (key == "cgi_timeout")
+            parseCgiTimeout(value, location.cgi_timeout);
         else if (key == "allowed_methods")
         {
             std::istringstream iss(StringUtils::trim(value));

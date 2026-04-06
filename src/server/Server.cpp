@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/10/30 13:40:20 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/03 16:31:09 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/06 07:36:06 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -20,7 +20,6 @@ Server::Server(const ConfigParser &config)
       interface(NULL),
       config(config),
       TIMEOUT_SECONDS(120),
-      CGI_TIMEOUT_SECONDS(60),
       shutdown_requested(false),
       cleaned_up(false)
 {
