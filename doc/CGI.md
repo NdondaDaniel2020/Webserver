@@ -1,9 +1,10 @@
 # 🔴 Implementacao CGI Atual (Detalhada)
 
-**Última Atualização:** 31 de Março de 2026  
+**Última Atualização:** 6 de Abril de 2026  
 **Revisão Crítica:** 27 de Março - 31 de Março de 2026  
 **Revisão Final:** 1º de Abril de 2026 - Fork/pipes/env documentados, 7 problemas listados  
-**Status:** ✅ DOCUMENTADO - Implementação completa, race conditions identificadas
+**Atualização:** 6 de Abril de 2026 - CGI timeout documentado, extensões customizadas clarificadas  
+**Status:** ✅ DOCUMENTADO - Implementação completa com timeout, race conditions identificadas
 
 ## Escopo
 
@@ -92,6 +93,114 @@ Como a associacao depende de estado (extensao antes do path), uma configuracao f
 - Handler mapeado para chave temporaria vazia
 
 Recomendacao: Parser deveria validar ordem ou usar sintaxe sem estado (ex: `cgi_handler .py /usr/bin/python3`)
+
+### 2.4 CGI Timeout Configuration
+
+Os processos CGI podem ser executados por tempo indefinido se mal-comportados (loops infinitos, operações bloqueantes). Para evitar resource leak e timeouts de cliente, implementamos **cgi_timeout** configurável em dois níveis:
+
+#### **Timeout Global (Server Level)**
+
+```conf
+server {
+    listen 8080;
+    cgi_timeout 30;  # Padrão para TODAS as locations
+    # ...
+}
+```
+
+Definido em `ServerConfig::cgi_timeout`, herdado por todas as locations caso não sejam overridadas.
+
+#### **Timeout Per-Location**
+
+```conf
+location /cgi-bin {
+    cgi_timeout 60;  # Override para esta location específica
+    # ...
+}
+```
+
+Definido em `LocationConfig::cgi_timeout`, sobrescreve o valor global.
+
+#### **Formato de Timeout**
+
+O parser `ConfigHelper::parseCgiTimeout()` suporta múltiplos formatos:
+
+```
+cgi_timeout 30;           # 30 segundos (valor numérico puro)
+cgi_timeout 30s;          # 30 segundos (unidade s)
+cgi_timeout 2m;           # 2 minutos = 120 segundos
+cgi_timeout 1h;           # 1 hora = 3600 segundos
+```
+
+**Implementação do parser:**
+```cpp
+void parseCgiTimeout(const std::string &value, time_t &cgi_timeout)
+{
+    std::string trimmed = StringUtils::trim(value);
+    char unit = trimmed[trimmed.length() - 1];
+    
+    if (unit == 'h' || unit == 'H')
+        cgi_timeout = std::atol(num_str.c_str()) * 3600;
+    else if (unit == 'm' || unit == 'M')
+        cgi_timeout = std::atol(num_str.c_str()) * 60;
+    else if (unit == 's' || unit == 'S')
+        cgi_timeout = std::atol(num_str.c_str());
+    else
+        cgi_timeout = std::atol(trimmed.c_str());  // Padrão: segundos
+}
+```
+
+#### **Aplicação do Timeout**
+
+1. **Início do CGI:** `Client::startCgi()` registra `cgi.start_time = time(NULL)`
+2. **Verificação:** Em `Client::handleCgiStdoutReadable()`, ao ler dados do pipe CGI:
+   ```cpp
+   time_t elapsed = time(NULL) - cgi.start_time;
+   if (elapsed > cgi_timeout) {
+       // Kill processo, retorna erro 504 Gateway Timeout
+       kill(cgi.pid, SIGTERM);
+   }
+   ```
+3. **Limpeza:** `Client::finishCgiAndGenerateResponse()` garante que processo filhopermaneça morto
+
+#### **Exemplo Prático (default.conf)**
+
+```conf
+server {
+    listen 127.0.0.1:8081;
+    
+    # Timeout global
+    timeout 120;          # 120s para conexões HTTP (inatividade)
+    cgi_timeout 30;       # 30s para scripts CGI globalmente
+    
+    location /cgi-bin {
+        # Override per-location
+        cgi_timeout 60;   # Scripts CGI nesta location tem 60s
+        timeout 180;      # Conexões HTTP nesta location tem 180s
+        
+        cgi_extension .py;
+        cgi_path /usr/bin/python3;
+    }
+    
+    location /slow-cgi {
+        # Timeout mais longo para operações lentas
+        cgi_timeout 300;  # 5 minutos
+        
+        cgi_extension .py;
+        cgi_path /usr/bin/python3;
+    }
+}
+```
+
+#### **Diferenças: timeout vs cgi_timeout**
+
+| Aspecto | `timeout` | `cgi_timeout` |
+|---------|-----------|--------------|
+| **Aplicação** | Inatividade em conexão HTTP (epoll) | Execução de script CGI apenas |
+| **Gatilho** | Sem dados por N segundos | Script rodando por N segundos |
+| **Ação** | Fecha socket HTTP, 408 Request Timeout | Kill processo filhom 504 Gateway Timeout |
+| **Escopo** | Todas requisições (estáticas + CGI) | Apenas requisições CGI |
+| **Default** | 120s | 0 (ilimitado) |
 
 ---
 

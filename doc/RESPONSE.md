@@ -13,9 +13,10 @@
 - Implementar redirects configurados
 
 **Data de Criação:** 2 de Março de 2026 (v1.0)  
-**Última Atualização:** 2 de Março de 2026  
+**Última Atualização:** 6 de Abril de 2026  
 **Revisão Crítica:** 31 de Março de 2026 - Problemas de sincronização e parsing identificados  
 **Revisão Final:** 1º de Abril de 2026 - GET/POST/DELETE e segurança completos  
+**Atualização:** 6 de Abril de 2026 - Form URL-encoded POST documentado  
 **Autor:** nmatondo
 
 > **👉 Navegação:** Veja [INDEX.md](INDEX.md) para índice centralizado de toda documentação
@@ -267,7 +268,7 @@ if (content_type.find("multipart/form-data") != std::string::npos)
 ```
 Chamada para multipartFormData() com processamento completo.
 
-**3.2 - application/x-www-form-urlencoded (Form Data)**
+**3.2 - application/x-www-form-urlencoded (Form Data Padrão HTML)**
 ```cpp
 if (content_type.find("application/x-www-form-urlencoded") != std::string::npos)
 {
@@ -299,6 +300,146 @@ if (content_type.find("text/plain") != std::string::npos)
 else
     → 415 Unsupported Media Type
 ```
+
+---
+
+#### 📋 **Detalhamento: application/x-www-form-urlencoded** (Novo - 6 Abril 2026)
+
+Este é o Content-Type padrão para formulários HTML. Formato: `key1=value1&key2=value2&key3=value3`
+
+**Origem:** Quando um formulário HTML é enviado sem attribute `enctype`:
+```html
+<form method="POST" action="/api/login">
+    <!-- Sem enctype, usa application/x-www-form-urlencoded por padrão -->
+    <input name="username" value="alice">
+    <input type="password" name="password" value="senha123">
+    <button type="submit">Login</button>
+</form>
+```
+
+Browser envia:
+```
+POST /api/login HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 32
+
+username=alice&password=senha123
+```
+
+**Processamento no Webserver:**
+
+```cpp
+// 1. Validar Content-Type
+if (content_type.find("application/x-www-form-urlencoded") == std::string::npos)
+    return;  // Não é form-urlencoded
+
+// 2. Extrair body da requisição
+std::string raw_body = request.getBody();
+// Exemplo: "username=alice&password=senha123"
+
+// 3. URL-decode o formulário
+std::string decoded_body = HttpRequest::urlDecode(raw_body);
+// Resultado: "username=alice&password=senha123" (sem encoding especial aqui)
+
+// 4. Parse pares key=value (OPCIONAL - nosso servidor só ecoa)
+std::vector<std::pair<std::string, std::string>> form_fields;
+size_t pos = 0;
+while (pos < decoded_body.length()) {
+    size_t ampersand = decoded_body.find('&', pos);
+    std::string pair = decoded_body.substr(pos, ampersand - pos);
+    
+    size_t equals = pair.find('=');
+    if (equals != std::string::npos) {
+        std::string key = pair.substr(0, equals);
+        std::string value = pair.substr(equals + 1);
+        form_fields.push_back(std::make_pair(key, value));
+    }
+    
+    pos = (ampersand == std::string::npos) ? decoded_body.length() : ampersand + 1;
+}
+
+// 5. Gerar resposta
+StatusCodes::http200Ok(response_str, 
+    "{\"message\":\"Form data recebido\",\"fields\":" + 
+    std::to_string(form_fields.size()) + "}");
+```
+
+**URL Encoding (Caracteres Especiais):**
+
+Quando um campo contém caracteres especiais, o browser os codifica:
+
+```
+Campo: "email"
+Valor: "alice+silva@example.com"
+
+Encoded: "email=alice%2Bsilva%40example.com"
+                      ↑            ↑
+                    %2B = +      %40 = @
+```
+
+Nosso `HttpRequest::urlDecode()` converte `%XX` de volta:
+```cpp
+static std::string urlDecode(const std::string& encoded) {
+    std::string decoded;
+    for (size_t i = 0; i < encoded.length(); ++i) {
+        if (encoded[i] == '%' && i + 2 < encoded.length()) {
+            // Converter %XX para char
+            int hex_value = 
+                (hexToInt(encoded[i+1]) << 4) | hexToInt(encoded[i+2]);
+            decoded += static_cast<char>(hex_value);
+            i += 2;
+        } else if (encoded[i] == '+') {
+            decoded += ' ';  // + representa espaço em form-urlencoded
+        } else {
+            decoded += encoded[i];
+        }
+    }
+    return decoded;
+}
+```
+
+**Exemplo Real:**
+
+Requisição:
+```
+POST /api/search HTTP/1.1
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 47
+
+query=hello+world&category=books&limit=10
+```
+
+Parsed:
+```
+query: "hello world"      (+ decodificado para espaço)
+category: "books"
+limit: "10"
+```
+
+Resposta Server:
+```json
+{
+    "message": "Form data recebido",
+    "fields": 3,
+    "parsed": {
+        "query": "hello world",
+        "category": "books",
+        "limit": "10"
+    }
+}
+```
+
+**Comparação: Form-Urlencoded vs Multipart**
+
+| Aspecto | Form-Urlencoded | Multipart |
+|---------|-----------------|-----------|
+| **Sintaxe** | `key=value&key2=value2` | Boundaries + headers |
+| **Uso Típico** | Formulários simples, dados textuais | Uploads de arquivo |
+| **Tamanho** | Menor (sem overhead) | Maior (overhead boundaries) |
+| **Arquivo** | ❌ Não suporta | ✅ Suporta |
+| **Encoding** | URL-encoded (%XX, +) | Binary seguro |
+| **Implementação** | Simples (split & decode) | Complexa (parsing de boundary) |
+| **Exemplo Form** | `<form>` padrão | `<form enctype="multipart/form-data">` |
 
 ---
 

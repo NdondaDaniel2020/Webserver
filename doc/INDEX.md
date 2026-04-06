@@ -1,7 +1,7 @@
 # 📚 Índice de Documentação do Webserver
 
-**Última Atualização:** 1º de Abril de 2026  
-**Status:** ✅ Documentação Completa (8 documentos, ~12K linhas)
+**Última Atualização:** 6 de Abril de 2026  
+**Status:** ✅ Documentação Completa (10 documentos, ~14K linhas)
 
 ---
 
@@ -50,13 +50,14 @@
               └────────────┬──────────┴─────────────┴───────┬────┘
                           │                                │
                           v                                v
-                      CGI.md                       IMPLEMENTATION.md
-                      (2,500+ linhas)              (Opcional: detalhes)
+                      CGI.md                         AUTH.md        IMPLEMENTATION.md
+                      (2,500+ linhas)                (800 linhas)   (Opcional: detalhes)
                       
-                      • Fork/pipes
-                      • execve setup
-                      • 31+ variáveis env
-                      • Race conditions
+                      • Fork/pipes                  • Login/Signup
+                      • execve setup                  • Autenticação CGI
+                      • 31+ variáveis env            • Session tokens
+                      • Race conditions              • Endpoints REST
+                      • Timeout configurável         • Form-based auth
 ```
 
 ---
@@ -96,11 +97,16 @@
    - Execução de scripts
    - Non-blocking I/O
 
-8. **[TROUBLESHOOTING.md](doc/TROUBLESHOOTING.md)** (20 min)
+8. **[AUTH.md](doc/AUTH.md)** (15 min)
+   - Autenticação de usuários
+   - Login/Signup endpoints
+   - Session tokens
+
+9. **[TROUBLESHOOTING.md](doc/TROUBLESHOOTING.md)** (20 min)
    - Resolver problemas
    - Técnicas de debug
 
-**Tempo Total:** ~2 horas para entendimento básico
+**Tempo Total:** ~2.5 horas para entendimento completo
 
 ---
 
@@ -279,12 +285,35 @@
   - Race conditions e sincronização
   - Problemas identificados (7 críticos)
   - Exemplos de scripts
+  - **NEW:** CGI Timeout configurável
 
 **Quando ler:**
 - CGI retorna erro 502?
 - Variável de env não setada?
 - Script CGI não executa?
 - Entender fork/pipes/exec
+- Timeout de script em execução
+
+---
+
+### AUTH.md (doc/) - **NOVO 6 Abril 2026**
+- **Tamanho:** 800 linhas
+- **Tempo de leitura:** 15 minutos
+- **Propósito:** Autenticação e endpoints de usuário
+- **Seções:**
+  - Sistema de autenticação implementado
+  - Endpoints: /api/login, /api/signup, /api/logout
+  - Verificação de sessão
+  - Form-based authentication via CGI
+  - Database de usuários (simulation)
+  - Token/session handling
+  - Endpoints protegidos
+
+**Quando ler:**
+- Implementar novo endpoint de auth?
+- Login/Signup não funciona?
+- Entender fluxo de autenticação
+- Session tokens não persistem?
 
 ---
 
@@ -336,13 +365,14 @@
 |-----------|--------|--------|-------------------|
 | README.md | 430 | ✅ Atualizado | 1º Abril 2026 |
 | ARCHITECTURE.md | 920 | ✅ Novo | 1º Abril 2026 |
-| SERVER.md | 1.845 | ✅ Completo | 31 Março 2026 |
+| SERVER.md | 1.845 | ✅ Completo | 6 Abril 2026 |
 | CLIENT.md | 1.330 | ✅ Completo | 31 Março 2026 |
-| RESPONSE.md | 1.979 | ✅ Completo | 31 Março 2026 |
+| RESPONSE.md | 2.100 | ✅ Atualizado | 6 Abril 2026 |
 | PARSING.md | 1.978 | ✅ Completo | 31 Março 2026 |
-| CGI.md | 2.500+ | ✅ Completo | 31 Março 2026 |
+| CGI.md | 2.700+ | ✅ Atualizado | 6 Abril 2026 |
+| AUTH.md | 800 | ✅ Novo | 6 Abril 2026 |
 | TROUBLESHOOTING.md | 750 | ✅ Novo | 1º Abril 2026 |
-| **TOTAL** | **~12.0K** | ✅ | 1º Abril 2026 |
+| **TOTAL** | **~13.9K** | ✅ | 6 Abril 2026 |
 
 ---
 

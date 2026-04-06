@@ -4,7 +4,8 @@
 **19 de Fevereiro de 2026** - Data de Criação  
 **2 de Março de 2026** - Atualização Base  
 **27-31 de Março de 2026** - Revisão Crítica: 26 Problemas encontrados  
-**1º de Abril de 2026** - Revisão Final e Integração com Documentação
+**1º de Abril de 2026** - Revisão Final e Integração com Documentação  
+**6 de Abril de 2026** - Atualização: Timeout global e per-location documentados
 
 ---
 
@@ -642,6 +643,135 @@ while (this->running) {
 - ✅ O(n) simples (vs O(log n) de heap-based timeout wheels)
 - ✅ Integrado no loop principal → sem threads/callbacks
 - ✅ Configurável via `TIMEOUT_SECONDS` constante
+
+---
+
+### 🆕 **Timeout Global vs Per-Location (6 de Abril de 2026)**
+
+A partir de 6 de Abril de 2026, o webserver suporta **configuração granular de timeouts** em dois níveis:
+
+#### **1. Timeout Global (Server Level)**
+
+```conf
+server {
+    listen 8080;
+    timeout 120;       # Padrão para TODAS as conexões
+    cgi_timeout 30;    # Padrão para TODOS os scripts CGI
+}
+```
+
+Implementado em `ServerConfig`:
+```cpp
+struct ServerConfig {
+    time_t timeout;           // Timeout global da conexão (segundos)
+    time_t cgi_timeout;       // Timeout global de CGI (segundos)
+    // ... outros membros
+};
+```
+
+#### **2. Timeout Per-Location (Location Level)**
+
+```conf
+location /uploads {
+    timeout 300;       # Override: 300s para esta location
+    cgi_timeout 60;    # Override: 60s para CGI nesta location
+}
+```
+
+Implementado em `LocationConfig`:
+```cpp
+struct LocationConfig {
+    time_t timeout;           // Timeout específico desta location
+    time_t cgi_timeout;       // Timeout de CGI específico desta location
+    // ... outros membros
+};
+```
+
+#### **3. Resolução de Timeout (Algoritmo)**
+
+Quando um cliente entra em uma location específica, o timeout aplicado segue esta ordem:
+
+```
+1. Client recebe ServerConfig na construção (timeout global)
+2. Client::processRequest() encontra matching location
+3. IF location.timeout > 0:
+       usar location.timeout
+   ELSE:
+       usar server.timeout (global)
+4. Client::last_activity é comparado com timeout aplicável
+```
+
+**Pseudocódigo em Client::processRequest():**
+```cpp
+const LocationConfig* loc = findMatchingLocation(request.path);
+
+time_t applied_timeout = config.timeout;  // Default: global
+if (loc && loc.timeout > 0) {
+    applied_timeout = loc.timeout;         // Override per-location
+}
+
+// Usar applied_timeout na próxima verificação
+```
+
+#### **4. Casos de Uso Práticos**
+
+| Cenário | Config | Benefício |
+|---------|--------|-----------|
+| Upload de arquivo grande | `location /uploads { timeout 600; }` | Não timeout durante upload lento |
+| API rápida | `location /api { timeout 10; }` | Detectar clientes mortos rapidamente |
+| CGI lento | `location /cgi { cgi_timeout 300; }` | Script pode rodar 5 minutos |
+| Padrão | `server { timeout 120; }` | Fallback sensato para outras locations |
+
+#### **5. Exemplo Completo (default.conf)**
+
+```conf
+server {
+    listen 127.0.0.1:8080;
+    
+    # Timeouts globais
+    timeout 120;
+    cgi_timeout 30;
+    
+    # Location padrão (usa global)
+    location / {
+        root www;
+        index index.html;
+        # Herda: timeout=120, cgi_timeout=30
+    }
+    
+    # Location com timeout longo
+    location /uploads {
+        timeout 600;         # 10 minutos para uploads
+        allowed_methods GET POST DELETE;
+        client_max_body_size 500M;
+        # Herda: cgi_timeout=30 (global)
+    }
+    
+    # CGI com timeout específico
+    location /slow-api {
+        cgi_timeout 180;     # 3 minutos para scripts CGI
+        timeout 300;         # 5 minutos conexão HTTP
+        
+        cgi_extension .py;
+        cgi_path /usr/bin/python3;
+    }
+    
+    # Tempo real (rápido)
+    location /health {
+        timeout 5;           # Muito rápido
+        # Sem CGI
+    }
+}
+```
+
+#### **6. Diferenças com Nginx**
+
+| Aspecto | Nosso Webserver | Nginx |
+|--------|----------------|-------|
+| Syntax | `timeout` | `client_body_timeout`, `send_timeout` |
+| Granularidade | Por location | Por operação (read/write/upload) |
+| Default | 120s | Varia (60s típico) |
+| Per-location | ✅ Sim | ✅ Sim |
 
 ---
 
