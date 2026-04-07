@@ -25,7 +25,7 @@ int Server::createServerSocket(const std::string &interface, int port)
         return -1;
     }
 
-    if (listen(server_fd, SOMAXCONN) < 0) // SOMAXCONN em vez de 10
+    if (listen(server_fd, SOMAXCONN) < 0)
     {
         perror("listen");
         close(server_fd);
@@ -151,7 +151,7 @@ void Server::checkTimeout()
 
         time_t client_timeout = client->getTimeout();
         if (client_timeout == 0)
-            client_timeout = TIMEOUT_SECONDS; // usar padrão se não configurado
+            client_timeout = TIMEOUT_SECONDS;
 
         if (now - client->getLastActivity() > client_timeout)
         {
@@ -172,7 +172,6 @@ void Server::checkTimeout()
             continue;
         Client *client = it->second;
 
-        // Mata o CGI e envia timeout response
         client->finishCgiAndGenerateResponse();
         to_close.push_back(cgi_timeout_vec[i]);
     }

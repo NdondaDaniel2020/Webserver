@@ -5,10 +5,10 @@
 # include <sys/stat.h>
 # include "ConfigParser.hpp"
 
-#include <netdb.h>      // getaddrinfo, freeaddrinfo, gai_strerror
-#include <arpa/inet.h>  // inet_ntop
-#include <sys/socket.h> // sockaddr
-#include <netinet/in.h> // sockaddr_in, sockaddr_in6
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
 
 namespace ConfigValidator
 {

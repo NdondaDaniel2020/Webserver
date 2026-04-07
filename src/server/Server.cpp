@@ -185,16 +185,13 @@ void Server::start()
                 if (cit != cgi_fd_map.end())
                 {
                     Client *c = cit->second;
-                    // ✅ Validar que o Client* ainda é válido (existe no clients map)
                     std::map<int, Client*>::iterator client_check = clients.find(c->getFd());
                     if (client_check != clients.end() && client_check->second == c)
                     {
-                        // Client é válido, processar evento
                         handleCgiPipeEvent(c, events[i].events);
                     }
                     else
                     {
-                        // Client foi deletado, remover do cgi_fd_map e ignorar evento
                         std::cout << "[EPOLLHUP] Ignorando evento para pipe fd=" << fd 
                                   << " (Client foi deletado)" << std::endl;
                         cgi_fd_map.erase(fd);
@@ -220,7 +217,6 @@ void Server::handleClientSendReady(int fd, Client *client)
             else
                 closeClient(fd);
         }
-        // Se não terminou, aguarda próximo EPOLLOUT
     }
 }
 

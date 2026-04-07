@@ -1,4 +1,4 @@
-#include "../include/ConfigValidator.hpp"
+#include "ConfigValidator.hpp"
 
 namespace ConfigValidator
 {

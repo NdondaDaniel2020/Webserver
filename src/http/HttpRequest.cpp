@@ -1,5 +1,3 @@
-
-
 #include "HttpRequest.hpp"
 #include "StringUtils.hpp"
 #include <iostream>

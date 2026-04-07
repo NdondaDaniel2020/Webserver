@@ -1,4 +1,4 @@
-#include "../../include/ConfigHelper.hpp"
+#include "ConfigHelper.hpp"
 
 namespace ConfigHelper
 {

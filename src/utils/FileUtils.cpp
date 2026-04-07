@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2025/11/03 15:44:58 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/05 00:25:00 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/07 08:18:30 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -101,8 +101,7 @@ std::string normalizePath(const std::string& path)
 std::string sanitizePath(const std::string& path)
 {
     std::string normalized = normalizePath(path);
-    
-    // Remover múltiplas barras
+
     std::string result;
     bool lastWasSlash = false;
     
@@ -141,8 +140,7 @@ bool isPathSafe(const std::string& path, const std::string& root)
     
     if (real_path.empty())
         return false;
-    
-    // Verificar se path começa com root
+
     return real_path.compare(0, real_root.size(), real_root) == 0;
 }
 
@@ -188,30 +186,25 @@ std::string getMimeType(const std::string& path)
 {
     size_t dot_pos = path.find_last_of('.');
     if (dot_pos == std::string::npos)
-        return "text/html"; //"application/octet-stream";
+        return "text/html";
     
     std::string ext = path.substr(dot_pos);
-    
-    // HTML
+
     if (ext == ".html" || ext == ".htm") return "text/html";
-    
-    // CSS/JS
+
     if (ext == ".css") return "text/css";
     if (ext == ".js") return "application/javascript";
     if (ext == ".json") return "application/json";
-    
-    // Imagens
+
     if (ext == ".jpg" || ext == ".jpeg") return "image/jpeg";
     if (ext == ".png") return "image/png";
     if (ext == ".gif") return "image/gif";
     if (ext == ".svg") return "image/svg+xml";
     if (ext == ".ico") return "image/x-icon";
-    
-    // Texto
+
     if (ext == ".txt") return "text/plain";
     if (ext == ".xml") return "application/xml";
-    
-    // PDFs e documentos
+
     if (ext == ".pdf") return "application/pdf";
     
     return "application/octet-stream";
@@ -249,8 +242,7 @@ bool createDirectory(const std::string& path)
     struct stat st;
     if (stat(path.c_str(), &st) == 0)
         return S_ISDIR(st.st_mode);
-    
-    // Criar diretório com permissões 755
+
     return mkdir(path.c_str(), 0755) == 0;
 }
 
@@ -263,13 +255,11 @@ std::string sanitizeFilename(const std::string& filename)
 {
     std::string safe_name;
 
-    // 1. Extrair apenas basename (remover paths)
     size_t last_slash = filename.find_last_of("/\\");
     std::string basename = (last_slash != std::string::npos)
                           ? filename.substr(last_slash + 1)
                           : filename;
 
-    // 2. Remover caracteres perigosos (aceitar só: a-z A-Z 0-9 . _ -)
     for (size_t i = 0; i < basename.size(); i++)
     {
         unsigned char c = basename[i];
@@ -280,24 +270,22 @@ std::string sanitizeFilename(const std::string& filename)
         }
         else
         {
-            safe_name += '_';  // Substituir caracteres perigosos
+            safe_name += '_';
         }
     }
 
-    // 3. Validações adicionais
     if (safe_name.empty())
         safe_name = "unnamed_file";
     if (safe_name[0] == '.')
-        safe_name = "_" + safe_name;  // Prevenir .htaccess e arquivos ocultos
+        safe_name = "_" + safe_name;
     if (safe_name.size() > 255)
-        safe_name = safe_name.substr(0, 255);  // Limite de tamanho
+        safe_name = safe_name.substr(0, 255);
 
     return safe_name;
 }
 
 std::string generateUniqueFilename(const std::string& original_name)
 {
-    // Timestamp + nome original
     time_t now = time(NULL);
     std::ostringstream oss;
     oss << now << "_" << original_name;
@@ -323,7 +311,6 @@ std::string extractBoundary(const std::string& content_type)
     
     std::string boundary = content_type.substr(pos + 9);
     
-    // Remover espaços e aspas
     if (!boundary.empty() && boundary[0] == '"')
         boundary = boundary.substr(1);
     if (!boundary.empty() && boundary[boundary.size() - 1] == '"')
@@ -418,7 +405,6 @@ std::string getFileExtension(const std::string& filename)
     
     std::string ext = filename.substr(dot_pos);
     
-    // Converter para lowercase
     for (size_t i = 0; i < ext.size(); ++i)
     {
         if (ext[i] >= 'A' && ext[i] <= 'Z')

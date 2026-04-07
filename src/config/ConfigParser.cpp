@@ -1,7 +1,7 @@
 
-# include "../../include/ConfigParser.hpp"
-# include "../../include/ConfigHelper.hpp"
-# include    "../../include/ConfigValidator.hpp"
+# include "ConfigParser.hpp"
+# include "ConfigHelper.hpp"
+# include  "ConfigValidator.hpp"
 
 ConfigParser::ConfigParser() 
 {
