@@ -277,7 +277,6 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
             content_type.find("application/octet-stream") == 0 ||
             content_type.find("text/plain") == 0 ||
             content_type.find("test/file") == 0 ||
-            content_type.find("application/json") == 0 ||
             content_type.find("application/x-www-form-urlencoded") == 0;
         
         if (!valid_type)
