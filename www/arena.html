@@ -492,56 +492,6 @@
         </div>
     </div>
 
-    <div class="divider"></div>
-
-    <!-- ===== RAW HTTP TESTER ===== -->
-    <div class="section" id="raw">
-        <div class="section-label">// Raw HTTP Tester</div>
-        <div class="section-title">🧪 Raw <span class="highlight">HTTP</span> Request</div>
-
-        <div class="card raw-tester">
-            <div class="card-header">
-                <span class="method-badge badge-get">RAW</span>
-                <h3>Escrever HTTP Manual</h3>
-            </div>
-            <p class="card-description">
-                Escreva um request HTTP raw. Internamente usa fetch, mas demonstra domínio do protocolo.
-            </p>
-            <div class="form-group">
-                <label>Raw HTTP Request</label>
-                <textarea class="form-input" id="raw-input" placeholder="GET / HTTP/1.1
-Host: localhost:8080
-Connection: close">GET / HTTP/1.1
-Host: localhost:8080
-Connection: close</textarea>
-            </div>
-            <button class="btn btn-neon" onclick="sendRaw()">
-                <span class="spinner"></span> Enviar Request ⚡
-            </button>
-            <div class="response-area" id="raw-response">
-                <div class="response-header">
-                    <div class="response-status">
-                        <span class="status-dot" id="raw-dot"></span>
-                        <span class="status-code" id="raw-status"></span>
-                    </div>
-                    <span class="response-time" id="raw-time"></span>
-                </div>
-                <div class="response-tabs">
-                    <button class="resp-tab active" onclick="switchRespTab(this, 'raw-body-content')">Body</button>
-                    <button class="resp-tab" onclick="switchRespTab(this, 'raw-headers-content')">Headers</button>
-                </div>
-                <div class="response-body">
-                    <div class="resp-content active" id="raw-body-content">
-                        <pre id="raw-body"></pre>
-                    </div>
-                    <div class="resp-content" id="raw-headers-content">
-                        <pre id="raw-headers"></pre>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <!-- ===== FOOTER ===== -->
     <footer class="footer">
         <p>🥷 <span class="highlight">Web Ninjas</span> — Server Battle Arena — 42 Project © 2025</p>
@@ -553,7 +503,7 @@ Connection: close</textarea>
         <div class="footer-inner">
             <div class="footer-brand">WEB NINJAS</div>
             <p>&copy; 2026 Web Ninjas &mdash; Built as part of the 42 curriculum.</p>
-            <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; poll()</div>
+            <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; epoll()</div>
             <div class="footer-nav">
                 <a href="/index.html">Início</a>
                 <span>|</span>

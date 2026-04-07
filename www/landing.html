@@ -75,15 +75,15 @@
                         &mdash; mas construído do zero.
                     </p>
                     <p>
-                        Utiliza <strong style="color:var(--neon);">poll()</strong> para multiplexação de I/O, garantindo
+                        Utiliza <strong style="color:var(--neon);">epoll()</strong> para multiplexação de I/O, garantindo
                         que nenhuma conexão bloqueia o servidor. Suporte completo a métodos HTTP, configuração via
                         ficheiro, e execução de scripts CGI.
                     </p>
                     <ul class="feature-list">
-                        <li>Non-blocking I/O com poll()</li>
+                        <li>Non-blocking I/O com epoll()</li>
                         <li>Suporte a GET, POST e DELETE</li>
                         <li>Sistema CGI (PHP / Python)</li>
-                        <li>Múltiplos ports e virtual hosts</li>
+                        <li>Múltiplos ports</li>
                         <li>Ficheiro de configuração customizável</li>
                         <li>Páginas de erro personalizadas</li>
                     </ul>
@@ -94,15 +94,15 @@
                         <div class="diagram-arrow">↓</div>
                         <div class="diagram-node">🔌 Socket</div>
                         <div class="diagram-arrow">↓</div>
-                        <div class="diagram-node">⚡ poll()</div>
+                        <div class="diagram-node">⚡ epoll()</div>
                         <div class="diagram-arrow">↓</div>
                         <div class="diagram-node">📝 Request Parser</div>
                         <div class="diagram-arrow">↓</div>
-                        <div class="diagram-node">🔀 Router</div>
+                        <div class="diagram-node">📄 HTTP Response</div>
                         <div class="diagram-arrow">↓</div>
                         <div class="diagram-node">📂 Static / CGI</div>
                         <div class="diagram-arrow">↓</div>
-                        <div class="diagram-node">📤 Response</div>
+                        <div class="diagram-node">📤 Send Response</div>
                     </div>
                 </div>
             </div>
@@ -133,7 +133,7 @@
                     <div class="stat-label">CGI Supported</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-value">poll()</div>
+                    <div class="stat-value">epoll()</div>
                     <div class="stat-label">I/O Model</div>
                 </div>
                 <div class="stat-card">
@@ -163,7 +163,7 @@
                 <div class="arch-connector">→</div>
                 <div class="arch-node">
                     <div class="arch-node-icon">⚡</div>
-                    <div class="arch-node-label">poll()</div>
+                    <div class="arch-node-label">epoll()</div>
                 </div>
                 <div class="arch-connector">→</div>
                 <div class="arch-node">
@@ -172,13 +172,18 @@
                 </div>
                 <div class="arch-connector">→</div>
                 <div class="arch-node">
-                    <div class="arch-node-icon">🔀</div>
-                    <div class="arch-node-label">Router</div>
+                    <div class="arch-node-icon">📄</div>
+                    <div class="arch-node-label">Response</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">📂</div>
+                    <div class="arch-node-label">Static / CGI</div>
                 </div>
                 <div class="arch-connector">→</div>
                 <div class="arch-node">
                     <div class="arch-node-icon">📤</div>
-                    <div class="arch-node-label">Response</div>
+                    <div class="arch-node-label">Send Data</div>
                 </div>
             </div>
         </div>
@@ -194,27 +199,28 @@
                 <div class="team-card">
                     <div class="team-avatar">N1</div>
                     <div class="team-name">MEMBRO 1</div>
-                    <div class="team-login">@login_42</div>
+                    <div class="team-login">@nmatondo</div>
                     <div class="team-role">
                         <span>Networking</span>
                         <span>Server Core</span>
-                        <span>poll()</span>
+                        <span>epoll()</span>
                     </div>
                 </div>
                 <div class="team-card">
                     <div class="team-avatar">N2</div>
                     <div class="team-name">MEMBRO 2</div>
-                    <div class="team-login">@login_42</div>
+                    <div class="team-login">@emalungo</div>
                     <div class="team-role">
                         <span>Parsing</span>
                         <span>Config System</span>
                         <span>Validation</span>
+                        <span>create index files</span>
                     </div>
                 </div>
                 <div class="team-card">
                     <div class="team-avatar">N3</div>
                     <div class="team-name">MEMBRO 3</div>
-                    <div class="team-login">@login_42</div>
+                    <div class="team-login">@ajacinto</div>
                     <div class="team-role">
                         <span>CGI</span>
                         <span>HTTP Methods</span>

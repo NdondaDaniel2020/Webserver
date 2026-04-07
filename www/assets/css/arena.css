@@ -834,17 +834,6 @@ textarea.form-input {
     letter-spacing: 1px;
 }
 
-/* ===== RAW HTTP TESTER ===== */
-.raw-tester {
-    margin-top: 20px;
-}
-
-.raw-tester textarea {
-    min-height: 150px;
-    font-size: 13px;
-    line-height: 1.8;
-}
-
 /* ===== ROUTES TABLE ===== */
 .routes-table {
     width: 100%;

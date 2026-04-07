@@ -208,61 +208,6 @@ async function triggerMethodNotAllowed() {
 }
 
 /* ──────────────────────────────────────────────
-   RAW HTTP TESTER
-   ────────────────────────────────────────────── */
-async function sendRaw() {
-    const rawText = document.getElementById('raw-input').value.trim();
-    if (!rawText) return;
-
-    // Parse the raw HTTP request
-    const lines = rawText.split('\n');
-    const requestLine = lines[0].trim().split(' ');
-    const method = requestLine[0] || 'GET';
-    const path = requestLine[1] || '/';
-
-    // Parse headers
-    const headers = {};
-    let bodyStart = -1;
-    for (let i = 1; i < lines.length; i++) {
-        const line = lines[i].trim();
-        if (line === '') {
-            bodyStart = i + 1;
-            break;
-        }
-        const colonIdx = line.indexOf(':');
-        if (colonIdx !== -1) {
-            const key = line.substring(0, colonIdx).trim();
-            const value = line.substring(colonIdx + 1).trim();
-            headers[key] = value;
-        }
-    }
-
-    let body = undefined;
-    if (bodyStart > 0 && bodyStart < lines.length) {
-        body = lines.slice(bodyStart).join('\n');
-    }
-
-    const fetchOptions = {
-        method: method,
-        headers: headers
-    };
-    if (body && method !== 'GET' && method !== 'HEAD') {
-        fetchOptions.body = body;
-    }
-
-    const start = performance.now();
-    try {
-        const resp = await fetch(path, fetchOptions);
-        const elapsed = Math.round(performance.now() - start);
-        const respBody = await resp.text();
-        displayResponse('raw', resp.status, resp.statusText, resp.headers, respBody, elapsed);
-    } catch (err) {
-        const elapsed = Math.round(performance.now() - start);
-        displayResponse('raw', 0, 'Network Error', new Headers(), err.message, elapsed);
-    }
-}
-
-/* ──────────────────────────────────────────────
    FORMULÁRIO + DATABASE (Python save + PHP list)
    ────────────────────────────────────────────── */
 async function saveToDB() {

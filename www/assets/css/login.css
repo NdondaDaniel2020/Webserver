@@ -95,6 +95,36 @@ a {
     z-index: 10;
 }
 
+.home-icon-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    width: 50px;
+    height: 50px;
+    border-radius: 16px;
+    border: 1px solid rgba(0, 255, 156, 0.35);
+    background: rgba(13, 15, 20, 0.8);
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+
+.home-icon-btn img {
+    width: 26px;
+    height: 26px;
+    filter: drop-shadow(0 0 6px var(--neon-glow));
+}
+
+.home-icon-btn:hover {
+    transform: translateY(-2px);
+    border-color: var(--neon);
+    box-shadow: 0 0 16px var(--neon-dim);
+}
+
 @keyframes slideUp {
     from {
         opacity: 0;
@@ -378,6 +408,19 @@ a {
 }
 
 @media (max-width: 480px) {
+    .home-icon-btn {
+        top: 12px;
+        left: 12px;
+        width: 44px;
+        height: 44px;
+        border-radius: 16px;
+    }
+
+    .home-icon-btn img {
+        width: 22px;
+        height: 22px;
+    }
+
     .login-card {
         padding: 30px 20px;
     }
