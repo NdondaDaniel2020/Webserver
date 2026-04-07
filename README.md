@@ -6,16 +6,15 @@ _Este projeto foi criado como parte do currículo da 42 por nmatondo, ajacinto, 
 
 O **Webserver** é um servidor HTTP implementado em C++98 conforme o padrão HTTP/1.1. O projeto tem como objetivo desenvolver um servidor web funcional capaz de processar múltiplas requisições simultâneas, servir arquivos estáticos, executar scripts CGI e gerenciar recursos de rede de forma eficiente.
 
-Este projeto faz parte do currículo da 42 e visa aprofundar o conhecimento em programação de sistemas, redes de computadores, sockets, I/O multiplexing e manipulação de protocolos de rede. O servidor implementa funcionalidades essenciais encontradas em servidores web modernos como nginx e Apache, incluindo suporte a múltiplos hosts virtuais, redirecionamentos, tratamento de erros personalizados e execução de CGI.
+Este projeto faz parte do currículo da 42 e visa aprofundar o conhecimento em programação de sistemas, redes de computadores, sockets, I/O multiplexing e manipulação de protocolos de rede. O servidor implementa funcionalidades essenciais encontradas em servidores web modernos como nginx e Apache, incluindo redirecionamentos, tratamento de erros personalizados e execução de CGI.
 
 ### Funcionalidades Principais
 
-- Tratamento de múltiplas conexões simultâneas usando `poll()` para multiplexing de I/O
+- Tratamento de múltiplas conexões simultâneas usando `epoll()` para multiplexing de I/O
 - Suporte aos métodos HTTP: GET, POST e DELETE
 - Leitura e interpretação de arquivos de configuração customizados
 - Servir arquivos estáticos (HTML, CSS, JavaScript, imagens)
 - Execução de scripts CGI (Common Gateway Interface)
-- Suporte a múltiplos hosts virtuais
 - Redirecionamentos HTTP
 - Páginas de erro personalizadas
 - Upload de arquivos
@@ -67,7 +66,7 @@ Para iniciar o servidor, forneça um arquivo de configuração como argumento:
 ./webserv config/default.conf
 ```
 
-O servidor lerá as configurações do arquivo especificado e iniciará os servidores virtuais definidos. Por padrão, o servidor escuta na porta 8080 e serve arquivos da pasta `www/`.
+O servidor lerá as configurações do arquivo especificado e iniciará os servidores virtuais definidos.
 
 ### Testando o Servidor
 
@@ -90,7 +89,7 @@ curl -X POST -F "file=@arquivo.txt" http://localhost:8080/upload
 
 **Testando CGI:**
 ```bash
-curl http://localhost:8080/cgi-bin/script.py
+curl http://localhost:8080/cgi-bin/hello.py
 ```
 
 ### Estrutura do Projeto
@@ -100,33 +99,46 @@ webserv/
 ├── Makefile
 ├── README.md
 ├── config/
-│   └── default.conf
+│   ├── default.conf
+│   ├── index.conf
+│   ├── mudefault.conf
+│   ├── robust.conf
+│   └── Youpi.conf
+├── include/
+│   └── [arquivos .hpp]
 ├── src/
 │   ├── main.cpp
-│   ├── server/
-│   │   ├── Server.cpp
-│   │   └── Client.cpp
-│   ├── http/
-│   │   ├── HttpRequest.cpp
-│   │   ├── Response.cpp
-│   │   ├── StatusCodes.cpp
-│   │   └── HttpMethods.cpp
-│   ├── config/
-│   │   ├── ConfigParser.cpp
-│   │   ├── ConfigValidator.cpp
-│   │   └── ConfigHelper.cpp
 │   ├── cgi/
 │   │   └── EnvBuilder.cpp
+│   ├── config/
+│   │   ├── ConfigHelper.cpp
+│   │   ├── ConfigParser.cpp
+│   │   └── ConfigValidator.cpp
+│   ├── http/
+│   │   ├── HttpMethods.cpp
+│   │   ├── HttpRequest.cpp
+│   │   ├── Response.cpp
+│   │   ├── ResponseDirectoryListing.cpp
+│   │   ├── ResponseHelpers.cpp
+│   │   ├── ResponseMultipart.cpp
+│   │   └── StatusCodes.cpp
+│   ├── server/
+│   │   ├── Client.cpp
+│   │   ├── ClientCgi.cpp
+│   │   ├── ClientProcessing.cpp
+│   │   ├── ClientRequest.cpp
+│   │   ├── Server.cpp
+│   │   ├── ServerConnections.cpp
+│   │   └── ServerEventLoop.cpp
 │   └── utils/
 │       ├── FileUtils.cpp
 │       └── StringUtils.cpp
-├── include/
-│   └── [arquivos .hpp]
-└── www/
-    ├── index.html
-    ├── errors/
-    ├── uploads/
-    └── cgi-bin/
+├── tests/
+│   └── commands.yml
+├── www/
+│   └── [arquivos do site www]
+└── YoupiBanane/
+    └── [arquivos do site YoupiBanane]
 ```
 
 ## Recursos
@@ -146,6 +158,7 @@ webserv/
 - "How to build a simple HTTP server" - Tutoriais sobre implementação de servidores HTTP
 - "Understanding HTTP/1.1 Protocol" - Artigos sobre o protocolo HTTP
 - "Multiplexing I/O with poll()" - Documentação sobre multiplexing de I/O
+- "Como Funciona Sockets, Cliente, Servidor e a Web?" - Tutorial do funcionamento de socket
 - Documentação do C++ Reference (cppreference.com) para funções padrão C++98
 
 ### Uso de IA
@@ -159,8 +172,8 @@ Durante o desenvolvimento deste projeto, ferramentas de IA foram utilizadas nas 
 
 **Partes do projeto desenvolvidas com auxílio de IA:**
 - Estruturação inicial da arquitetura do servidor
-- Implementação do parser de configuração
 - Tratamento de casos especiais do protocolo HTTP
 - Otimização do gerenciamento de recursos e conexões
+- Sugestão de melhoria na estrutura do parsing de configuração
 
 Todo código foi revisado, compreendido e adaptado manualmente para garantir conformidade com os requisitos do projeto e padrão C++98.

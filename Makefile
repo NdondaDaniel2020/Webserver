@@ -6,11 +6,9 @@
 #    By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+         #
 #                                                 +#+#+#+#+#+   +#+            #
 #    Created: 2025/07/11 10:11:23 by nmatondo          #+#    #+#              #
-#    Updated: 2026/03/29 02:01:12 by nmatondo         ###   ########.fr        #
+#    Updated: 2026/04/07 08:25:28 by nmatondo         ###   ########.fr        #
 #                                                                              #
 # **************************************************************************** #
-
-# ================================ VARIABLES ================================= #
 
 NAME		= webserv
 CXX			= c++
@@ -18,11 +16,7 @@ CXXFLAGS	= -Wall -Wextra -Werror -std=c++98 -g
 INCLUDE		= -I./include
 OBJDIR		= obj
 
-# ================================= SOURCES ================================== #
-
 SRCDIR		= src
-
-# Arquivos existentes atualmente
 SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/server/Server.cpp \
 			  $(SRCDIR)/server/ServerConnections.cpp \
@@ -45,21 +39,8 @@ SOURCES		= $(SRCDIR)/main.cpp \
 			  $(SRCDIR)/server/ClientCgi.cpp \
 			  $(SRCDIR)/cgi/EnvBuilder.cpp \
 
-# Arquivos futuros (descomente conforme forem sendo criados)
-# SOURCES  += $(SRCDIR)/server/PollManager.cpp \
-#			  $(SRCDIR)/http/Request.cpp \
-#			  $(SRCDIR)/http/Response.cpp \
-#			  $(SRCDIR)/http/StatusCodes.cpp \
-#			  $(SRCDIR)/http/Headers.cpp \
-#			  $(SRCDIR)/config/ConfigParser.cpp \
-#			  $(SRCDIR)/config/ConfigData.cpp \
-#			  $(SRCDIR)/cgi/CGIHandler.cpp \
-
 OBJECTS		= $(SOURCES:$(SRCDIR)/%.cpp=$(OBJDIR)/%.o)
 
-# ================================= HEADERS ================================== #
-
-# Headers existentes atualmente
 HEADERS		= include/Server.hpp \
 			  include/FileUtils.hpp \
 			  include/ConfigParser.hpp \
@@ -69,26 +50,14 @@ HEADERS		= include/Server.hpp \
 			  include/Client.hpp \
 			  include/ConfigValidator.hpp \
 			  include/EnvBuilder.hpp \
-# Headers futuros (descomente conforme forem sendo criados)
 
-# HEADERS  += include/PollManager.hpp \
-#			  include/Request.hpp \
-#			  include/Response.hpp \
-#			  include/StatusCodes.hpp \
-#			  include/Headers.hpp \
-#			  include/ConfigParser.hpp \
-#			  include/ConfigData.hpp \
-#			  include/CGIHandler.hpp \
-#			  include/EnvBuilder.hpp \
-#			  include/Logger.hpp \
 
-# ================================== RULES =================================== #
 
 all: $(NAME)
 
 $(NAME): $(OBJECTS)
 	@echo "🔗 Linking $(NAME)..."
-	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(NAME) -lpthread
+	@$(CXX) $(CXXFLAGS) $(OBJECTS) -o $(NAME)
 	@echo "✅ $(NAME) compiled successfully!"
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.cpp $(HEADERS)
@@ -106,7 +75,6 @@ fclean: clean
 
 re: fclean all
 
-# ================================ NEW RULES ================================= #
 
 run: $(NAME)
 	@echo "🚀 Running $(NAME)..."
