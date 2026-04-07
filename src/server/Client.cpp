@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/06 07:57:14 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/07 11:39:19 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -177,10 +177,10 @@ bool Client::hasDataToSend() const
     return !send_buffer.empty() && send_offset < send_buffer.size();
 }
 
-bool Client::sendData()
+int Client::sendData()
 {
     if (state != SENDING_RESPONSE || !hasDataToSend())
-        return false;
+        return 0;
 
     ssize_t sent = write(fd, send_buffer.c_str() + send_offset, 
                         send_buffer.size() - send_offset);
@@ -193,27 +193,25 @@ bool Client::sendData()
         {
             std::cout << "[CLIENT " << fd << "] Resposta enviada completamente" << std::endl;
             state = DONE;
-            return true;
+            return 1;
         }
-        return false;
+        return 0;
     }
 
     if (sent == 0)
     {
         std::cout << "[CLIENT " << fd << "] Conexão fechada pelo cliente durante envio" << std::endl;
-        return false;
+        return -1;
     }
     
-    // sent < 0: erro ao escrever
     int err = errno;
     if (err == EAGAIN || err == EWOULDBLOCK)
     {
-        // Socket bloqueado, retry posteriormente
-        return false;
+        return 0;
     }
     
     std::cerr << "[CLIENT " << fd << "] Erro ao enviar dados: " << strerror(err) << std::endl;
-    return false;
+    return -1;
 }
 
 

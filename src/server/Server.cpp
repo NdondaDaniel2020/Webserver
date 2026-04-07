@@ -209,13 +209,17 @@ void Server::handleClientSendReady(int fd, Client *client)
 {
     if (client->getState() == Client::SENDING_RESPONSE && client->hasDataToSend())
     {
-        bool finished = client->sendData();
-        if (finished)
+        int result = client->sendData();
+        if (result == 1)
         {
             if (client->isKeepAlive())
                 client->reset();
             else
                 closeClient(fd);
+        }
+        else if (result == -1)
+        {
+            closeClient(fd);
         }
     }
 }
@@ -261,13 +265,17 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
         c->finishCgiAndGenerateResponse();
         if (c->getState() == Client::SENDING_RESPONSE && c->hasDataToSend())
         {
-            bool finished = c->sendData();
-            if (finished)
+            int result = c->sendData();
+            if (result == 1)
             {
                 if (c->isKeepAlive())
                     c->reset();
                 else
                     closeClient(c->getFd());
+            }
+            else if (result == -1)
+            {
+                closeClient(c->getFd());
             }
         }
     }

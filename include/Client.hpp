@@ -120,7 +120,7 @@ public:
 
     void                processHeaderRequest(const ServerConfig& server_config);
     void                processRequest(const ServerConfig& server_config, int epoll_fd);
-    bool                sendData();
+    int                 sendData();
     void                reset();
     void                setState(State s);
 

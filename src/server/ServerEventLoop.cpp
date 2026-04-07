@@ -46,13 +46,17 @@ void Server::handleClientData(int fd)
     {
         if (client->hasDataToSend())
         {
-            bool finished = client->sendData();
-            if (finished)
+            int result = client->sendData();
+            if (result == 1)
             {
                 if (client->isKeepAlive())
                     client->reset();
                 else
                     closeClient(fd);
+            }
+            else if (result == -1)
+            {
+                closeClient(fd);
             }
         }
     }
