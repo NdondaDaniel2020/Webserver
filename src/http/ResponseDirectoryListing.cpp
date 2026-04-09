@@ -155,7 +155,7 @@ void Response::generateDirectoryListing(const HttpRequest &request, const std::s
         html << "    <title>Index of " << htmlEscape(current_uri) << " | Web Ninjas</title>\n";
         html << "    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n";
         html << "    <link href=\"https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;500;600&display=swap\" rel=\"stylesheet\">\n";
-        html << "    <link href=\"/assets/directory-listing.css\" rel=\"stylesheet\">\n";
+        html << "    <link href=\"/assets/css/directory-listing.css\" rel=\"stylesheet\">\n";
         html << "</head>\n<body>\n";
         html << "    <div class=\"background-lines\"></div>\n";
         html << "    <main>\n";
