@@ -204,12 +204,8 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
     if (!IsHeaderRequestComplete())
         return;
 
-    // SEMPRE processar headers PRIMEIRO (antes de validações que dependem deles)
     parseHeaders();
-    
-    if (state == ERROR_413)  // Content-Length ou Transfer-Encoding excedeu
-        return;
-    
+        
     if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
     {
         StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
@@ -242,11 +238,13 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         this->state = SENDING_RESPONSE;
         return;
     }
-
+    
     if (request.getMethod() == "POST" && !is_chunked && request.hasHeader("Content-Length"))
     {
         size_t max_size = 0;
-        
+     
+        std::cout << "muito grande? content_length=" << content_length << std::endl;
+        std::cout << "server_config.client_max_body_size=" << server_config.client_max_body_size << std::endl;
         if (location && location->client_max_body_size > 0)
             max_size = location->client_max_body_size;
         else if (server_config.client_max_body_size > 0)
