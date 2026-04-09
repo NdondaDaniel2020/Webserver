@@ -57,7 +57,7 @@ class Server
         void newConnection(int fd);
         void handleClientData(int fd);
         void handleClientSendReady(int fd, Client *client);
-        void handleCgiPipeEvent(Client *c, int events_mask);
+        void handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask);
         void closeClient(int fd);
         bool isServerSocket(int fd) const;
         void checkTimeout();

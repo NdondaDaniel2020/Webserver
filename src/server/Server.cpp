@@ -188,7 +188,7 @@ void Server::start()
                     std::map<int, Client*>::iterator client_check = clients.find(c->getFd());
                     if (client_check != clients.end() && client_check->second == c)
                     {
-                        handleCgiPipeEvent(c, events[i].events);
+                        handleCgiPipeEvent(c, fd, events[i].events);
                     }
                     else
                     {
@@ -224,12 +224,30 @@ void Server::handleClientSendReady(int fd, Client *client)
     }
 }
 
-void Server::handleCgiPipeEvent(Client *c, int events_mask)
+void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
 {
-    if (events_mask & (EPOLLIN | EPOLLERR | EPOLLHUP))
+    if (!c)
+        return;
+
+    Client::CgiState& cgi_state = c->getCgiState();
+
+    // Determine which pipe this fd belongs to
+    bool is_stdin = (pipe_fd == cgi_state.pipe_in[1]);
+    bool is_stdout = (pipe_fd == cgi_state.pipe_out[0]);
+    bool is_stderr = (pipe_fd == cgi_state.pipe_error[0]);
+
+    if (is_stdout && (events_mask & (EPOLLIN | EPOLLERR | EPOLLHUP)))
+    {
         c->handleCgiStdoutReadable(epoll_fd, cgi_fd_map);
-    else if (events_mask & EPOLLOUT)
+    }
+    else if (is_stderr && (events_mask & (EPOLLIN | EPOLLERR | EPOLLHUP)))
+    {
+        c->handleCgiStderrReadable(epoll_fd, cgi_fd_map);
+    }
+    else if (is_stdin && (events_mask & EPOLLOUT))
+    {
         c->handleCgiStdinWritable(epoll_fd);
+    }
 
     // Verificar se CGI terminou via EPOLLHUP
     if (events_mask & EPOLLHUP)
@@ -239,13 +257,20 @@ void Server::handleCgiPipeEvent(Client *c, int events_mask)
         if (!c->isCgiActive())
             return;
 
-        Client::CgiState& cgi_state = c->getCgiState();
         if (cgi_state.pipe_out[0] >= 0)
         {
             epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi_state.pipe_out[0], NULL);
             cgi_fd_map.erase(cgi_state.pipe_out[0]);
             close(cgi_state.pipe_out[0]);
             cgi_state.pipe_out[0] = -1;
+        }
+
+        if (cgi_state.pipe_error[0] >= 0)
+        {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi_state.pipe_error[0], NULL);
+            cgi_fd_map.erase(cgi_state.pipe_error[0]);
+            close(cgi_state.pipe_error[0]);
+            cgi_state.pipe_error[0] = -1;
         }
 
         int status = 0;

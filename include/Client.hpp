@@ -56,7 +56,9 @@ public:
         pid_t           pid;
         int             pipe_in[2];     // pai escreve body → filho stdin
         int             pipe_out[2];    // filho stdout → pai lê
+        int             pipe_error[2];  // filho stderr → pai lê
         std::string     output;         // acumula saída do CGI
+        std::string     error_output;   // acumula stderr do CGI
         size_t          body_written;   // quantos bytes do body já enviados
         bool            finished;
         time_t          start_time;
@@ -65,6 +67,7 @@ public:
         {
             pipe_in[0] = pipe_in[1] = -1;
             pipe_out[0] = pipe_out[1] = -1;
+            pipe_error[0] = pipe_error[1] = -1;
         }
     };
 
@@ -128,6 +131,7 @@ public:
     void                startCgi(const HttpRequest& req, const LocationConfig& loc,
                                  const ServerConfig& server_config, int epoll_fd);
     void                handleCgiStdoutReadable(int epoll_fd, std::map<int, Client*>& cgi_fd_map);
+    void                handleCgiStderrReadable(int epoll_fd, std::map<int, Client*>& cgi_fd_map);
     void                handleCgiStdinWritable(int epoll_fd);
     void                finishCgiAndGenerateResponse();
     bool                unchunkBody(std::string& out);

@@ -39,8 +39,7 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
                       const ServerConfig &server_config, int epoll_fd)
 {
     std::string error_msg = "Fail CGI";
-    
-    // Construir path: root + path completo (sem remover loc.path)
+
     std::string file_path = req.getPath();
     if (file_path[0] == '/')
         file_path = file_path.substr(1);
@@ -204,6 +203,66 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     fcntl(cgi.pipe_in[1], F_SETFL, O_NONBLOCK);
     fcntl(cgi.pipe_out[0], F_SETFL, O_NONBLOCK);
 
+    cgi.pipe_error[0] = cgi.pipe_error[1] = -1;
+    if (pipe(cgi.pipe_error) < 0)
+    {
+        int saved_errno = errno;
+        std::cerr << "[CGI] pipe(pipe_error) failed: " << strerror(saved_errno) << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to create error pipe", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (setClosExec(cgi.pipe_error[0]) < 0)
+    {
+        int saved_errno = errno;
+        std::cerr << "[CGI] setClosExec(pipe_error[0]) failed: " << strerror(saved_errno) << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        close(cgi.pipe_error[0]);
+        close(cgi.pipe_error[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        cgi.pipe_error[0] = cgi.pipe_error[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on error pipe", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (setClosExec(cgi.pipe_error[1]) < 0)
+    {
+        int saved_errno = errno;
+        std::cerr << "[CGI] setClosExec(pipe_error[1]) failed: " << strerror(saved_errno) << std::endl;
+        close(cgi.pipe_in[0]);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_out[1]);
+        close(cgi.pipe_error[0]);
+        close(cgi.pipe_error[1]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        cgi.pipe_error[0] = cgi.pipe_error[1] = -1;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to set CLOEXEC on error pipe", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    fcntl(cgi.pipe_error[0], F_SETFL, O_NONBLOCK);
+
     char **envp = buildEnvp(req, script_path);
     pid_t pid = fork();
     if (pid < 0)
@@ -215,8 +274,11 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
         close(cgi.pipe_out[1]);
+        close(cgi.pipe_error[0]);
+        close(cgi.pipe_error[1]);
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
         cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        cgi.pipe_error[0] = cgi.pipe_error[1] = -1;
         StatusCodes::http502BadGateway(error_msg, req, "Failed to fork process", server_config);
         send_buffer = error_msg;
         send_offset = 0;
@@ -228,15 +290,11 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
     {
         dup2(cgi.pipe_in[0], STDIN_FILENO);
         dup2(cgi.pipe_out[1], STDOUT_FILENO);
-        int devnull_fd = open("/dev/null", O_WRONLY);
-        if (devnull_fd >= 0)
-        {
-            dup2(devnull_fd, STDERR_FILENO);
-            close(devnull_fd);
-        }
+        dup2(cgi.pipe_error[1], STDERR_FILENO);
 
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
+        close(cgi.pipe_error[0]);
 
         char *argv[3];
         argv[0] = const_cast<char *>(interpreter.c_str());
@@ -252,12 +310,14 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
 
     close(cgi.pipe_in[0]);
     close(cgi.pipe_out[1]);
+    close(cgi.pipe_error[1]);
 
     cgi.pid = pid;
     cgi.body_written = 0;
     cgi.finished = false;
     cgi.start_time = time(NULL);
     cgi.output = "";
+    cgi.error_output = "";
     is_cgi_active = true;
 
     epoll_event ev;
@@ -294,8 +354,10 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
         close(cgi.pipe_in[1]);
         close(cgi.pipe_out[0]);
+        close(cgi.pipe_error[0]);
         cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
         cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        cgi.pipe_error[0] = cgi.pipe_error[1] = -1;
         if (cgi.pid > 0)
         {
             kill(cgi.pid, SIGKILL);
@@ -304,6 +366,34 @@ void Client::startCgi(const HttpRequest &req, const LocationConfig &loc,
         }
         is_cgi_active = false;
         StatusCodes::http502BadGateway(error_msg, req, "Failed to register output pipe in epoll", server_config);
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
+
+    ev.events = EPOLLIN | EPOLLHUP;
+    ev.data.fd = cgi.pipe_error[0];
+    if (epoll_ctl(epoll_fd, EPOLL_CTL_ADD, cgi.pipe_error[0], &ev) < 0)
+    {
+        int saved_errno = errno;
+        std::cerr << "[CGI] epoll_ctl(pipe_error) failed: " << strerror(saved_errno) << std::endl;
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_in[1], NULL);
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
+        close(cgi.pipe_in[1]);
+        close(cgi.pipe_out[0]);
+        close(cgi.pipe_error[0]);
+        cgi.pipe_in[0] = cgi.pipe_in[1] = -1;
+        cgi.pipe_out[0] = cgi.pipe_out[1] = -1;
+        cgi.pipe_error[0] = cgi.pipe_error[1] = -1;
+        if (cgi.pid > 0)
+        {
+            kill(cgi.pid, SIGKILL);
+            waitpid(cgi.pid, NULL, 0);
+            cgi.pid = -1;
+        }
+        is_cgi_active = false;
+        StatusCodes::http502BadGateway(error_msg, req, "Failed to register error pipe in epoll", server_config);
         send_buffer = error_msg;
         send_offset = 0;
         state = SENDING_RESPONSE;
@@ -433,6 +523,49 @@ void Client::handleCgiStdoutReadable(int epoll_fd, std::map<int, Client *> &cgi_
     }
 }
 
+void Client::handleCgiStderrReadable(int epoll_fd, std::map<int, Client *> &cgi_fd_map)
+{
+    if (!is_cgi_active)
+        return;
+
+    char buf[BUFFERSIZE];
+    ssize_t r = read(cgi.pipe_error[0], buf, sizeof(buf));
+
+    int saved_errno = errno;
+
+    if (r > 0)
+    {
+        cgi.error_output.append(buf, r);
+        std::cout << "[CLIENT " << fd << "] CGI stderr: " << std::string(buf, r) << std::endl;
+        return;
+    }
+
+    if (r == 0)
+    {
+        std::cout << "[CLIENT " << fd << "] CGI stderr EOF" << std::endl;
+        if (cgi.pipe_error[0] >= 0)
+        {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_error[0], NULL);
+            cgi_fd_map.erase(cgi.pipe_error[0]);
+            close(cgi.pipe_error[0]);
+            cgi.pipe_error[0] = -1;
+        }
+        return;
+    }
+
+    if (saved_errno == EAGAIN || saved_errno == EWOULDBLOCK)
+        return;
+
+    std::cerr << "[CLIENT " << fd << "] CGI stderr read error: " << strerror(saved_errno) << std::endl;
+    if (cgi.pipe_error[0] >= 0)
+    {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_error[0], NULL);
+        cgi_fd_map.erase(cgi.pipe_error[0]);
+        close(cgi.pipe_error[0]);
+        cgi.pipe_error[0] = -1;
+    }
+}
+
 void Client::finishCgiAndGenerateResponse()
 {
     int status;
@@ -480,6 +613,18 @@ void Client::finishCgiAndGenerateResponse()
     }
 
     is_cgi_active = false;
+
+    if (!cgi.error_output.empty())
+    {
+        std::cout << "[CLIENT " << fd << "] CGI had stderr output - returning 500" << std::endl;
+        std::string error_msg;
+        StatusCodes::http500InternalServerError(error_msg, request, "CGI stderr: " + cgi.error_output,
+                                                 config->getServerConfig(server_index));
+        send_buffer = error_msg;
+        send_offset = 0;
+        state = SENDING_RESPONSE;
+        return;
+    }
 
     if (cgi_failed)
     {

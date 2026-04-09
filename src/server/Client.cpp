@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/07 11:39:19 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/09 14:25:20 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -17,7 +17,7 @@
 Client::Client(int fd, const ConfigParser *config, int server_index)
     : fd(fd),
       state(READING_HEADERS),
-      last_activity(0), // ← corrigido
+      last_activity(0),
       recv_buffer(),
       send_buffer(),
       send_offset(0),
@@ -92,6 +92,13 @@ void Client::cleanupCgiIfActive(int epoll_fd)
         epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_out[0], NULL);
         close(cgi.pipe_out[0]);
         cgi.pipe_out[0] = -1;
+    }
+
+    if (cgi.pipe_error[0] >= 0)
+    {
+        epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_error[0], NULL);
+        close(cgi.pipe_error[0]);
+        cgi.pipe_error[0] = -1;
     }
 
     is_cgi_active = false;
