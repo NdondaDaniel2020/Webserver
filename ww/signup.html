@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Criar Conta — Web Ninjas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- link css -->
+    <link rel="stylesheet" href="./assets/css/signup.css">
+</head>
+
+<body>
+
+    <!-- Background Lines -->
+    <div class="background-lines"></div>
+
+    <!-- ===== SIGNUP SECTION ===== -->
+    <section class="signup-container">
+        <div class="signup-card">
+            <!-- Header -->
+            <div class="signup-header">
+                <img class="hero-icon" src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png" alt="Ninja">
+                <div class="signup-tag">&lt; CRIAR CONTA /&gt;</div>
+                <h1><span class="highlight">NINJAS</span></h1>
+            </div>
+
+            <!-- Form -->
+            <form class="signup-form" id="signupForm">
+                <!-- Username Field -->
+                <div class="form-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">⚔️</span>
+                        <input 
+                            type="text" 
+                            id="username" 
+                            name="username" 
+                            class="form-input" 
+                            placeholder="Username"
+                            minlength="3"
+                            maxlength="20"
+                            required
+                        >
+                        <div class="input-underline"></div>
+                    </div>
+                </div>
+
+                <!-- Email Field -->
+                <div class="form-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">📧</span>
+                        <input 
+                            type="email" 
+                            id="email" 
+                            name="email" 
+                            class="form-input" 
+                            placeholder="Email"
+                            required
+                        >
+                        <div class="input-underline"></div>
+                    </div>
+                </div>
+
+                <!-- Password Field -->
+                <div class="form-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔐</span>
+                        <input 
+                            type="password" 
+                            id="password" 
+                            name="password" 
+                            class="form-input" 
+                            placeholder="Password"
+                            minlength="6"
+                            required
+                        >
+                        <div class="input-underline"></div>
+                    </div>
+                </div>
+
+                <!-- Confirm Password Field -->
+                <div class="form-group">
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔑</span>
+                        <input 
+                            type="password" 
+                            id="confirmPassword" 
+                            name="confirmPassword" 
+                            class="form-input" 
+                            placeholder="Confirmar Password"
+                            minlength="6"
+                            required
+                        >
+                        <div class="input-underline"></div>
+                    </div>
+                </div>
+
+                <!-- Terms Checkbox -->
+                <div class="form-group checkbox-group">
+                    <label class="checkbox-label">
+                        <input 
+                            type="checkbox" 
+                            id="terms" 
+                            name="terms" 
+                            class="checkbox-input"
+                            required
+                        >
+                        <span class="checkbox-text">Concordo com os <a href="#" class="terms-link">Termos de Serviço</a></span>
+                    </label>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-signup">
+                    <span class="btn-text">Criar Conta</span>
+                    <span class="btn-icon">✓</span>
+                </button>
+
+            </form>
+
+            <!-- Footer -->
+            <div class="signup-footer">
+                <p class="footer-text">
+                    Já tens conta? <a href="./login.html" class="footer-link">Fazer Login</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Decorative Elements -->
+        <div class="decoration top-left"></div>
+        <div class="decoration bottom-right"></div>
+    </section>
+
+    <script src="./assets/js/signup.js"></script>
+
+</body>
+
+</html>

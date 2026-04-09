@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <title>⚡ Server Battle Arena — Web Ninjas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="./assets/css/arena.css">
+</head>
+
+<body>
+
+    <!-- Background Lines -->
+    <div class="background-lines"></div>
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="/index.html" class="nav-logo">
+                <img src="https://img.icons8.com/ios-filled/50/00ff9c/ninja-head.png" alt="Ninja Logo">
+                <div class="nav-logo-text">
+                    <span class="web">WEB</span> <span class="ninjas">NINJAS</span>
+                </div>
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/landing.html">Home</a></li>
+                <li><a href="/landing.html#about">Sobre</a></li>
+                <li><a href="/landing.html#team">Equipa</a></li>
+                <li><a href="/landing.html#stats">Estatísticas</a></li>
+                <li><a href="/login.html" class="active">🔐 Testar com Sessão</a></li>
+            </ul>
+            <div class="nav-hamburger" id="hamburger"
+                onclick="document.getElementById('navLinks').classList.toggle('open')">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero">
+        <img class="hero-icon" src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png" alt="Ninja">
+        <div class="hero-tag">⚡ SHADOW SERVER CONSOLE ⚡</div>
+        <h1>SERVER <span class="highlight">BATTLE</span> <span class="purple">ARENA</span></h1>
+        <p class="hero-sub">Teste o servidor visualmente. Sem telnet. Sem medo.<br>Domine cada método HTTP como um
+            verdadeiro ninja.</p>
+    </section>
+
+    <!-- ===== HTTP TEST PANEL ===== -->
+    <div class="section" id="tests">
+        <div class="section-label">// Painel de Testes HTTP</div>
+        <div class="section-title">Testar <span class="highlight">Métodos</span> HTTP</div>
+
+        <!-- Tab Navigation -->
+        <div class="tab-nav">
+            <button class="tab-btn active" data-tab="tab-get">
+                <span class="icon">⚡</span> GET
+            </button>
+            <button class="tab-btn" data-tab="tab-post">
+                <span class="icon">📡</span> POST
+            </button>
+            <button class="tab-btn" data-tab="tab-upload">
+                <span class="icon">📁</span> UPLOAD
+            </button>
+            <button class="tab-btn" data-tab="tab-delete">
+                <span class="icon">💀</span> DELETE
+            </button>
+        </div>
+
+        <!-- ==================== TAB: GET ==================== -->
+        <div class="tab-panel active" id="tab-get">
+            <div class="card">
+                <div class="card-header">
+                    <span class="method-badge badge-get">GET</span>
+                    <h3>Testar GET Request</h3>
+                </div>
+                <p class="card-description">
+                    Testar ficheiros estáticos, default file (index.html), directory listing e redirecionamento.
+                </p>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>URL / Path</label>
+                        <input type="text" class="form-input" id="get-url"
+                            placeholder="/ , /index.html , /uploads , /old-page">
+                    </div>
+                </div>
+                <button class="btn btn-neon" onclick="sendGet()">
+                    <span class="spinner"></span> Enviar GET ⚡
+                </button>
+                <div class="response-area" id="get-response">
+                    <div class="response-header">
+                        <div class="response-status">
+                            <span class="status-dot" id="get-dot"></span>
+                            <span class="status-code" id="get-status"></span>
+                        </div>
+                        <span class="response-time" id="get-time"></span>
+                    </div>
+                    <div class="response-tabs">
+                        <button class="resp-tab active" onclick="switchRespTab(this, 'get-body-content')">Body</button>
+                        <button class="resp-tab" onclick="switchRespTab(this, 'get-headers-content')">Headers</button>
+                    </div>
+                    <div class="response-body">
+                        <div class="resp-content active" id="get-body-content">
+                            <pre id="get-body"></pre>
+                        </div>
+                        <div class="resp-content" id="get-headers-content">
+                            <pre id="get-headers"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: POST ==================== -->
+        <div class="tab-panel" id="tab-post">
+            <div class="card">
+                <div class="card-header">
+                    <span class="method-badge badge-post">POST</span>
+                    <h3>Testar POST Request</h3>
+                </div>
+                <p class="card-description">
+                    Testar recebimento de body, limite máximo configurado (client_max_body_size) e resposta adequada.
+                </p>
+                <div class="form-group">
+                    <label>URL / Path</label>
+                    <input type="text" class="form-input" id="post-url" placeholder="/uploads">
+                </div>
+                <div class="form-group">
+                    <label>Content-Type</label>
+                    <input type="text" class="form-input" id="post-content-type"
+                        placeholder="application/x-www-form-urlencoded" value="application/x-www-form-urlencoded">
+                </div>
+                <div class="form-group">
+                    <label>Body</label>
+                    <textarea class="form-input" id="post-body" placeholder="nome=Ninja&rank=Shadow"></textarea>
+                </div>
+                <button class="btn btn-cyan" onclick="sendPost()">
+                    <span class="spinner"></span> Enviar POST 📡
+                </button>
+                <div class="response-area" id="post-response">
+                    <div class="response-header">
+                        <div class="response-status">
+                            <span class="status-dot" id="post-dot"></span>
+                            <span class="status-code" id="post-status"></span>
+                        </div>
+                        <span class="response-time" id="post-time"></span>
+                    </div>
+                    <div class="response-tabs">
+                        <button class="resp-tab active" onclick="switchRespTab(this, 'post-body-content')">Body</button>
+                        <button class="resp-tab" onclick="switchRespTab(this, 'post-headers-content')">Headers</button>
+                    </div>
+                    <div class="response-body">
+                        <div class="resp-content active" id="post-body-content">
+                            <pre id="post-body-resp"></pre>
+                        </div>
+                        <div class="resp-content" id="post-headers-content">
+                            <pre id="post-headers"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: UPLOAD ==================== -->
+        <div class="tab-panel" id="tab-upload">
+            <div class="card">
+                <div class="card-header">
+                    <span class="method-badge badge-upload">UPLOAD</span>
+                    <h3>Upload de Ficheiros</h3>
+                </div>
+                <p class="card-description">
+                    Testar upload de ficheiros para o servidor. Verifica pasta configurada, restrições e resposta.
+                </p>
+                <div class="form-group">
+                    <label>URL / Path de Upload</label>
+                    <input type="text" class="form-input" id="upload-url" placeholder="/uploads" value="/uploads">
+                </div>
+                <div class="form-group">
+                    <label>Ficheiro</label>
+                    <div class="file-upload-wrapper">
+                        <label class="file-upload-label">
+                            <input type="file" id="upload-file" onchange="updateFileName()">
+                            📂 Escolher Ficheiro
+                        </label>
+                    </div>
+                    <div class="file-name" id="upload-file-name">Nenhum ficheiro selecionado</div>
+                </div>
+                <button class="btn btn-purple" onclick="sendUpload()">
+                    <span class="spinner"></span> Upload 🚀
+                </button>
+                <div class="response-area" id="upload-response">
+                    <div class="response-header">
+                        <div class="response-status">
+                            <span class="status-dot" id="upload-dot"></span>
+                            <span class="status-code" id="upload-status"></span>
+                        </div>
+                        <span class="response-time" id="upload-time"></span>
+                    </div>
+                    <div class="response-tabs">
+                        <button class="resp-tab active"
+                            onclick="switchRespTab(this, 'upload-body-content')">Body</button>
+                        <button class="resp-tab"
+                            onclick="switchRespTab(this, 'upload-headers-content')">Headers</button>
+                    </div>
+                    <div class="response-body">
+                        <div class="resp-content active" id="upload-body-content">
+                            <pre id="upload-body"></pre>
+                        </div>
+                        <div class="resp-content" id="upload-headers-content">
+                            <pre id="upload-headers"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TAB: DELETE ==================== -->
+        <div class="tab-panel" id="tab-delete">
+            <div class="card">
+                <div class="card-header">
+                    <span class="method-badge badge-delete">DELETE</span>
+                    <h3>Testar DELETE Request</h3>
+                </div>
+                <p class="card-description">
+                    Testar remoção de ficheiros. Espera-se 200 OK, 204 No Content ou 404 se não existir.
+                </p>
+                <div class="form-group">
+                    <label>Path do Ficheiro</label>
+                    <input type="text" class="form-input" id="delete-url" placeholder="/uploads/ficheiro.txt">
+                </div>
+                <button class="btn btn-red" onclick="sendDelete()">
+                    <span class="spinner"></span> Executar DELETE 💀
+                </button>
+                <div class="response-area" id="delete-response">
+                    <div class="response-header">
+                        <div class="response-status">
+                            <span class="status-dot" id="delete-dot"></span>
+                            <span class="status-code" id="delete-status"></span>
+                        </div>
+                        <span class="response-time" id="delete-time"></span>
+                    </div>
+                    <div class="response-tabs">
+                        <button class="resp-tab active"
+                            onclick="switchRespTab(this, 'delete-body-content')">Body</button>
+                        <button class="resp-tab"
+                            onclick="switchRespTab(this, 'delete-headers-content')">Headers</button>
+                    </div>
+                    <div class="response-body">
+                        <div class="resp-content active" id="delete-body-content">
+                            <pre id="delete-body"></pre>
+                        </div>
+                        <div class="resp-content" id="delete-headers-content">
+                            <pre id="delete-headers"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===== ERROR SIMULATION ===== -->
+    <div class="section" id="errors">
+        <div class="section-label">// Simulação de Erros</div>
+        <div class="section-title">🚨 Forçar <span class="highlight">Error</span> Codes</div>
+
+        <div class="error-grid">
+            <div class="error-card e403" onclick="triggerError(403)">
+                <div class="error-icon">🥷</div>
+                <div class="error-code">403</div>
+                <div class="error-label">Forbidden</div>
+            </div>
+            <div class="error-card e404" onclick="triggerError(404)">
+                <div class="error-icon">⚔</div>
+                <div class="error-code">404</div>
+                <div class="error-label">Not Found</div>
+            </div>
+            <div class="error-card e405" onclick="triggerError(405)">
+                <div class="error-icon">🧨</div>
+                <div class="error-code">405</div>
+                <div class="error-label">Method Not Allowed</div>
+            </div>
+            <div class="error-card e500" onclick="triggerError(500)">
+                <div class="error-icon">💥</div>
+                <div class="error-code">500</div>
+                <div class="error-label">Internal Server Error</div>
+            </div>
+        </div>
+
+        <div class="response-area error-response-area" id="error-response">
+            <div class="response-header">
+                <div class="response-status">
+                    <span class="status-dot" id="error-dot"></span>
+                    <span class="status-code" id="error-status"></span>
+                </div>
+                <span class="response-time" id="error-time"></span>
+            </div>
+            <div class="response-tabs">
+                <button class="resp-tab active" onclick="switchRespTab(this, 'error-body-content')">Body</button>
+                <button class="resp-tab" onclick="switchRespTab(this, 'error-headers-content')">Headers</button>
+            </div>
+            <div class="response-body">
+                <div class="resp-content active" id="error-body-content">
+                    <pre id="error-body"></pre>
+                </div>
+                <div class="resp-content" id="error-headers-content">
+                    <pre id="error-headers"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===== FORMULARIO PYTHON + PHP ===== -->
+    <div class="section" id="form-demo">
+        <div class="section-label">// Integração Python ↔ PHP + SQLite</div>
+        <div class="section-title">📝 Formulário com <span class="highlight">Database</span></div>
+
+        <div class="card">
+            <div class="card-header">
+                <span class="method-badge badge-get">FORMULÁRIO</span>
+                <h3>Salva dados com Python → Lê com PHP</h3>
+            </div>
+            <p class="card-description">
+                Preencha o formulário abaixo. Python salva em SQLite. PHP lista os dados.
+            </p>
+
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                <!-- Form para salvar -->
+                <div>
+                    <div
+                        style="font-family: var(--font-mono); font-size: 11px; color: var(--dark-gray); margin-bottom: 10px; text-transform: uppercase;">
+                        Salvar com Python</div>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <input type="text" id="form-name" placeholder="Nome..."
+                            style="padding: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 6px; color: white; font-family: var(--font-body);" />
+                        <input type="email" id="form-email" placeholder="Email..."
+                            style="padding: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 6px; color: white; font-family: var(--font-body);" />
+                        <textarea id="form-message" placeholder="Mensagem..."
+                            style="padding: 8px; border: 1px solid rgba(255,255,255,0.1); background: rgba(255,255,255,0.03); border-radius: 6px; color: white; font-family: var(--font-body); resize: vertical; min-height: 100px;"></textarea>
+                        <button class="btn btn-neon" onclick="saveToDB()">💾 Salvar</button>
+                    </div>
+                </div>
+
+                <!-- Lista -->
+                <div>
+                    <div
+                        style="font-family: var(--font-mono); font-size: 11px; color: var(--dark-gray); margin-bottom: 10px; text-transform: uppercase;">
+                        Listar com PHP</div>
+                    <div id="form-list"
+                        style="background: rgba(0,0,0,0.3); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px; max-height: 380px; overflow-y: auto; font-family: var(--font-mono); font-size: 12px;">
+                        <span style="color: var(--dark-gray);">Nenhum dado ainda. Salve algo!</span>
+                    </div>
+                    <button class="btn btn-outline" onclick="loadFromDB()" style="margin-top: 10px; width: 100%;">🔄
+                        Atualizar</button>
+                </div>
+            </div>
+
+            <div class="response-area" id="form-response" style="display: none;">
+                <div class="response-header">
+                    <div class="response-status">
+                        <span class="status-dot" id="form-dot"></span>
+                        <span class="status-code" id="form-status"></span>
+                    </div>
+                    <span class="response-time" id="form-time"></span>
+                </div>
+                <div class="response-body">
+                    <pre id="form-json"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ===== SERVER STATS ===== -->
+    <div class="section" id="stats">
+        <div class="section-label">// Informações do Servidor</div>
+        <div class="section-title">📊 <span class="highlight">Server</span> Stats</div>
+
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-icon neon">🌐</div>
+                <div class="stat-info">
+                    <div class="stat-label">Host</div>
+                    <div class="stat-value">127.0.0.1</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon purple">🔌</div>
+                <div class="stat-info">
+                    <div class="stat-label">Porta Ativa</div>
+                    <div class="stat-value">8080</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon cyan">📦</div>
+                <div class="stat-info">
+                    <div class="stat-label">Max Body Size</div>
+                    <div class="stat-value">10 MB</div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-icon orange">📂</div>
+                <div class="stat-info">
+                    <div class="stat-label">Upload Max Size</div>
+                    <div class="stat-value">50 MB</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Routes Table -->
+        <div style="margin-top: 30px;">
+            <div class="section-label">// Rotas Configuradas</div>
+            <table class="routes-table">
+                <thead>
+                    <tr>
+                        <th>Rota</th>
+                        <th>Métodos</th>
+                        <th>Descrição</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>/</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Página principal (index.html)</td>
+                    </tr>
+                    <tr>
+                        <td>/uploads</td>
+                        <td>
+                            <span class="route-method get">GET</span>
+                            <span class="route-method post">POST</span>
+                            <span class="route-method delete">DELETE</span>
+                        </td>
+                        <td>Upload dir (autoindex on)</td>
+                    </tr>
+                    <tr>
+                        <td>/old-page</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Redireciona → 301 → /new-page</td>
+                    </tr>
+                    <tr>
+                        <td>/redirect-external</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Redireciona → 302 → google.com</td>
+                    </tr>
+                    <tr>
+                        <td>/errors/403.html</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Página de erro 403</td>
+                    </tr>
+                    <tr>
+                        <td>/errors/404.html</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Página de erro 404</td>
+                    </tr>
+                    <tr>
+                        <td>/errors/405.html</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Página de erro 405</td>
+                    </tr>
+                    <tr>
+                        <td>/errors/500.html</td>
+                        <td><span class="route-method get">GET</span></td>
+                        <td>Página de erro 500</td>
+                    </tr>
+                    <tr>
+                        <td>/cgi-bin/form_save.py</td>
+                        <td>
+                            <span class="route-method post">POST</span>
+                        </td>
+                        <td>Salva formulário na base SQLite (Python CGI)</td>
+                    </tr>
+                    <tr>
+                        <td>/cgi-bin/form_list.py</td>
+                        <td>
+                            <span class="route-method post">POST</span>
+                        </td>
+                        <td>Lista dados da base SQLite (PHP CGI)</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer">
+        <p>🥷 <span class="highlight">Web Ninjas</span> — Server Battle Arena — 42 Project © 2025</p>
+    </footer>
+
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer" id="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">WEB NINJAS</div>
+            <p>&copy; 2026 Web Ninjas &mdash; Built as part of the 42 curriculum.</p>
+            <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; epoll()</div>
+            <div class="footer-nav">
+                <a href="/index.html">Início</a>
+                <span>|</span>
+                <a href="/landing.html">Projeto</a>
+                <span>|</span>
+                <a href="/arena.html">Arena</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- ===== JAVASCRIPT ===== -->
+    <script src="./assets/js/arena.js"></script>
+
+
+</body>
+
+</html>

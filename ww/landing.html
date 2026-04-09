@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="pt">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Web Ninjas — Landing</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Fonts -->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <!-- link css -->
+    <link rel="stylesheet" href="./assets/css/landing.css">
+</head>
+
+<body>
+
+    <!-- Background Lines -->
+    <div class="background-lines"></div>
+
+    <!-- ===== NAVBAR ===== -->
+    <nav class="navbar">
+        <div class="navbar-inner">
+            <a href="/index.html" class="nav-logo">
+                <img src="https://img.icons8.com/ios-filled/50/00ff9c/ninja-head.png" alt="Ninja Logo">
+                <div class="nav-logo-text">
+                    <span class="web">WEB</span> <span class="ninjas">NINJAS</span>
+                </div>
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#hero">Home</a></li>
+                <li><a href="#about">Sobre</a></li>
+                <li><a href="#stats">Estatísticas</a></li>
+                <li><a href="#architecture">Arquitetura</a></li>
+                <li><a href="#team">Equipa</a></li>
+                <li><a href="/arena.html" class="nav-cta">⚡ Testar Servidor</a></li>
+                <li><a href="/login.html" class="nav-cta">🔐 Testar com Sessão</a></li>
+            </ul>
+            <div class="nav-hamburger" id="hamburger"
+                onclick="document.getElementById('navLinks').classList.toggle('open')">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ===== HERO ===== -->
+    <section class="hero" id="hero">
+        <div class="hero-content fade-in">
+            <img class="hero-icon" src="https://img.icons8.com/ios-filled/100/00ff9c/ninja-head.png" alt="Ninja">
+            <div class="hero-tag">&lt; WEB_NINJAS /&gt;</div>
+            <h1>Mastering <span class="highlight">HTTP</span><br>in Silence</h1>
+            <p>A high-performance non-blocking HTTP server built in C++98.<br>Engineered for precision. Deployed in
+                stealth.</p>
+            <div class="hero-buttons">
+                <a href="#about" class="btn btn-primary">Explorar Projeto</a>
+                <a href="/arena.html" class="btn btn-primary">⚡ Testar Servidor</a>
+                <a href="/login.html" class="btn btn-primary">🔐 Testar com Sessão</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ABOUT ===== -->
+    <section class="about" id="about">
+        <div class="section-inner fade-in">
+            <div class="section-label">// About</div>
+            <div class="section-title">O que é o <span class="highlight">Webserv</span>?</div>
+            <div class="about-grid">
+                <div class="about-text">
+                    <p>
+                        O Webserv é um servidor HTTP escrito inteiramente em <strong
+                            style="color:var(--white);">C++98</strong>, seguindo as normas do protocolo HTTP/1.1.
+                        Desenvolvido como projeto da 42, ele replica funcionalidades reais de servidores como o NGINX
+                        &mdash; mas construído do zero.
+                    </p>
+                    <p>
+                        Utiliza <strong style="color:var(--neon);">epoll()</strong> para multiplexação de I/O, garantindo
+                        que nenhuma conexão bloqueia o servidor. Suporte completo a métodos HTTP, configuração via
+                        ficheiro, e execução de scripts CGI.
+                    </p>
+                    <ul class="feature-list">
+                        <li>Non-blocking I/O com epoll()</li>
+                        <li>Suporte a GET, POST e DELETE</li>
+                        <li>Sistema CGI (PHP / Python)</li>
+                        <li>Múltiplos ports</li>
+                        <li>Ficheiro de configuração customizável</li>
+                        <li>Páginas de erro personalizadas</li>
+                    </ul>
+                </div>
+                <div class="about-diagram">
+                    <div class="diagram-flow">
+                        <div class="diagram-node">🌐 Browser</div>
+                        <div class="diagram-arrow">↓</div>
+                        <div class="diagram-node">🔌 Socket</div>
+                        <div class="diagram-arrow">↓</div>
+                        <div class="diagram-node">⚡ epoll()</div>
+                        <div class="diagram-arrow">↓</div>
+                        <div class="diagram-node">📝 Request Parser</div>
+                        <div class="diagram-arrow">↓</div>
+                        <div class="diagram-node">📄 HTTP Response</div>
+                        <div class="diagram-arrow">↓</div>
+                        <div class="diagram-node">📂 Static / CGI</div>
+                        <div class="diagram-arrow">↓</div>
+                        <div class="diagram-node">📤 Send Response</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== STATS ===== -->
+    <section class="stats" id="stats">
+        <div class="section-inner fade-in">
+            <div class="section-label">// Statistics</div>
+            <div class="section-title">Estatísticas <span class="highlight">Técnicas</span></div>
+            <div class="section-subtitle">Números que demonstram a engenharia por trás do servidor.</div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value">4,200+</div>
+                    <div class="stat-label">Lines of Code</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">3</div>
+                    <div class="stat-label">HTTP Methods</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">2</div>
+                    <div class="stat-label">Ports Listening</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">PHP/PY</div>
+                    <div class="stat-label">CGI Supported</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">epoll()</div>
+                    <div class="stat-label">I/O Model</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value">C++98</div>
+                    <div class="stat-label">Language Standard</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== ARCHITECTURE ===== -->
+    <section class="architecture" id="architecture">
+        <div class="section-inner fade-in">
+            <div class="section-label">// Architecture</div>
+            <div class="section-title">Internal <span class="highlight">Architecture</span></div>
+            <div class="section-subtitle">Fluxo de processamento de cada request no servidor.</div>
+            <div class="arch-flow">
+                <div class="arch-node">
+                    <div class="arch-node-icon">🖥️</div>
+                    <div class="arch-node-label">Client</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">🔌</div>
+                    <div class="arch-node-label">Socket</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">⚡</div>
+                    <div class="arch-node-label">epoll()</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">📋</div>
+                    <div class="arch-node-label">Parser</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">📄</div>
+                    <div class="arch-node-label">Response</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">📂</div>
+                    <div class="arch-node-label">Static / CGI</div>
+                </div>
+                <div class="arch-connector">→</div>
+                <div class="arch-node">
+                    <div class="arch-node-icon">📤</div>
+                    <div class="arch-node-label">Send Data</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== TEAM ===== -->
+    <section class="team" id="team">
+        <div class="section-inner fade-in">
+            <div class="section-label">// Team</div>
+            <div class="section-title">A <span class="highlight">Equipa</span></div>
+            <div class="section-subtitle">Os ninjas por trás da engenharia deste servidor.</div>
+            <div class="team-grid">
+                <div class="team-card">
+                    <div class="team-avatar">N1</div>
+                    <div class="team-name">MEMBRO 1</div>
+                    <div class="team-login">@nmatondo</div>
+                    <div class="team-role">
+                        <span>Networking</span>
+                        <span>Server Core</span>
+                        <span>epoll()</span>
+                    </div>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">N2</div>
+                    <div class="team-name">MEMBRO 2</div>
+                    <div class="team-login">@emalungo</div>
+                    <div class="team-role">
+                        <span>Parsing</span>
+                        <span>Config System</span>
+                        <span>Validation</span>
+                        <span>create index files</span>
+                    </div>
+                </div>
+                <div class="team-card">
+                    <div class="team-avatar">N3</div>
+                    <div class="team-name">MEMBRO 3</div>
+                    <div class="team-login">@ajacinto</div>
+                    <div class="team-role">
+                        <span>CGI</span>
+                        <span>HTTP Methods</span>
+                        <span>Error Handling</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ===== FOOTER ===== -->
+    <footer class="footer" id="footer">
+        <div class="footer-inner">
+            <div class="footer-brand">WEB NINJAS</div>
+            <p>&copy; 2026 Web Ninjas &mdash; Built as part of the 42 curriculum.</p>
+            <div class="footer-tags">C++98 &nbsp;|&nbsp; Non-blocking &nbsp;|&nbsp; HTTP/1.1 &nbsp;|&nbsp; poll()</div>
+            <div class="footer-nav">
+                <a href="/index.html">Início</a>
+                <span>|</span>
+                <a href="/landing.html">Projeto</a>
+                <span>|</span>
+                <a href="/arena.html">Arena</a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="./assets/js/landing.js"></script>
+
+</body>
+
+</html>
