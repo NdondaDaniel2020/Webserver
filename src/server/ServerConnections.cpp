@@ -127,8 +127,6 @@ void Server::closeClient(int fd)
 void Server::checkTimeout()
 {
     time_t now = time(NULL);
-    std::vector<int> to_close;
-    std::vector<int> cgi_timeout_vec;
 
     for (std::map<int, Client *>::iterator it = clients.begin();
          it != clients.end(); ++it)
@@ -144,8 +142,8 @@ void Server::checkTimeout()
             {
                 std::cout << "[TIMEOUT] CGI fd=" << client_fd
                           << " excedeu " << cgi_timeout << "s" << std::endl;
-                cgi_timeout_vec.push_back(client_fd);
-                continue;
+                client->cleanupCgiIfActive(this->epoll_fd);
+                client->sendTimeoutResponse();
             }
         }
 
@@ -160,22 +158,6 @@ void Server::checkTimeout()
                       << (now - client->getLastActivity())
                       << "s (limite: " << client_timeout << "s)" << std::endl;
             client->sendTimeoutResponse();
-            to_close.push_back(client_fd);
         }
     }
-
-    // CGI timeout — envia 504 antes de fechar
-    for (size_t i = 0; i < cgi_timeout_vec.size(); i++)
-    {
-        std::map<int, Client *>::iterator it = clients.find(cgi_timeout_vec[i]);
-        if (it == clients.end())
-            continue;
-        Client *client = it->second;
-
-        client->finishCgiAndGenerateResponse();
-        to_close.push_back(cgi_timeout_vec[i]);
-    }
-
-    for (size_t i = 0; i < to_close.size(); i++)
-        closeClient(to_close[i]);
 }
