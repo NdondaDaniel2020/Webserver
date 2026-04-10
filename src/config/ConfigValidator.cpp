@@ -61,21 +61,50 @@ namespace ConfigValidator
     {
         value = StringUtils::trim(value);
         size_t pos = value.find(' ');
+        
+        std::string num_red;
+        std::string str_red;
+        
         if (pos == std::string::npos)
-            return false;
-        std::string num_red = value.substr(0, pos);
-        std::string str_red = value.substr(pos + 1);
+        {
+            num_red = value;
+            str_red = "";
+        }
+        else
+        {
+            num_red = value.substr(0, pos);
+            str_red = value.substr(pos + 1);
+        }
+        
         for (size_t i = 0; i < num_red.size(); i++)
         {
             if (!isdigit(num_red[i]))
                 return false;
         }
-        if (str_red[0] != '/' && str_red[0] != 'h')
-            return false;
-        int num_redirect = atoi(num_red.c_str());
-        if (num_redirect < 300 || num_redirect > 308)
-            return false;
-        return true;
+        
+        int code = atoi(num_red.c_str());
+        
+        if (code >= 300 && code <= 308)
+        {
+            if (pos == std::string::npos)
+                return false;
+            if (str_red.empty() || (str_red[0] != '/' && str_red[0] != 'h'))
+                return false;
+            return true;
+        }
+        else if (code >= 400 && code <= 499)
+        {
+            if (pos != std::string::npos)
+                return false;
+            return true;
+        }
+        else if (code >= 500 && code <= 599)
+        {
+            if (pos != std::string::npos)
+                return false;
+            return true;
+        }
+        return false;
     }
 
     bool validatePath(const std::string &path)
@@ -248,9 +277,6 @@ namespace ConfigValidator
 
         if (server.root.empty())
             throw std::runtime_error("Missing required field: root");
-
-        // if (server.client_max_body_size <= 0)
-        //     throw std::runtime_error("Invalid client_max_body_size: must be greater than 0");
     }
 
     void validateLocationConfigDefault(const LocationConfig& location)
@@ -260,8 +286,16 @@ namespace ConfigValidator
 
         if (location.redirect_code != 0)
         {
-            if (location.redirect_url.empty())
-                throw std::runtime_error("Invalid location redirect: redirect_url is required");
+            if (location.redirect_code >= 300 && location.redirect_code <= 308)
+            {
+                if (location.redirect_url.empty())
+                    throw std::runtime_error("Invalid location redirect: redirect_url is required for 3xx status codes");
+            }
+            else if (location.redirect_code >= 400)
+            {
+                if (!location.redirect_url.empty())
+                    throw std::runtime_error("Invalid location redirect: redirect_url must be empty for 4xx/5xx status codes");
+            }
             return;
         }
 

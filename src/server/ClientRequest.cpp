@@ -205,7 +205,7 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
         return;
 
     parseHeaders();
-        
+
     if (request.getMethod() != "GET" && request.getMethod() != "POST" && request.getMethod() != "DELETE")
     {
         StatusCodes::http405MethodNotAllowed(this->send_buffer, request, request.getUri(), server_config);
@@ -218,6 +218,14 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
     if (!location)
     {
         StatusCodes::http404NotFound(this->send_buffer, request, request.getUri(), server_config);
+        this->send_offset = 0;
+        this->state = SENDING_RESPONSE;
+        return;
+    }
+
+    if (location && location->redirect_code > 0)
+    {
+        handleRedirect(this->send_buffer, location->redirect_code, location->redirect_url);
         this->send_offset = 0;
         this->state = SENDING_RESPONSE;
         return;

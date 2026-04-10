@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/03 10:05:33 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/05 00:19:51 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/10 12:02:38 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -58,6 +58,9 @@ void Response::buildHttpResponse(const HttpRequest &request)
 
     if (location && !location->root.empty())
         root = location->root;
+
+    if (location && location->redirect_code > 0)
+        return handleRedirect(this->response_str, location->redirect_code, location->redirect_url);
 
     std::string file_path = root + removeLocationInUri(uri, location);
     if (request.getMethod() == "GET")

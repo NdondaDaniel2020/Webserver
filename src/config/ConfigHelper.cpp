@@ -45,9 +45,20 @@ namespace ConfigHelper
 
     void parseRedirect(const std::string &value, int &code, std::string &url)
     {
-        std::string code_str;
-        Detail::extractTwoValues(value, code_str, url);
-        code = atoi(code_str.c_str());
+        std::string trimmed = StringUtils::trim(value);
+        size_t pos = trimmed.find(' ');
+        
+        if (pos == std::string::npos)
+        {
+            code = atoi(trimmed.c_str());
+            url = "";
+        }
+        else
+        {
+            std::string code_str = trimmed.substr(0, pos);
+            url = StringUtils::trim(trimmed.substr(pos + 1));
+            code = atoi(code_str.c_str());
+        }
     }
 
     void parseCgiTimeout(const std::string &value, time_t &cgi_timeout)

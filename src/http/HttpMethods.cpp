@@ -17,8 +17,6 @@ void Response::methodGet(const HttpRequest &request, const std::string &file_pat
     if (location && !location->cgi_handlers.empty())
         return StatusCodes::http502BadGateway(this->response_str, request, "Fail CGI", this->config);
 
-    if (location && location->redirect_code > 0)
-        return handleRedirect(this->response_str, location->redirect_code, location->redirect_url);
     if (isDirectory(_file_path))
     {
         std::vector<std::string> index_files = this->config.index_files;

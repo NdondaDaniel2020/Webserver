@@ -101,16 +101,60 @@ test: $(NAME)
 debug: CXXFLAGS += -DDEBUG -fsanitize=address -fsanitize=undefined
 debug: $(NAME)
 
+test-suite: $(NAME)
+	@echo "🧪 Running comprehensive test suite..."
+	@echo "Starting server on http://127.0.0.1:8080..."
+	@./$(NAME) conf/test.conf &
+	@SERVER_PID=$$!; \
+	sleep 2; \
+	if ./test/test_webserver.sh http://127.0.0.1:8080; then \
+		echo "✅ Test suite completed successfully!"; \
+		kill $$SERVER_PID 2>/dev/null || true; \
+		exit 0; \
+	else \
+		echo "❌ Test suite failed!"; \
+		kill $$SERVER_PID 2>/dev/null || true; \
+		exit 1; \
+	fi
+
+test-stress: $(NAME)
+	@echo "💪 Running stress test with Siege..."
+	@if ! command -v siege &> /dev/null; then \
+		echo "❌ Siege not found. Install with: brew install siege"; \
+		exit 1; \
+	fi
+	@echo "Starting server on http://127.0.0.1:8080..."
+	@./$(NAME) conf/test.conf &
+	@SERVER_PID=$$!; \
+	sleep 2; \
+	echo "Running 50 concurrent users for 10 seconds..."; \
+	siege -c50 -t10S -b http://127.0.0.1:8080/; \
+	kill $$SERVER_PID 2>/dev/null || true
+
+test-memory: $(NAME)
+	@echo "🔍 Running memory leak test with Valgrind..."
+	@echo "Starting server on http://127.0.0.1:8080..."
+	@valgrind --leak-check=full --track-fds=yes ./$(NAME) conf/test.conf &
+	@SERVER_PID=$$!; \
+	sleep 3; \
+	./test/test_webserver.sh http://127.0.0.1:8080; \
+	echo "Stopping server..."; \
+	kill $$SERVER_PID 2>/dev/null || true; \
+	sleep 1
+
 help:
 	@echo "📖 Available targets:"
-	@echo "  all      - Build the project"
-	@echo "  clean    - Remove object files"
-	@echo "  fclean   - Remove object files and executable"
-	@echo "  re       - Rebuild the project"
-	@echo "  run      - Build and run the server"
-	@echo "  valgrind - Run with Valgrind memory checker"
-	@echo "  test     - Run all tests"
-	@echo "  debug    - Build with debug flags and sanitizers"
-	@echo "  help     - Show this help message"
+	@echo "  all         - Build the project"
+	@echo "  clean       - Remove object files"
+	@echo "  fclean      - Remove object files and executable"
+	@echo "  re          - Rebuild the project"
+	@echo "  run         - Build and run the server with default.conf"
+	@echo "  valgrind    - Run with Valgrind memory checker"
+	@echo "  test        - Run basic tests"
+	@echo "  test-suite  - Run comprehensive test suite (automated)"
+	@echo "  test-stress - Run stress test with Siege (50 concurrent users)"
+	@echo "  test-memory - Run test suite under Valgrind (memory leaks)"
+	@echo "  debug       - Build with debug flags and sanitizers"
+	@echo "  help        - Show this help message"
 
-.PHONY: all clean fclean re run valgrind test debug help
+.PHONY: all clean fclean re run valgrind test test-suite test-stress test-memory debug help
