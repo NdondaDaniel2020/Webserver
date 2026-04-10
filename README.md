@@ -100,9 +100,7 @@ webserv/
 ├── README.md
 ├── config/
 │   ├── default.conf
-│   ├── index.conf
 │   ├── mudefault.conf
-│   ├── robust.conf
 │   └── Youpi.conf
 ├── include/
 │   └── [arquivos .hpp]
