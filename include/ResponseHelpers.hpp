@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/26 10:00:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/07 08:07:37 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/10 12:23:06 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -18,6 +18,7 @@ const LocationConfig *findMatchingLocation(const ServerConfig &config, const std
 bool validateAllowedMethod(const ServerConfig &config, const HttpRequest &request);
 std::string removeLocationInUri(const std::string &uri, const LocationConfig *location);
 std::string getUploadDir(const ServerConfig &config, const HttpRequest &request);
-void handleRedirect(std::string &response_str, int code, const std::string &url);
+void handleRedirect(std::string &response_str, const LocationConfig *location,
+                    const HttpRequest &request, const ServerConfig &config);
 
 #endif

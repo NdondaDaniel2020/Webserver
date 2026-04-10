@@ -225,7 +225,7 @@ void Client::processHeaderRequest(const ServerConfig& server_config)
 
     if (location && location->redirect_code > 0)
     {
-        handleRedirect(this->send_buffer, location->redirect_code, location->redirect_url);
+        handleRedirect(this->send_buffer, location, request, server_config);
         this->send_offset = 0;
         this->state = SENDING_RESPONSE;
         return;

@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/28 11:30:00 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/10 12:07:58 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/10 12:27:12 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -297,7 +297,6 @@ void StatusCodes::http403Forbidden(std::string& response_str, const HttpRequest&
     std::string error_page_path = StatusCodes::findErrorPage(config.error_pages, "403");
     std::string content;
 
-    std::cout << "\n\n[403] Página de erro personalizada: " << (error_page_path.empty() ? "Nenhuma" : error_page_path) << std::endl << std::endl;
     if (!error_page_path.empty())
     {
         std::string error_page_full = config.root + error_page_path;

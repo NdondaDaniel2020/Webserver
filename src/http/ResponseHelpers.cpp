@@ -91,68 +91,68 @@ std::string getUploadDir(const ServerConfig &config, const HttpRequest &request)
     return upload_dir;
 }
 
-void handleRedirect(std::string &response_str, int code, const std::string &url)
+void handleRedirect(std::string &response_str, const LocationConfig *location, const HttpRequest &request, const ServerConfig &config)
 {
-    if (url.empty())
+    if (location->redirect_url.empty())
     {
-        if (code == 400)
-            return StatusCodes::http400BadRequest(response_str, "Bad Request", ServerConfig(), HttpRequest());
-        else if (code == 401)
-            return StatusCodes::http401Unauthorized(response_str, HttpRequest(), "Unauthorized", ServerConfig());
-        else if (code == 403)
-            return StatusCodes::http403Forbidden(response_str, HttpRequest(), "", ServerConfig());
-        else if (code == 404)
-            return StatusCodes::http404NotFound(response_str, HttpRequest(), "", ServerConfig());
-        else if (code == 405)
-            return StatusCodes::http405MethodNotAllowed(response_str, HttpRequest(), "", ServerConfig());
-        else if (code == 408)
-            return StatusCodes::http408RequestTimeout(response_str, ServerConfig(), HttpRequest());
-        else if (code == 409)
-            return StatusCodes::http409Conflict(response_str, HttpRequest(), "Conflict", ServerConfig());
-        else if (code == 411)
-            return StatusCodes::http411LengthRequired(response_str, ServerConfig(), HttpRequest());
-        else if (code == 413)
-            return StatusCodes::http413PayloadTooLarge(response_str, ServerConfig(), HttpRequest());
-        else if (code == 414)
-            return StatusCodes::http414UriTooLong(response_str, ServerConfig(), HttpRequest());
-        else if (code == 415)
-            return StatusCodes::http415UnsupportedMediaType(response_str, HttpRequest(), ServerConfig());
-        else if (code == 429)
-            return StatusCodes::http429TooManyRequests(response_str, HttpRequest(), ServerConfig());
-        else if (code == 500)
-            return StatusCodes::http500InternalServerError(response_str, HttpRequest(), "Internal Server Error", ServerConfig());
-        else if (code == 501)
-            return StatusCodes::http501NotImplemented(response_str, HttpRequest(), "Not Implemented", ServerConfig());
-        else if (code == 502)
-            return StatusCodes::http502BadGateway(response_str, HttpRequest(), "Bad Gateway", ServerConfig());
-        else if (code == 503)
-            return StatusCodes::http503ServiceUnavailable(response_str, HttpRequest(), ServerConfig());
-        else if (code == 504)
-            return StatusCodes::http504GatewayTimeout(response_str, HttpRequest(), ServerConfig());
-        else if (code == 505)
-            return StatusCodes::http505VersionNotSupported(response_str, ServerConfig(), HttpRequest());        
+        if (location->redirect_code == 400)
+            return StatusCodes::http400BadRequest(response_str, "Bad Request", config, request);
+        else if (location->redirect_code == 401)
+            return StatusCodes::http401Unauthorized(response_str, request, "Unauthorized", config);
+        else if (location->redirect_code == 403)
+            return StatusCodes::http403Forbidden(response_str, request, "", config);
+        else if (location->redirect_code == 404)
+            return StatusCodes::http404NotFound(response_str, request, "", config);
+        else if (location->redirect_code == 405)
+            return StatusCodes::http405MethodNotAllowed(response_str, request, "", config);
+        else if (location->redirect_code == 408)
+            return StatusCodes::http408RequestTimeout(response_str, config, request);
+        else if (location->redirect_code == 409)
+            return StatusCodes::http409Conflict(response_str, request, "Conflict", config);
+        else if (location->redirect_code == 411)
+            return StatusCodes::http411LengthRequired(response_str, config, request);
+        else if (location->redirect_code == 413)
+            return StatusCodes::http413PayloadTooLarge(response_str, config, request);
+        else if (location->redirect_code == 414)
+            return StatusCodes::http414UriTooLong(response_str, config, request);
+        else if (location->redirect_code == 415)
+            return StatusCodes::http415UnsupportedMediaType(response_str, request, config);
+        else if (location->redirect_code == 429)
+            return StatusCodes::http429TooManyRequests(response_str, request, config);
+        else if (location->redirect_code == 500)
+            return StatusCodes::http500InternalServerError(response_str, request, "Internal Server Error", config);
+        else if (location->redirect_code == 501)
+            return StatusCodes::http501NotImplemented(response_str, request, "Not Implemented", config);
+        else if (location->redirect_code == 502)
+            return StatusCodes::http502BadGateway(response_str, request, "Bad Gateway", config);
+        else if (location->redirect_code == 503)
+            return StatusCodes::http503ServiceUnavailable(response_str, request, config);
+        else if (location->redirect_code == 504)
+            return StatusCodes::http504GatewayTimeout(response_str, request, config);
+        else if (location->redirect_code == 505)
+            return StatusCodes::http505VersionNotSupported(response_str, config, request);        
     }
     else
     {
         std::ostringstream oss;
-        oss << "HTTP/1.1 " << code;
+        oss << "HTTP/1.1 " << location->redirect_code;
 
-        if (code == 300)
+        if (location->redirect_code == 300)
             oss << " Multiple Choices\r\n";
-        else if (code == 301)
+        else if (location->redirect_code == 301)
             oss << " Moved Permanently\r\n";
-        else if (code == 302)
+        else if (location->redirect_code == 302)
             oss << " Found\r\n";
-        else if (code == 303)
+        else if (location->redirect_code == 303)
             oss << " See Other\r\n";
-        else if (code == 307)
+        else if (location->redirect_code == 307)
             oss << " Temporary Redirect\r\n";
-        else if (code == 308)
+        else if (location->redirect_code == 308)
             oss << " Permanent Redirect\r\n";
         else
             oss << " Redirect\r\n";
 
-        oss << "Location: " << url << "\r\n";
+        oss << "Location: " << location->redirect_url << "\r\n";
         oss << "Content-Length: 0\r\n";
         oss << "Connection: close\r\n\r\n";
         response_str = oss.str();
