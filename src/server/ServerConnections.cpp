@@ -137,8 +137,7 @@ void Server::checkTimeout()
         if (client->isCgiActive())
         {
             time_t cgi_timeout = client->getCgiTimeout();
-
-            if (now - client->getCgiStartTime() > cgi_timeout)
+            if (cgi_timeout > 0 && now - client->getCgiStartTime() > cgi_timeout)
             {
                 std::cout << "[TIMEOUT] CGI fd=" << client_fd
                           << " excedeu " << cgi_timeout << "s" << std::endl;
@@ -150,8 +149,7 @@ void Server::checkTimeout()
         time_t client_timeout = client->getTimeout();
         if (client_timeout == 0)
             client_timeout = TIMEOUT_SECONDS;
-
-        if (now - client->getLastActivity() > client_timeout)
+        if (client_timeout > 0 && now - client->getLastActivity() > client_timeout)
         {
             std::cout << "[TIMEOUT] Cliente fd=" << client_fd
                       << " inactivo por "
