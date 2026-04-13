@@ -1,4 +1,5 @@
 # include "ResponseHelpers.hpp"
+# include "FileUtils.hpp"
 
 const LocationConfig *findMatchingLocation(const ServerConfig &config, const std::string &uri)
 {
@@ -25,8 +26,25 @@ const LocationConfig *findMatchingLocation(const ServerConfig &config, const std
         {
             best_match = &config.locations[i];
             best_match_length = location_path.size();
+            std::cout << "New best match found: " << best_match->path << std::endl;
         }
     }
+
+    if (!best_match)
+        return NULL;
+    std::string request_path = uri;
+    if (best_match->path.size() <= request_path.size() && 
+        request_path.substr(0, best_match->path.size()) == best_match->path)
+        request_path = request_path.substr(best_match->path.size());    
+    if (request_path.empty())
+        request_path = "/";
+    size_t last_slash = request_path.find_last_of('/');
+    size_t last_dot_in_path = request_path.find_last_of('.');
+    if (last_dot_in_path != std::string::npos && last_dot_in_path > last_slash)
+        request_path = request_path.substr(0, last_slash + 1);
+    std::string full_path = best_match->root + request_path;
+    if (!isDirectory(full_path))
+        return NULL;
     return best_match;
 }
 
