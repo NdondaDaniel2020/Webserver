@@ -35,10 +35,13 @@ void Server::handleClientData(int fd)
             {
                 int out_fd = client->getCgiOutFd();
                 int in_fd = client->getCgiInFd();
+                int err_fd = client->getCgiErrFd();
                 if (out_fd >= 0)
                     cgi_fd_map[out_fd] = client;
                 if (in_fd >= 0)
                     cgi_fd_map[in_fd] = client;
+                if (err_fd >= 0)
+                    cgi_fd_map[err_fd] = client;
             }
         }
     }

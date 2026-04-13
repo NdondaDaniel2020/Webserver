@@ -231,7 +231,7 @@ void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
 
     Client::CgiState& cgi_state = c->getCgiState();
 
-    bool is_stdin = (pipe_fd == cgi_state.pipe_in[1]);
+    bool is_stdin  = (pipe_fd == cgi_state.pipe_in[1]);
     bool is_stdout = (pipe_fd == cgi_state.pipe_out[0]);
     bool is_stderr = (pipe_fd == cgi_state.pipe_error[0]);
 
@@ -247,16 +247,31 @@ void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
         std::cout << "[EPOLLHUP] CGI pipe closed for client fd=" << c->getFd() << std::endl;
 
         if (!c->isCgiActive())
+            return;
+
+        if (cgi_state.finished)
+            return;
+
+        if (is_stdin && cgi_state.pipe_in[1] >= 0)
         {
-            std::cout << "[EPOLLHUP]=-" << c->getFd() << std::endl;
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi_state.pipe_in[1], NULL);
+            cgi_fd_map.erase(cgi_state.pipe_in[1]);
+            close(cgi_state.pipe_in[1]);
+            cgi_state.pipe_in[1] = -1;
             return;
         }
 
-        if (cgi_state.finished)
+        if (is_stderr && cgi_state.pipe_error[0] >= 0)
         {
-            std::cout << "[DEBUG] CGI already finished, ignoring duplicate EPOLLHUP event" << std::endl;
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi_state.pipe_error[0], NULL);
+            cgi_fd_map.erase(cgi_state.pipe_error[0]);
+            close(cgi_state.pipe_error[0]);
+            cgi_state.pipe_error[0] = -1;
             return;
         }
+
+        if (!is_stdout)
+            return;
 
         if (cgi_state.pipe_out[0] >= 0)
         {
@@ -282,8 +297,10 @@ void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
             std::cout << "[CGI] Processo ainda rodando, finalizando com dados parciais" << std::endl;
         else if (result < 0)
             std::cerr << "[CGI] waitpid error: " << strerror(errno) << std::endl;
+
         cgi_state.finished = true;
         c->finishCgiAndGenerateResponse();
+
         if (c->getState() == Client::SENDING_RESPONSE && c->hasDataToSend())
         {
             int result = c->sendData();
@@ -295,9 +312,7 @@ void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
                     closeClient(c->getFd());
             }
             else if (result == -1)
-            {
                 closeClient(c->getFd());
-            }
         }
     }
 }

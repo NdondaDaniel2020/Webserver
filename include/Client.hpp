@@ -98,6 +98,7 @@ public:
 
     // Getters básicos
     int                 getFd() const;
+    int                 getCgiErrFd() const;
     int                 getCgiOutFd() const;
     int                 getCgiInFd() const;
     State               getState() const;

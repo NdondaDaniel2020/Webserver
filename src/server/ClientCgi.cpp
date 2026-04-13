@@ -506,6 +506,14 @@ void Client::handleCgiStdoutReadable(int epoll_fd, std::map<int, Client *> &cgi_
             close(cgi.pipe_out[0]);
             cgi.pipe_out[0] = -1;
         }
+        if (cgi.pipe_error[0] >= 0)
+        {
+            epoll_ctl(epoll_fd, EPOLL_CTL_DEL, cgi.pipe_error[0], NULL);
+            cgi_fd_map.erase(cgi.pipe_error[0]);
+            close(cgi.pipe_error[0]);
+            cgi.pipe_error[0] = -1;
+        }
+        cgi.finished = true;
         finishCgiAndGenerateResponse();
         return;
     }

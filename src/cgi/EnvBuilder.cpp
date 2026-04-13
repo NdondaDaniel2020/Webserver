@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/03/05 12:17:35 by ajacinto          #+#    #+#             */
-/*   Updated: 2026/03/20 14:00:38 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/13 10:14:29 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -30,9 +30,6 @@ std::vector<std::string> build(const HttpRequest& request,
     // location might not be used in the simple implementation but kept for
     // future flexibility (e.g. root override, custom vars)
     std::vector<std::string> env;
-
-     std::cerr << "[ENV] query='" << request.getQuery() << "'\n";
-    std::cerr << "[ENV] path='"  << request.getPath()  << "'\n";
 
     // standard CGI variables
     env.push_back("REDIRECT_STATUS=200");

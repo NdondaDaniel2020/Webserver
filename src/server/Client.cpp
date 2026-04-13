@@ -6,7 +6,7 @@
 /*   By: nmatondo <marvin@42.fr>                    +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2026/02/19 11:33:45 by nmatondo          #+#    #+#             */
-/*   Updated: 2026/04/09 14:25:20 by nmatondo         ###   ########.fr       */
+/*   Updated: 2026/04/13 09:55:52 by nmatondo         ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -132,6 +132,11 @@ int Client::getCgiOutFd() const
 int Client::getCgiInFd() const
 {
     return cgi.pipe_in[1];
+}
+
+int Client::getCgiErrFd() const
+{
+    return cgi.pipe_error[0];
 }
 
 Client::State Client::getState() const

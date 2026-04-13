@@ -103,10 +103,12 @@ void Server::closeClient(int fd)
 
     int cgi_out = -1;
     int cgi_in = -1;
+    int cgi_err = -1;
     if (client->isCgiActive())
     {
         cgi_out = client->getCgiOutFd();
         cgi_in = client->getCgiInFd();
+        cgi_err = client->getCgiErrFd();
     }
 
     client->cleanupCgiIfActive(this->epoll_fd);
@@ -116,6 +118,8 @@ void Server::closeClient(int fd)
         cgi_fd_map.erase(cgi_out);
     if (cgi_in >= 0)
         cgi_fd_map.erase(cgi_in);
+    if (cgi_err >= 0)
+        cgi_fd_map.erase(cgi_err);
 
     this->clients.erase(it);
     close(fd);
