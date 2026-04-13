@@ -231,31 +231,32 @@ void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
 
     Client::CgiState& cgi_state = c->getCgiState();
 
-    // Determine which pipe this fd belongs to
     bool is_stdin = (pipe_fd == cgi_state.pipe_in[1]);
     bool is_stdout = (pipe_fd == cgi_state.pipe_out[0]);
     bool is_stderr = (pipe_fd == cgi_state.pipe_error[0]);
 
     if (is_stdout && (events_mask & (EPOLLIN | EPOLLERR | EPOLLHUP)))
-    {
         c->handleCgiStdoutReadable(epoll_fd, cgi_fd_map);
-    }
     else if (is_stderr && (events_mask & (EPOLLIN | EPOLLERR | EPOLLHUP)))
-    {
         c->handleCgiStderrReadable(epoll_fd, cgi_fd_map);
-    }
     else if (is_stdin && (events_mask & EPOLLOUT))
-    {
         c->handleCgiStdinWritable(epoll_fd);
-    }
 
-    // Verificar se CGI terminou via EPOLLHUP
     if (events_mask & EPOLLHUP)
     {
         std::cout << "[EPOLLHUP] CGI pipe closed for client fd=" << c->getFd() << std::endl;
 
         if (!c->isCgiActive())
+        {
+            std::cout << "[EPOLLHUP]=-" << c->getFd() << std::endl;
             return;
+        }
+
+        if (cgi_state.finished)
+        {
+            std::cout << "[DEBUG] CGI already finished, ignoring duplicate EPOLLHUP event" << std::endl;
+            return;
+        }
 
         if (cgi_state.pipe_out[0] >= 0)
         {
@@ -276,17 +277,12 @@ void Server::handleCgiPipeEvent(Client *c, int pipe_fd, int events_mask)
         int status = 0;
         pid_t result = waitpid(cgi_state.pid, &status, WNOHANG);
         if (result == cgi_state.pid)
-        {
             std::cout << "[CGI] Processo terminou (status=" << WEXITSTATUS(status) << ")" << std::endl;
-        }
         else if (result == 0)
-        {
             std::cout << "[CGI] Processo ainda rodando, finalizando com dados parciais" << std::endl;
-        }
         else if (result < 0)
-        {
             std::cerr << "[CGI] waitpid error: " << strerror(errno) << std::endl;
-        }
+        cgi_state.finished = true;
         c->finishCgiAndGenerateResponse();
         if (c->getState() == Client::SENDING_RESPONSE && c->hasDataToSend())
         {
