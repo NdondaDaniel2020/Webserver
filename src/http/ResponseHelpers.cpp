@@ -26,7 +26,6 @@ const LocationConfig *findMatchingLocation(const ServerConfig &config, const std
         {
             best_match = &config.locations[i];
             best_match_length = location_path.size();
-            std::cout << "New best match found: " << best_match->path << std::endl;
         }
     }
 
@@ -42,8 +41,15 @@ const LocationConfig *findMatchingLocation(const ServerConfig &config, const std
     size_t last_dot_in_path = request_path.find_last_of('.');
     if (last_dot_in_path != std::string::npos && last_dot_in_path > last_slash)
         request_path = request_path.substr(0, last_slash + 1);
-    std::string full_path = best_match->root + request_path;
-    if (!isDirectory(full_path))
+    std::string root = best_match->root;
+    if (root.empty())
+    {
+        if (request_path[0] != '/')
+            root = root + '/';
+        root = config.root;
+    }
+    std::string full_path = root + "/" + request_path;
+    if (!isDirectory(full_path) && !fileExists(full_path))
         return NULL;
     return best_match;
 }

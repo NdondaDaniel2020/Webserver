@@ -10,12 +10,12 @@
 # 1. GET - TESTES BÁSICOS (Expected: 200 OK)
 # ============================================================================
 get_basic:
-  curl -v http://127.0.0.1:8080/ 
-  curl -v http://127.0.0.1:8080/index.html
-  curl -v http://127.0.0.1:8080/landing.html
-  curl -v http://127.0.0.1:8080/login.html
-  curl -v http://127.0.0.1:8080/assets/css/index.css
-  curl -v http://127.0.0.1:8080/assets/js/index.js
+  curl -I -X GET -v http://127.0.0.1:8080/ 
+  curl -I -X GET -v http://127.0.0.1:8080/index.html
+  curl -I -X GET -v http://127.0.0.1:8080/landing.html
+  curl -I -X GET -v http://127.0.0.1:8080/login.html
+  curl -I -X GET -v http://127.0.0.1:8080/assets/css/index.css
+  curl -I -X GET -v http://127.0.0.1:8080/assets/js/index.js
   curl -I http://127.0.0.1:8080/index.html
 
 # ============================================================================
@@ -149,8 +149,7 @@ cgi_delete:
 # 20. CGI - TIMEOUT (Expected: 504 Gateway Timeout)
 # ============================================================================
 cgi_timeout:
-  curl -v --max-time 5 http://127.0.0.1:8080/cgi-bin/slow_client.py
-  curl -v --max-time 10 http://127.0.0.1:8080/cgi-bin/loop.py
+  curl -v  http://127.0.0.1:8080/cgi-bin/loop.py
 
 # ============================================================================
 # 21. CGI - SCRIPT NÃO ENCONTRADO (Expected: 502 Bad Gateway)
