@@ -1,0 +1,100 @@
+{
+  "id": "webserver",
+  "name": "Webserver (Web Ninjas)",
+  "tagline": {
+    "pt": "Servidor HTTP/1.1 de Alta Performance com I/O Não-Bloqueante (epoll), Execução de CGI, Uploads Multipart e Virtual Hosts em C++98",
+    "en": "High-Performance Non-Blocking HTTP/1.1 Web Server with I/O Multiplexing (epoll), CGI Execution, Multipart Uploads, and Virtual Hosts in C++98"
+  },
+  "category": "backend",
+  "featured": true,
+  "architecture_type": "Non-Blocking Event-Driven HTTP/1.1 Web Server with I/O Multiplexing (epoll) in C++98",
+  "about": {
+    "pt": "O Webserver (Web Ninjas) é um servidor web HTTP/1.1 de alto desempenho implementado em C++98, desenvolvido em conformidade com as RFCs 2616 e 7230-7235. Utiliza uma arquitetura orientada a eventos totalmente não-bloqueante baseada em epoll (Linux), capaz de lidar com milhares de conexões simultâneas com baixo consumo de memória e latência mínima. O servidor inclui parser robusto de configurações no estilo Nginx (com múltiplos servidores virtuais, rotas, limites de cliente e páginas de erro customizadas), suporte integral aos métodos GET, POST e DELETE, streaming de upload multipart/form-data e chunked transfer encoding, listagem automática de diretórios (autoindex) e uma pipeline completa para execução assíncrona de scripts CGI (Python e PHP) via pipes não-bloqueantes com isolamento de processos.",
+    "en": "Webserver (Web Ninjas) is a high-performance HTTP/1.1 web server implemented in C++98, strictly complying with RFCs 2616 and 7230-7235. Built on a fully non-blocking, event-driven architecture powered by Linux epoll, it handles thousands of concurrent connections with minimal memory footprint and ultra-low latency. The server features a robust Nginx-style configuration parser (supporting multiple virtual hosts, location blocks, client body limits, and custom error pages), full HTTP method support (GET, POST, DELETE), multipart/form-data upload streaming and chunked transfer encoding, automatic directory indexing (autoindex), and a complete asynchronous CGI pipeline (Python and PHP) utilizing non-blocking pipes with process isolation."
+  },
+  "highlights": [
+    "Arquitetura orientada a eventos com I/O multiplexing via epoll() no Linux para alta concorrência",
+    "Parser e manipulador de protocolo HTTP/1.1 em C++98 (RFC 7230-7235) com Keep-Alive e conexões persistentes",
+    "Motor de roteamento e configuração estilo Nginx com Virtual Hosts, location blocks, redirecionamentos (301/302/307) e páginas de erro customizadas",
+    "Pipeline de execução CGI assíncrona via pipes não-bloqueantes para Python e PHP com isolamento de processos e timeout configurável",
+    "Suporte a upload de arquivos em streaming com multipart/form-data e Transfer-Encoding: chunked sem bloqueio do servidor",
+    "Serviço de arquivos estáticos de alta performance com resolução automática de MIME types e geração de autoindex HTML",
+    "Portal Web interativo ('Web Ninjas') com autenticação baseada em cookies de sessão, formulários SQLite e console Server Battle Arena",
+    "Validação estrita de limites de memória (client_max_body_size) e proteção contra buffer overflows e memory leaks"
+  ],
+  "technologies": [
+    "C++98",
+    "HTTP/1.1",
+    "epoll",
+    "POSIX Sockets",
+    "CGI (RFC 3875)",
+    "Python",
+    "PHP",
+    "SQLite",
+    "Nginx-style Config",
+    "Linux",
+    "Makefile"
+  ],
+  "media": {
+    "cover": "cover.webp",
+    "gallery": [
+      {
+        "type": "video",
+        "src": "gallery/demo.mp4",
+        "caption": "Demonstração Completa do Webserver: Conexões Concorrentes, CGI, Uploads e Portal Ninja"
+      },
+      {
+        "type": "image",
+        "src": "gallery/01-landing-hero.webp",
+        "caption": "Landing Page 'Web Ninjas': Apresentação Moderna do Servidor HTTP/1.1 C++98"
+      },
+      {
+        "type": "image",
+        "src": "gallery/02-dashboard-tester.webp",
+        "caption": "Dashboard de Gerenciamento com Testador Interativo de Métodos HTTP (GET, POST, DELETE)"
+      },
+      {
+        "type": "image",
+        "src": "gallery/03-dashboard-database.webp",
+        "caption": "Painel de Dados e Integração com SQLite via Scripts CGI e Cookies de Sessão"
+      },
+      {
+        "type": "image",
+        "src": "gallery/04-battle-arena.webp",
+        "caption": "Server Battle Arena: Console Visual para Validação de Rotas e Métodos em Tempo Real"
+      },
+      {
+        "type": "image",
+        "src": "gallery/05-auth-login.webp",
+        "caption": "Portal de Autenticação com Login Seguro e Gestão de Sessão via Cookies HTTP"
+      },
+      {
+        "type": "image",
+        "src": "gallery/06-auth-signup.webp",
+        "caption": "Registro de Utilizadores com Hashing Seguro e Validação de Formulários via CGI"
+      },
+      {
+        "type": "image",
+        "src": "gallery/07-server-logs-ide.webp",
+        "caption": "Monitorização em Tempo Real no Terminal com Logs Detalhados de Conexões e Requisições epoll"
+      },
+      {
+        "type": "image",
+        "src": "gallery/08-config-routing.webp",
+        "caption": "Arquivo de Configuração Estilo Nginx com Servidores Virtuais, Rotas e Handlers CGI"
+      }
+    ],
+    "videos": [
+      {
+        "id": "demo-webserver",
+        "file": "01-demo-webserver.mp4",
+        "title": "Demonstração Completa do Webserver (C++98 / HTTP/1.1)",
+        "description": "Showcase completo do servidor HTTP/1.1: inicialização de múltiplos virtual hosts com epoll, navegação na interface Web Ninjas, testes de métodos GET/POST/DELETE na Battle Arena, fluxo de autenticação com cookies de sessão e persistência em banco de dados SQLite via CGI.",
+        "category": "backend",
+        "duration": "208s",
+        "size_mb": 5.02,
+        "src": "videos/01-demo-webserver.mp4"
+      }
+    ]
+  }
+}

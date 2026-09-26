@@ -60,3 +60,5 @@ webserv
 
 # End of https://www.toptal.com/developers/gitignore/api/vim,visualstudiocode
 
+# Portfolio - capturas brutas nao otimizadas
+.portfolio/raw-captures/
