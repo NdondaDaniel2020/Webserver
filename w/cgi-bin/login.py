@@ -11,8 +11,11 @@ import json
 import hashlib
 import secrets
 import http.cookies
+import warnings
 from urllib.parse import parse_qs
 from datetime import datetime, timedelta
+
+warnings.filterwarnings("ignore")
 
 DB_PATH = "/tmp/users.db"
 SESSIONS_PATH = "/tmp/sessions.db"
@@ -61,7 +64,7 @@ def verify_password(password, hash_stored):
 def create_session(user_id, username):
     """Cria nova sessão e retorna token"""
     session_token = secrets.token_hex(32)
-    expires_at = datetime.utcnow() + timedelta(days=7)
+    expires_at = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d %H:%M:%S")
     
     try:
         conn = sqlite3.connect(SESSIONS_PATH)
